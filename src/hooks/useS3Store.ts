@@ -1,0 +1,78 @@
+
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+import { S3Credentials, S3Bucket, S3Object } from '../types/s3';
+
+interface S3Store {
+  isAuthenticated: boolean;
+  credentials: S3Credentials | null;
+  currentBucket: string | null;
+  currentPath: string;
+  buckets: S3Bucket[];
+  objects: S3Object[];
+  loading: boolean;
+  error: string | null;
+  
+  // Actions
+  login: (credentials: S3Credentials) => void;
+  logout: () => void;
+  setCurrentBucket: (bucket: string) => void;
+  setCurrentPath: (path: string) => void;
+  setBuckets: (buckets: S3Bucket[]) => void;
+  setObjects: (objects: S3Object[]) => void;
+  setLoading: (loading: boolean) => void;
+  setError: (error: string | null) => void;
+}
+
+export const useS3Store = create<S3Store>()(
+  persist(
+    (set) => ({
+      isAuthenticated: false,
+      credentials: null,
+      currentBucket: null,
+      currentPath: '',
+      buckets: [],
+      objects: [],
+      loading: false,
+      error: null,
+      
+      login: (credentials) => set({ 
+        isAuthenticated: true, 
+        credentials,
+        error: null 
+      }),
+      
+      logout: () => set({ 
+        isAuthenticated: false, 
+        credentials: null,
+        currentBucket: null,
+        currentPath: '',
+        buckets: [],
+        objects: [],
+        error: null
+      }),
+      
+      setCurrentBucket: (bucket) => set({ 
+        currentBucket: bucket, 
+        currentPath: '' 
+      }),
+      
+      setCurrentPath: (path) => set({ currentPath: path }),
+      
+      setBuckets: (buckets) => set({ buckets }),
+      
+      setObjects: (objects) => set({ objects }),
+      
+      setLoading: (loading) => set({ loading }),
+      
+      setError: (error) => set({ error })
+    }),
+    {
+      name: 's3-storage',
+      partialize: (state) => ({ 
+        isAuthenticated: state.isAuthenticated,
+        credentials: state.credentials 
+      })
+    }
+  )
+);

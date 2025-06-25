@@ -1,12 +1,26 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+
+import React from 'react';
+import { useS3Store } from '../hooks/useS3Store';
+import { LoginForm } from '../components/LoginForm';
+import { Header } from '../components/Header';
+import { BucketList } from '../components/BucketList';
+import { ObjectList } from '../components/ObjectList';
+import { Breadcrumb } from '../components/Breadcrumb';
 
 const Index = () => {
+  const { isAuthenticated, currentBucket } = useS3Store();
+
+  if (!isAuthenticated) {
+    return <LoginForm />;
+  }
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
-      </div>
+    <div className="min-h-screen bg-gray-50">
+      <Header />
+      <main className="container mx-auto px-6 py-8">
+        <Breadcrumb />
+        {currentBucket ? <ObjectList /> : <BucketList />}
+      </main>
     </div>
   );
 };
