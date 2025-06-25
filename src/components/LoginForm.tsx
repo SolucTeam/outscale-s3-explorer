@@ -21,7 +21,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
   const [isLoading, setIsLoading] = useState(false);
 
   const { toast } = useToast();
-  const { login } = useBackendApi();
+  const { initialize } = useBackendApi();
 
   // Get the selected region details
   const selectedRegion = OUTSCALE_REGIONS.find(r => r.id === region);
@@ -48,9 +48,9 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
 
       const credentials = { accessKey, secretKey, region };
       
-      const result = await login(credentials);
+      const result = await initialize(credentials);
       
-      if (result.success) {
+      if (result) {
         toast({
           title: "Connexion réussie",
           description: "Vous êtes maintenant connecté à votre compte Outscale"
@@ -61,7 +61,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
       } else {
         toast({
           title: "Erreur de connexion",
-          description: result.message || "Échec de la connexion",
+          description: "Échec de la connexion",
           variant: "destructive"
         });
       }
