@@ -10,6 +10,7 @@ import Dashboard from "./pages/Dashboard";
 import BucketView from "./pages/BucketView";
 import FolderView from "./pages/FolderView";
 import NotFound from "./pages/NotFound";
+import Index from "./pages/Index";
 
 const queryClient = new QueryClient();
 
@@ -20,6 +21,9 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
+          {/* Route racine avec redirection intelligente */}
+          <Route path="/" element={<Index />} />
+          
           {/* Route publique */}
           <Route path="/login" element={<Login />} />
           
@@ -36,14 +40,11 @@ const App = () => (
             </ProtectedRoute>
           } />
           
-          <Route path="/bucket/:name/folder/:path" element={
+          <Route path="/bucket/:name/folder/:path*" element={
             <ProtectedRoute>
               <FolderView />
             </ProtectedRoute>
           } />
-          
-          {/* Redirection de la racine */}
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
           
           {/* 404 */}
           <Route path="*" element={<NotFound />} />

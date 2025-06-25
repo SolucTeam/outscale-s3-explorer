@@ -23,7 +23,9 @@ interface S3Store {
   setObjects: (objects: S3Object[]) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
-  initializeFromUrl: () => void;
+  navigateToBucket: (bucketName: string) => void;
+  navigateToFolder: (bucketName: string, folderPath: string) => void;
+  navigateToDashboard: () => void;
 }
 
 export const useS3Store = create<S3Store>()(
@@ -59,40 +61,12 @@ export const useS3Store = create<S3Store>()(
         isAuthenticated: !!credentials 
       }),
       
-      setCurrentBucket: (bucket) => {
-        set({ 
-          currentBucket: bucket, 
-          currentPath: '' 
-        });
-        
-        // Update URL
-        const url = new URL(window.location.href);
-        if (bucket) {
-          url.searchParams.set('bucket', bucket);
-          url.searchParams.delete('path');
-        } else {
-          url.searchParams.delete('bucket');
-          url.searchParams.delete('path');
-        }
-        window.history.pushState({}, '', url.toString());
-      },
+      setCurrentBucket: (bucket) => set({ 
+        currentBucket: bucket, 
+        currentPath: bucket ? '' : ''
+      }),
       
-      setCurrentPath: (path) => {
-        set({ currentPath: path });
-        
-        // Update URL
-        const url = new URL(window.location.href);
-        const { currentBucket } = get();
-        if (currentBucket) {
-          url.searchParams.set('bucket', currentBucket);
-          if (path) {
-            url.searchParams.set('path', path);
-          } else {
-            url.searchParams.delete('path');
-          }
-          window.history.pushState({}, '', url.toString());
-        }
-      },
+      setCurrentPath: (path) => set({ currentPath: path }),
       
       setBuckets: (buckets) => set({ buckets }),
       
@@ -102,17 +76,19 @@ export const useS3Store = create<S3Store>()(
       
       setError: (error) => set({ error }),
       
-      initializeFromUrl: () => {
-        const url = new URL(window.location.href);
-        const bucket = url.searchParams.get('bucket');
-        const path = url.searchParams.get('path') || '';
-        
-        if (bucket) {
-          set({ 
-            currentBucket: bucket,
-            currentPath: path
-          });
-        }
+      navigateToBucket: (bucketName: string) => {
+        set({ currentBucket: bucketName, currentPath: '' });
+        window.history.pushState({}, '', `/bucket/${encodeURIComponent(bucketName)}`);
+      },
+      
+      navigateToFolder: (bucketName: string, folderPath: string) => {
+        set({ currentBucket: bucketName, currentPath: folderPath });
+        window.history.pushState({}, '', `/bucket/${encodeURIComponent(bucketName)}/folder/${encodeURIComponent(folderPath)}`);
+      },
+      
+      navigateToDashboard: () => {
+        set({ currentBucket: null, currentPath: '' });
+        window.history.pushState({}, '', '/dashboard');
       }
     }),
     {
