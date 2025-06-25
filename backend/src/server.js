@@ -1,4 +1,3 @@
-
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -8,7 +7,7 @@ require('dotenv').config();
 
 const logger = require('./utils/logger');
 const errorHandler = require('./middleware/errorHandler');
-const authRoutes = require('./routes/auth');
+const { router: authRoutes } = require('./routes/auth');
 const s3Routes = require('./routes/s3');
 
 const app = express();
