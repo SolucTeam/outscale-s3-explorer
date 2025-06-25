@@ -5,21 +5,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useS3Store } from '../hooks/useS3Store';
-import { useBackendApi } from '../hooks/useBackendApi';
 import { OUTSCALE_REGIONS } from '../data/regions';
-import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '../contexts/AuthContext';
 import { Cloud, Shield, AlertCircle, Globe, Server } from 'lucide-react';
 
 export const LoginForm = () => {
   const [accessKey, setAccessKey] = useState('');
   const [secretKey, setSecretKey] = useState('');
   const [region, setRegion] = useState('eu-west-2');
-  const [isLoading, setIsLoading] = useState(false);
-
-  const { login } = useS3Store();
-  const { initialize } = useBackendApi();
-  const { toast } = useToast();
+  const { login, isLoading } = useAuth();
 
   // Get the selected region details
   const selectedRegion = OUTSCALE_REGIONS.find(r => r.id === region);
@@ -28,43 +22,11 @@ export const LoginForm = () => {
     e.preventDefault();
     
     if (!accessKey || !secretKey) {
-      toast({
-        title: "Erreur",
-        description: "Veuillez remplir tous les champs",
-        variant: "destructive"
-      });
       return;
     }
 
-    setIsLoading(true);
-
-    try {
-      console.log('Attempting to login with:', {
-        accessKey: accessKey.substring(0, 8) + '...',
-        region
-      });
-
-      const credentials = { accessKey, secretKey, region };
-      
-      const success = await initialize(credentials);
-      
-      if (success) {
-        login(credentials);
-        toast({
-          title: "Connexion réussie",
-          description: "Vous êtes maintenant connecté à votre compte Outscale"
-        });
-      }
-    } catch (error) {
-      console.error('Login error:', error);
-      toast({
-        title: "Erreur de connexion",
-        description: "Impossible de se connecter au service. Vérifiez vos identifiants et votre connexion internet.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoading(false);
-    }
+    const credentials = { accessKey, secretKey, region };
+    await login(credentials);
   };
 
   return (
@@ -165,14 +127,14 @@ export const LoginForm = () => {
           <div className="mt-6 p-4 bg-green-50 rounded-lg border border-green-200">
             <p className="text-sm text-green-800">
               <Shield className="w-4 h-4 inline mr-2" />
-              Connexion sécurisée via notre backend à votre infrastructure Outscale.
+              Connexion sécurisée via JWT avec auto-refresh des tokens.
             </p>
           </div>
 
           <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
             <p className="text-sm text-blue-800 flex items-start">
               <AlertCircle className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
-              Vos identifiants sont sécurisés et stockés uniquement durant votre session.
+              Vos identifiants sont chiffrés et stockés de manière sécurisée.
             </p>
           </div>
         </CardContent>
