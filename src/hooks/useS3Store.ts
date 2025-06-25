@@ -16,17 +16,18 @@ interface S3Store {
   // Actions
   login: (credentials: S3Credentials) => void;
   logout: () => void;
-  setCurrentBucket: (bucket: string) => void;
+  setCurrentBucket: (bucket: string | null) => void;
   setCurrentPath: (path: string) => void;
   setBuckets: (buckets: S3Bucket[]) => void;
   setObjects: (objects: S3Object[]) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
+  initializeFromUrl: () => void;
 }
 
 export const useS3Store = create<S3Store>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       isAuthenticated: false,
       credentials: null,
       currentBucket: null,
@@ -52,12 +53,40 @@ export const useS3Store = create<S3Store>()(
         error: null
       }),
       
-      setCurrentBucket: (bucket) => set({ 
-        currentBucket: bucket, 
-        currentPath: '' 
-      }),
+      setCurrentBucket: (bucket) => {
+        set({ 
+          currentBucket: bucket, 
+          currentPath: '' 
+        });
+        
+        // Update URL
+        const url = new URL(window.location.href);
+        if (bucket) {
+          url.searchParams.set('bucket', bucket);
+          url.searchParams.delete('path');
+        } else {
+          url.searchParams.delete('bucket');
+          url.searchParams.delete('path');
+        }
+        window.history.pushState({}, '', url.toString());
+      },
       
-      setCurrentPath: (path) => set({ currentPath: path }),
+      setCurrentPath: (path) => {
+        set({ currentPath: path });
+        
+        // Update URL
+        const url = new URL(window.location.href);
+        const { currentBucket } = get();
+        if (currentBucket) {
+          url.searchParams.set('bucket', currentBucket);
+          if (path) {
+            url.searchParams.set('path', path);
+          } else {
+            url.searchParams.delete('path');
+          }
+          window.history.pushState({}, '', url.toString());
+        }
+      },
       
       setBuckets: (buckets) => set({ buckets }),
       
@@ -65,7 +94,20 @@ export const useS3Store = create<S3Store>()(
       
       setLoading: (loading) => set({ loading }),
       
-      setError: (error) => set({ error })
+      setError: (error) => set({ error }),
+      
+      initializeFromUrl: () => {
+        const url = new URL(window.location.href);
+        const bucket = url.searchParams.get('bucket');
+        const path = url.searchParams.get('path') || '';
+        
+        if (bucket) {
+          set({ 
+            currentBucket: bucket,
+            currentPath: path
+          });
+        }
+      }
     }),
     {
       name: 's3-storage',

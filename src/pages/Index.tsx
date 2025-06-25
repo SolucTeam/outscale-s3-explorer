@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useS3Store } from '../hooks/useS3Store';
 import { LoginForm } from '../components/LoginForm';
 import { Header } from '../components/Header';
@@ -8,7 +8,13 @@ import { ObjectList } from '../components/ObjectList';
 import { Breadcrumb } from '../components/Breadcrumb';
 
 const Index = () => {
-  const { isAuthenticated, currentBucket } = useS3Store();
+  const { isAuthenticated, currentBucket, initializeFromUrl } = useS3Store();
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      initializeFromUrl();
+    }
+  }, [isAuthenticated]);
 
   if (!isAuthenticated) {
     return <LoginForm />;

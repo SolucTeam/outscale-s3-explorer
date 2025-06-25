@@ -5,15 +5,17 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useS3Store } from '../hooks/useS3Store';
 import { useS3Mock } from '../hooks/useS3Mock';
-import { Upload, Download, Trash2, FolderOpen, File, RefreshCw, Plus } from 'lucide-react';
+import { Upload, Download, Trash2, FolderOpen, File, RefreshCw, Plus, FolderPlus } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { FileUpload } from './FileUpload';
+import { CreateFolderDialog } from './CreateFolderDialog';
 
 export const ObjectList = () => {
   const { currentBucket, currentPath, objects, loading, setCurrentPath } = useS3Store();
   const { fetchObjects, deleteObject } = useS3Mock();
   const [showUpload, setShowUpload] = useState(false);
+  const [showCreateFolder, setShowCreateFolder] = useState(false);
 
   useEffect(() => {
     if (currentBucket) {
@@ -49,6 +51,10 @@ export const ObjectList = () => {
     // Dans une vraie implémentation, cela génèrerait une URL signée
   };
 
+  const handleFolderCreated = () => {
+    fetchObjects(currentBucket!, currentPath);
+  };
+
   if (!currentBucket) return null;
 
   if (loading) {
@@ -76,6 +82,13 @@ export const ObjectList = () => {
         
         <div className="flex items-center space-x-2">
           <Button 
+            onClick={() => setShowCreateFolder(true)}
+            variant="outline"
+          >
+            <FolderPlus className="w-4 h-4 mr-2" />
+            Nouveau dossier
+          </Button>
+          <Button 
             onClick={() => setShowUpload(true)}
             className="bg-blue-600 hover:bg-blue-700"
           >
@@ -100,12 +113,18 @@ export const ObjectList = () => {
             </div>
             <div>
               <h3 className="text-lg font-medium text-gray-900">Aucun objet trouvé</h3>
-              <p className="text-gray-600">Ce dossier est vide. Commencez par uploader des fichiers.</p>
+              <p className="text-gray-600">Ce dossier est vide. Commencez par uploader des fichiers ou créer des dossiers.</p>
             </div>
-            <Button onClick={() => setShowUpload(true)} className="mt-4">
-              <Plus className="w-4 h-4 mr-2" />
-              Ajouter des fichiers
-            </Button>
+            <div className="flex items-center justify-center space-x-2">
+              <Button onClick={() => setShowCreateFolder(true)} variant="outline">
+                <FolderPlus className="w-4 h-4 mr-2" />
+                Créer un dossier
+              </Button>
+              <Button onClick={() => setShowUpload(true)} className="mt-4">
+                <Plus className="w-4 h-4 mr-2" />
+                Ajouter des fichiers
+              </Button>
+            </div>
           </div>
         </Card>
       ) : (
@@ -188,6 +207,16 @@ export const ObjectList = () => {
             setShowUpload(false);
             fetchObjects(currentBucket, currentPath);
           }}
+        />
+      )}
+
+      {showCreateFolder && (
+        <CreateFolderDialog
+          open={showCreateFolder}
+          onOpenChange={setShowCreateFolder}
+          bucket={currentBucket}
+          currentPath={currentPath}
+          onFolderCreated={handleFolderCreated}
         />
       )}
     </div>

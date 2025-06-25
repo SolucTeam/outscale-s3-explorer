@@ -1,17 +1,21 @@
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useS3Store } from '../hooks/useS3Store';
 import { useS3Mock } from '../hooks/useS3Mock';
-import { Folder, Calendar, HardDrive, ChevronRight, RefreshCw } from 'lucide-react';
+import { Folder, Calendar, HardDrive, ChevronRight, RefreshCw, Plus, Trash2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { CreateBucketDialog } from './CreateBucketDialog';
+import { useToast } from '@/components/ui/use-toast';
 
 export const BucketList = () => {
   const { buckets, loading, setCurrentBucket } = useS3Store();
-  const { fetchBuckets } = useS3Mock();
+  const { fetchBuckets, deleteBucket } = useS3Mock();
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     fetchBuckets();
@@ -23,6 +27,22 @@ export const BucketList = () => {
     const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const handleDeleteBucket = async (bucketName: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    
+    if (!window.confirm(`Êtes-vous sûr de vouloir supprimer le bucket "${bucketName}" ? Cette action est irréversible.`)) {
+      return;
+    }
+
+    const success = await deleteBucket(bucketName);
+    if (success) {
+      toast({
+        title: "Succès",
+        description: `Bucket "${bucketName}" supprimé avec succès`
+      });
+    }
   };
 
   if (loading) {
@@ -43,10 +63,16 @@ export const BucketList = () => {
           <h2 className="text-2xl font-bold text-gray-900">Mes Buckets S3</h2>
           <p className="text-gray-600">Gérez vos espaces de stockage Outscale</p>
         </div>
-        <Button onClick={fetchBuckets} variant="outline" size="sm">
-          <RefreshCw className="w-4 h-4 mr-2" />
-          Actualiser
-        </Button>
+        <div className="flex items-center space-x-2">
+          <Button onClick={() => setShowCreateDialog(true)} className="bg-blue-600 hover:bg-blue-700">
+            <Plus className="w-4 h-4 mr-2" />
+            Nouveau bucket
+          </Button>
+          <Button onClick={fetchBuckets} variant="outline" size="sm">
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Actualiser
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -67,7 +93,17 @@ export const BucketList = () => {
                     </Badge>
                   </div>
                 </div>
-                <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-blue-600 transition-colors" />
+                <div className="flex items-center space-x-1">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={(e) => handleDeleteBucket(bucket.name, e)}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity text-red-600 hover:text-red-700 hover:bg-red-50"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                  <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-blue-600 transition-colors" />
+                </div>
               </div>
             </CardHeader>
             
@@ -99,6 +135,11 @@ export const BucketList = () => {
           </Card>
         ))}
       </div>
+
+      <CreateBucketDialog 
+        open={showCreateDialog} 
+        onOpenChange={setShowCreateDialog}
+      />
     </div>
   );
 };
