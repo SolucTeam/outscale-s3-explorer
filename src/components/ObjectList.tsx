@@ -38,9 +38,16 @@ export const ObjectList = () => {
     }
   };
 
-  const handleDelete = async (objectKey: string) => {
-    if (window.confirm('Êtes-vous sûr de vouloir supprimer cet élément ?')) {
-      await deleteObject(currentBucket!, objectKey);
+  const handleDelete = async (objectKey: string, isFolder: boolean = false) => {
+    const itemType = isFolder ? 'dossier' : 'fichier';
+    const confirmMessage = isFolder 
+      ? `Êtes-vous sûr de vouloir supprimer le dossier "${objectKey}" et tout son contenu ?`
+      : `Êtes-vous sûr de vouloir supprimer ce ${itemType} ?`;
+    
+    if (window.confirm(confirmMessage)) {
+      // For folders, we need to delete the folder with trailing slash
+      const keyToDelete = isFolder && !objectKey.endsWith('/') ? `${objectKey}/` : objectKey;
+      await deleteObject(currentBucket!, keyToDelete);
       fetchObjects(currentBucket!, currentPath);
     }
   };
@@ -170,8 +177,8 @@ export const ObjectList = () => {
                     </div>
                   </div>
                   
-                  {!object.isFolder && (
-                    <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-2">
+                    {!object.isFolder && (
                       <Button
                         size="sm"
                         variant="outline"
@@ -179,16 +186,16 @@ export const ObjectList = () => {
                       >
                         <Download className="w-4 h-4" />
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleDelete(object.key)}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  )}
+                    )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleDelete(object.key, object.isFolder)}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>

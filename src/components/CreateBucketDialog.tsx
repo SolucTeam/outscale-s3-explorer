@@ -1,12 +1,13 @@
+
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { OUTSCALE_REGIONS } from '../data/regions';
-import { useDirectS3 } from '../hooks/useDirectS3';
+import { useS3Store } from '../hooks/useS3Store';
+import { useBackendApi } from '../hooks/useBackendApi';
 import { useToast } from '@/hooks/use-toast';
+import { OUTSCALE_REGIONS } from '../data/regions';
 
 interface CreateBucketDialogProps {
   open: boolean;
@@ -15,16 +16,20 @@ interface CreateBucketDialogProps {
 
 export const CreateBucketDialog = ({ open, onOpenChange }: CreateBucketDialogProps) => {
   const [bucketName, setBucketName] = useState('');
-  const [region, setRegion] = useState('');
   const [isCreating, setIsCreating] = useState(false);
-  const { createBucket, fetchBuckets } = useDirectS3();
+  const { credentials } = useS3Store();
+  const { createBucket, fetchBuckets } = useBackendApi();
   const { toast } = useToast();
 
+  // Get current region info
+  const currentRegion = credentials?.region || 'eu-west-2';
+  const regionInfo = OUTSCALE_REGIONS.find(r => r.id === currentRegion);
+
   const handleCreate = async () => {
-    if (!bucketName.trim() || !region) {
+    if (!bucketName.trim()) {
       toast({
         title: "Erreur",
-        description: "Veuillez remplir tous les champs",
+        description: "Veuillez saisir un nom de bucket",
         variant: "destructive"
       });
       return;
@@ -43,14 +48,11 @@ export const CreateBucketDialog = ({ open, onOpenChange }: CreateBucketDialogPro
 
     setIsCreating(true);
     
-    const success = await createBucket(bucketName, region);
+    await createBucket(bucketName, currentRegion);
     
-    if (success) {
-      setBucketName('');
-      setRegion('');
-      onOpenChange(false);
-      fetchBuckets(); // Actualiser la liste des buckets
-    }
+    setBucketName('');
+    onOpenChange(false);
+    await fetchBuckets();
     
     setIsCreating(false);
   };
@@ -77,20 +79,12 @@ export const CreateBucketDialog = ({ open, onOpenChange }: CreateBucketDialogPro
             </p>
           </div>
           
-          <div>
-            <Label htmlFor="region">Région</Label>
-            <Select value={region} onValueChange={setRegion} disabled={isCreating}>
-              <SelectTrigger>
-                <SelectValue placeholder="Sélectionnez une région" />
-              </SelectTrigger>
-              <SelectContent>
-                {OUTSCALE_REGIONS.map((r) => (
-                  <SelectItem key={r.id} value={r.id}>
-                    {r.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="bg-gray-50 p-3 rounded-lg">
+            <Label className="text-sm font-medium text-gray-700">Région et endpoint</Label>
+            <div className="mt-1 space-y-1">
+              <p className="text-sm text-gray-900 font-medium">{regionInfo?.name || currentRegion}</p>
+              <p className="text-xs text-gray-600">{regionInfo?.endpoint || `Région: ${currentRegion}`}</p>
+            </div>
           </div>
         </div>
         
