@@ -1,16 +1,24 @@
+
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useS3Store } from '../hooks/useS3Store';
+import { useFlaskApi } from '../hooks/useFlaskApi';
 import { OUTSCALE_REGIONS } from '../data/regions';
 import { LogOut, Cloud, Globe } from 'lucide-react';
+
 export const Header = () => {
-  const {
-    credentials,
-    logout
-  } = useS3Store();
+  const { credentials } = useS3Store();
+  const { logout } = useFlaskApi();
+  
   const currentRegion = OUTSCALE_REGIONS.find(r => r.id === credentials?.region);
-  return <header className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-50">
+
+  const handleLogout = async () => {
+    await logout();
+  };
+
+  return (
+    <header className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-50">
       <div className="px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
@@ -37,12 +45,18 @@ export const Header = () => {
               <span className="font-medium">{credentials?.accessKey}</span>
             </div>
             
-            <Button variant="outline" size="sm" onClick={logout} className="text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleLogout} 
+              className="text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300"
+            >
               <LogOut className="w-4 h-4 mr-2" />
               Déconnexion
             </Button>
           </div>
         </div>
       </div>
-    </header>;
+    </header>
+  );
 };

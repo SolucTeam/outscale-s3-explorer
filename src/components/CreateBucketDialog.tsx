@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { OUTSCALE_REGIONS } from '../data/regions';
-import { useS3Mock } from '../hooks/useS3Mock';
+import { useFlaskApi } from '../hooks/useFlaskApi';
 import { useToast } from '@/components/ui/use-toast';
 
 interface CreateBucketDialogProps {
@@ -18,7 +18,7 @@ export const CreateBucketDialog = ({ open, onOpenChange }: CreateBucketDialogPro
   const [bucketName, setBucketName] = useState('');
   const [region, setRegion] = useState('');
   const [isCreating, setIsCreating] = useState(false);
-  const { createBucket, fetchBuckets } = useS3Mock();
+  const { createBucket, fetchBuckets } = useFlaskApi();
   const { toast } = useToast();
 
   const handleCreate = async () => {
@@ -43,17 +43,14 @@ export const CreateBucketDialog = ({ open, onOpenChange }: CreateBucketDialogPro
     }
 
     setIsCreating(true);
+    
     const success = await createBucket(bucketName, region);
     
     if (success) {
-      toast({
-        title: "Succès",
-        description: `Bucket "${bucketName}" créé avec succès`
-      });
       setBucketName('');
       setRegion('');
       onOpenChange(false);
-      fetchBuckets();
+      fetchBuckets(); // Actualiser la liste des buckets
     }
     
     setIsCreating(false);
