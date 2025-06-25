@@ -10,15 +10,15 @@ import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
 export const ActionHistory = () => {
-  const { actions, clearHistory } = useActionHistoryStore();
+  const { entries, clearHistory } = useActionHistoryStore();
   const [filter, setFilter] = useState<'all' | 'success' | 'error' | 'info'>('all');
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const filteredActions = actions.filter(action => {
+  const filteredActions = entries.filter(entry => {
     if (filter === 'all') return true;
-    if (filter === 'success') return action.status === 'success';
-    if (filter === 'error') return action.status === 'error';
-    if (filter === 'info') return action.status === 'info';
+    if (filter === 'success') return entry.status === 'success';
+    if (filter === 'error') return entry.status === 'error';
+    if (filter === 'info') return entry.status === 'started' || entry.status === 'progress';
     return true;
   });
 
@@ -28,7 +28,8 @@ export const ActionHistory = () => {
         return <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4 text-green-500" />;
       case 'error':
         return <XCircle className="w-3 h-3 sm:w-4 sm:h-4 text-red-500" />;
-      case 'info':
+      case 'started':
+      case 'progress':
         return <AlertCircle className="w-3 h-3 sm:w-4 sm:h-4 text-blue-500" />;
       default:
         return <Clock className="w-3 h-3 sm:w-4 sm:h-4 text-gray-500" />;
@@ -41,7 +42,8 @@ export const ActionHistory = () => {
         return 'bg-green-100 text-green-800';
       case 'error':
         return 'bg-red-100 text-red-800';
-      case 'info':
+      case 'started':
+      case 'progress':
         return 'bg-blue-100 text-blue-800';
       default:
         return 'bg-gray-100 text-gray-800';
@@ -56,7 +58,7 @@ export const ActionHistory = () => {
             <Activity className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
             <CardTitle className="text-sm sm:text-base">Historique des actions</CardTitle>
             <Badge variant="secondary" className="text-xs">
-              {actions.length}
+              {entries.length}
             </Badge>
           </div>
           <div className="flex items-center space-x-1">
@@ -68,7 +70,7 @@ export const ActionHistory = () => {
             >
               <Filter className="w-3 h-3" />
             </Button>
-            {actions.length > 0 && (
+            {entries.length > 0 && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -108,41 +110,43 @@ export const ActionHistory = () => {
         ) : (
           <ScrollArea className="h-64 xl:h-96">
             <div className="p-4 space-y-3">
-              {filteredActions.map((action) => (
+              {filteredActions.map((entry) => (
                 <div
-                  key={action.id}
+                  key={entry.id}
                   className="border-l-2 border-gray-200 pl-3 pb-3 last:pb-0"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center space-x-2 min-w-0">
-                      {getStatusIcon(action.status)}
+                      {getStatusIcon(entry.status)}
                       <div className="min-w-0 flex-1">
                         <p className="text-xs sm:text-sm font-medium text-gray-900 truncate">
-                          {action.operation}
+                          {entry.userFriendlyMessage}
                         </p>
-                        {action.target && (
+                        {(entry.bucketName || entry.objectName) && (
                           <p className="text-xs text-gray-600 truncate">
-                            {action.target}
+                            {entry.bucketName && `Bucket: ${entry.bucketName}`}
+                            {entry.bucketName && entry.objectName && ' - '}
+                            {entry.objectName && `Objet: ${entry.objectName}`}
                           </p>
                         )}
                       </div>
                     </div>
                     <Badge
                       variant="secondary"
-                      className={`text-xs flex-shrink-0 ${getStatusColor(action.status)}`}
+                      className={`text-xs flex-shrink-0 ${getStatusColor(entry.status)}`}
                     >
-                      {action.status}
+                      {entry.status}
                     </Badge>
                   </div>
                   
-                  {action.details && (
+                  {entry.details && (
                     <p className="text-xs text-gray-600 mt-1 pl-5 truncate">
-                      {action.details}
+                      {entry.details}
                     </p>
                   )}
                   
                   <p className="text-xs text-gray-500 mt-1 pl-5">
-                    {formatDistanceToNow(action.timestamp, { addSuffix: true, locale: fr })}
+                    {formatDistanceToNow(entry.timestamp, { addSuffix: true, locale: fr })}
                   </p>
                 </div>
               ))}
