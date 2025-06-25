@@ -1,5 +1,5 @@
-
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -20,6 +20,7 @@ export const LoginForm = () => {
   const { login } = useS3Store();
   const { initialize } = useBackendApi();
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   // Get the selected region details
   const selectedRegion = OUTSCALE_REGIONS.find(r => r.id === region);
@@ -54,6 +55,9 @@ export const LoginForm = () => {
           title: "Connexion réussie",
           description: "Vous êtes maintenant connecté à votre compte Outscale"
         });
+        
+        // Redirection vers le dashboard
+        navigate('/dashboard');
       }
     } catch (error) {
       console.error('Login error:', error);
