@@ -8,8 +8,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useS3Store } from '../hooks/useS3Store';
 import { OUTSCALE_REGIONS } from '../data/regions';
 import { apiService } from '../services/apiService';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 import { Cloud, Shield, AlertCircle } from 'lucide-react';
+import { useBackendStatus } from '../hooks/useBackendStatus';
+import { BackendStatusIndicator } from './BackendStatusIndicator';
 
 export const LoginForm = () => {
   const [accessKey, setAccessKey] = useState('');
@@ -19,6 +21,7 @@ export const LoginForm = () => {
 
   const { login } = useS3Store();
   const { toast } = useToast();
+  const { status: backendStatus, isChecking, checkStatus } = useBackendStatus();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,6 +30,15 @@ export const LoginForm = () => {
       toast({
         title: "Erreur",
         description: "Veuillez remplir tous les champs",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!backendStatus.isOnline) {
+      toast({
+        title: "Backend inaccessible",
+        description: "Impossible de se connecter avec le backend indisponible",
         variant: "destructive"
       });
       return;
@@ -89,6 +101,14 @@ export const LoginForm = () => {
         </CardHeader>
         
         <CardContent>
+          {/* Indicateur de statut du backend */}
+          <BackendStatusIndicator 
+            status={backendStatus}
+            isChecking={isChecking}
+            onRetry={checkStatus}
+            className="mb-6"
+          />
+
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="region" className="text-sm font-medium text-gray-700">
@@ -143,7 +163,7 @@ export const LoginForm = () => {
             <Button 
               type="submit" 
               className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white py-3 rounded-lg font-medium transition-all duration-200 shadow-lg hover:shadow-xl" 
-              disabled={!accessKey || !secretKey || isLoading}
+              disabled={!accessKey || !secretKey || isLoading || !backendStatus.isOnline}
             >
               <Shield className="w-4 h-4 mr-2" />
               {isLoading ? 'Connexion...' : 'Se connecter'}
