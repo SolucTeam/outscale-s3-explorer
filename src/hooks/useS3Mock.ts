@@ -159,14 +159,14 @@ export const useS3Mock = () => {
     try {
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Vérifier si le bucket a des objets
-      const bucketObjects = mockObjects[bucketName] || [];
-      if (bucketObjects.length > 0) {
-        throw new Error('Le bucket doit être vide avant suppression');
-      }
+      // Supprimer tous les objets du bucket d'abord (suppression forcée)
+      Object.keys(mockObjects).forEach(key => {
+        if (key.startsWith(bucketName)) {
+          delete mockObjects[key];
+        }
+      });
       
       mockBuckets = mockBuckets.filter(b => b.name !== bucketName);
-      delete mockObjects[bucketName];
       setBuckets([...mockBuckets]);
       return true;
     } catch (error) {
@@ -263,10 +263,27 @@ export const useS3Mock = () => {
     }
   };
 
-  const deleteObject = async (bucket: string, key: string) => {
+  const deleteObject = async (bucket: string, objectKey: string) => {
     setLoading(true);
+    setError(null);
+    
     try {
       await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Trouver et supprimer l'objet dans tous les chemins possibles
+      Object.keys(mockObjects).forEach(key => {
+        if (key.startsWith(bucket)) {
+          mockObjects[key] = mockObjects[key].filter(obj => obj.key !== objectKey);
+          
+          // Si c'est un dossier, supprimer aussi tous les objets dans ce dossier
+          if (objectKey.endsWith('/')) {
+            const folderPrefix = objectKey;
+            const subFolderKey = key === bucket ? `${bucket}/${folderPrefix}` : `${key}/${folderPrefix}`;
+            delete mockObjects[subFolderKey];
+          }
+        }
+      });
+      
       return true;
     } catch (error) {
       setError('Erreur lors de la suppression');

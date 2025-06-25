@@ -7,7 +7,7 @@ import { s3LoggingService } from '../services/s3LoggingService';
 
 export const useBackendApi = () => {
   const [isLoading, setIsLoading] = useState(false);
-  const { setBuckets, setObjects, setCredentials, setCurrentBucket } = useS3Store();
+  const { setBuckets, setObjects, setCredentials, setCurrentBucket, currentPath } = useS3Store();
   const { toast } = useToast();
 
   const initialize = useCallback(async (credentials: S3Credentials): Promise<boolean> => {
@@ -279,7 +279,8 @@ export const useBackendApi = () => {
           description: "L'objet a été supprimé avec succès"
         });
         
-        await fetchObjects(bucket);
+        // Utiliser currentPath au lieu d'une string vide
+        await fetchObjects(bucket, currentPath);
       } else {
         throw new Error(response.message || 'Erreur lors de la suppression de l\'objet');
       }
@@ -301,7 +302,7 @@ export const useBackendApi = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [fetchObjects, toast]);
+  }, [fetchObjects, toast, currentPath]);
 
   const downloadObject = useCallback(async (bucket: string, objectKey: string) => {
     const logEntryId = s3LoggingService.logOperationStart('object_download', bucket, objectKey);
