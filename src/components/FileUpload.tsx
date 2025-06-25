@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -6,6 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useDirectS3 } from '../hooks/useDirectS3';
 import { Upload, X, File, CheckCircle, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { s3LoggingService } from '../services/s3LoggingService';
 
 interface FileUploadProps {
   bucket: string;
@@ -19,6 +21,7 @@ interface UploadFile {
   status: 'pending' | 'uploading' | 'success' | 'error';
   progress: number;
   error?: string;
+  logEntryId?: string;
 }
 
 export const FileUpload: React.FC<FileUploadProps> = ({
@@ -29,6 +32,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({
 }) => {
   const [files, setFiles] = useState<UploadFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+  const [bulkLogEntryId, setBulkLogEntryId] = useState<string>('');
   const { uploadFile } = useDirectS3();
   const { toast } = useToast();
 
@@ -60,29 +64,71 @@ export const FileUpload: React.FC<FileUploadProps> = ({
       status: 'pending',
       progress: 0
     }));
-    setFiles(prev => [...prev, ...uploadFiles]);
+    setFiles(prev => {
+      const updated = [...prev, ...uploadFiles];
+      console.log(`📁 Fichiers ajoutés pour upload: ${newFiles.length} nouveaux fichiers`);
+      return updated;
+    });
   };
 
   const removeFile = (index: number) => {
-    setFiles(prev => prev.filter((_, i) => i !== index));
+    setFiles(prev => {
+      const fileToRemove = prev[index];
+      console.log(`🗑️ Fichier retiré de la liste: ${fileToRemove.file.name}`);
+      return prev.filter((_, i) => i !== index);
+    });
   };
 
   const startUpload = async () => {
     const pendingFiles = files.filter(f => f.status === 'pending');
     
+    if (pendingFiles.length === 0) return;
+
+    // Log bulk operation start
+    const bulkId = s3LoggingService.logBulkOperationStart('object_upload', pendingFiles.length);
+    setBulkLogEntryId(bulkId);
+    
+    console.log(`🚀 Démarrage de l'upload en lot: ${pendingFiles.length} fichiers`);
+    
+    let completedUploads = 0;
+    
     for (let i = 0; i < pendingFiles.length; i++) {
       const fileIndex = files.findIndex(f => f === pendingFiles[i]);
+      const currentFile = pendingFiles[i];
       
-      // Marquer comme en cours d'upload
+      // Log individual file upload start
+      const logEntryId = s3LoggingService.logOperationStart(
+        'object_upload',
+        bucket,
+        currentFile.file.name,
+        `Taille: ${formatBytes(currentFile.file.size)}`
+      );
+      
+      // Update file with log entry ID and mark as uploading
       setFiles(prev => prev.map((f, idx) => 
-        idx === fileIndex ? { ...f, status: 'uploading', progress: 0 } : f
+        idx === fileIndex ? { 
+          ...f, 
+          status: 'uploading', 
+          progress: 0,
+          logEntryId 
+        } : f
       ));
 
-      // Simuler la progression pendant l'upload
+      // Simulate progress during upload
       const progressInterval = setInterval(() => {
         setFiles(prev => prev.map((f, idx) => {
           if (idx === fileIndex && f.status === 'uploading') {
             const newProgress = Math.min(f.progress + Math.random() * 20, 90);
+            
+            // Log progress updates every 25%
+            if (f.logEntryId && Math.floor(newProgress / 25) > Math.floor(f.progress / 25)) {
+              s3LoggingService.logOperationProgress(
+                f.logEntryId,
+                Math.floor(newProgress),
+                `Upload en cours: ${Math.floor(newProgress)}%`
+              );
+            }
+            
             return { ...f, progress: newProgress };
           }
           return f;
@@ -90,27 +136,99 @@ export const FileUpload: React.FC<FileUploadProps> = ({
       }, 300);
 
       try {
-        const success = await uploadFile(pendingFiles[i].file, bucket, path);
+        const success = await uploadFile(currentFile.file, bucket, path);
         clearInterval(progressInterval);
         
         if (success) {
           setFiles(prev => prev.map((f, idx) => 
             idx === fileIndex ? { ...f, status: 'success', progress: 100 } : f
           ));
+          
+          // Log success
+          s3LoggingService.logOperationSuccess(
+            logEntryId,
+            'object_upload',
+            bucket,
+            currentFile.file.name,
+            `Upload réussi (${formatBytes(currentFile.file.size)})`
+          );
+          
+          completedUploads++;
         } else {
           setFiles(prev => prev.map((f, idx) => 
-            idx === fileIndex ? { ...f, status: 'error', progress: 0, error: 'Échec de l\'upload' } : f
+            idx === fileIndex ? { 
+              ...f, 
+              status: 'error', 
+              progress: 0, 
+              error: 'Échec de l\'upload' 
+            } : f
           ));
+          
+          // Log error
+          s3LoggingService.logOperationError(
+            logEntryId,
+            'object_upload',
+            'Échec de l\'upload',
+            bucket,
+            currentFile.file.name,
+            'UPLOAD_FAILED'
+          );
         }
       } catch (error) {
         clearInterval(progressInterval);
+        const errorMessage = error instanceof Error ? error.message : 'Erreur réseau';
+        
         setFiles(prev => prev.map((f, idx) => 
-          idx === fileIndex ? { ...f, status: 'error', progress: 0, error: error instanceof Error ? error.message : 'Erreur réseau' } : f
+          idx === fileIndex ? { 
+            ...f, 
+            status: 'error', 
+            progress: 0, 
+            error: errorMessage 
+          } : f
         ));
+        
+        // Log error
+        s3LoggingService.logOperationError(
+          logEntryId,
+          'object_upload',
+          error instanceof Error ? error : errorMessage,
+          bucket,
+          currentFile.file.name,
+          'NETWORK_ERROR'
+        );
+      }
+      
+      // Update bulk progress
+      if (bulkId) {
+        s3LoggingService.logBulkOperationProgress(bulkId, i + 1, pendingFiles.length);
       }
     }
 
-    // Fermer après un délai si tous les uploads sont terminés avec succès
+    // Log bulk operation completion
+    if (bulkId) {
+      if (completedUploads === pendingFiles.length) {
+        s3LoggingService.logOperationSuccess(
+          bulkId,
+          'object_upload',
+          bucket,
+          undefined,
+          `Tous les uploads réussis: ${completedUploads}/${pendingFiles.length}`
+        );
+      } else {
+        s3LoggingService.logOperationError(
+          bulkId,
+          'object_upload',
+          `Uploads partiellement réussis: ${completedUploads}/${pendingFiles.length}`,
+          bucket,
+          undefined,
+          'PARTIAL_SUCCESS'
+        );
+      }
+    }
+
+    console.log(`✅ Upload en lot terminé: ${completedUploads}/${pendingFiles.length} réussis`);
+
+    // Close after a delay if all uploads are complete and some succeeded
     setTimeout(() => {
       const allComplete = files.every(f => f.status === 'success' || f.status === 'error');
       const hasSuccess = files.some(f => f.status === 'success');
@@ -216,7 +334,12 @@ export const FileUpload: React.FC<FileUploadProps> = ({
                   </div>
                   
                   {uploadFile.status === 'uploading' && (
-                    <Progress value={uploadFile.progress} className="mt-2" />
+                    <div className="mt-2">
+                      <Progress value={uploadFile.progress} className="h-2" />
+                      <p className="text-xs text-gray-500 mt-1">
+                        {Math.round(uploadFile.progress)}% - Upload en cours...
+                      </p>
+                    </div>
                   )}
                   
                   {uploadFile.status === 'error' && uploadFile.error && (
