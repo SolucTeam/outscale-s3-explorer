@@ -1,5 +1,4 @@
-
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,7 +7,7 @@ import { CreateBucketDialog } from './CreateBucketDialog';
 import { useS3Store } from '../hooks/useS3Store';
 import { useBackendApi } from '../hooks/useBackendApi';
 import { useToast } from '@/hooks/use-toast';
-import { Folder, Trash2, HardDrive, Calendar, MapPin, FileText } from 'lucide-react';
+import { Folder, Trash2, HardDrive, Calendar, MapPin, FileText, Plus } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import {
@@ -28,6 +27,7 @@ export const BucketList = () => {
   const { buckets, loading } = useS3Store();
   const { deleteBucket, isLoading } = useBackendApi();
   const { toast } = useToast();
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
   const handleDeleteBucket = async (bucketName: string) => {
     try {
@@ -58,7 +58,10 @@ export const BucketList = () => {
             {buckets.length} bucket{buckets.length !== 1 ? 's' : ''} disponible{buckets.length !== 1 ? 's' : ''}
           </p>
         </div>
-        <CreateBucketDialog />
+        <Button onClick={() => setIsCreateDialogOpen(true)}>
+          <Plus className="w-4 h-4 mr-2" />
+          Nouveau bucket
+        </Button>
       </div>
 
       {loading ? (
@@ -177,9 +180,17 @@ export const BucketList = () => {
           <p className="text-gray-600 mb-6">
             Créez votre premier bucket pour commencer à stocker vos fichiers.
           </p>
-          <CreateBucketDialog />
+          <Button onClick={() => setIsCreateDialogOpen(true)}>
+            <Plus className="w-4 h-4 mr-2" />
+            Créer un bucket
+          </Button>
         </div>
       )}
+
+      <CreateBucketDialog 
+        open={isCreateDialogOpen} 
+        onOpenChange={setIsCreateDialogOpen} 
+      />
     </div>
   );
 };

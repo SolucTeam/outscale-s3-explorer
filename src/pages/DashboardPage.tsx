@@ -5,9 +5,11 @@ import { BucketList } from '../components/BucketList';
 import { ActionHistory } from '../components/ActionHistory';
 import { BackendStatusIndicator } from '../components/BackendStatusIndicator';
 import { useBackendApi } from '../hooks/useBackendApi';
+import { useBackendStatus } from '../hooks/useBackendStatus';
 
 export const DashboardPage = () => {
   const { fetchBuckets } = useBackendApi();
+  const { status, isChecking, checkStatus } = useBackendStatus();
 
   useEffect(() => {
     fetchBuckets();
@@ -30,7 +32,11 @@ export const DashboardPage = () => {
         <div className="lg:hidden mt-6">
           <ActionHistory />
         </div>
-        <BackendStatusIndicator />
+        <BackendStatusIndicator 
+          status={status} 
+          isChecking={isChecking} 
+          onRetry={checkStatus}
+        />
       </main>
     </div>
   );

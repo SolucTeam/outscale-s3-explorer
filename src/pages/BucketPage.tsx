@@ -8,6 +8,7 @@ import { BackendStatusIndicator } from '../components/BackendStatusIndicator';
 import { Breadcrumb } from '../components/Breadcrumb';
 import { useS3Store } from '../hooks/useS3Store';
 import { useBackendApi } from '../hooks/useBackendApi';
+import { useBackendStatus } from '../hooks/useBackendStatus';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 
@@ -19,6 +20,7 @@ export const BucketPage = () => {
   
   const { setCurrentBucket, setCurrentPath } = useS3Store();
   const { fetchObjects } = useBackendApi();
+  const { status, isChecking, checkStatus } = useBackendStatus();
 
   useEffect(() => {
     if (bucketName) {
@@ -67,7 +69,11 @@ export const BucketPage = () => {
         <div className="lg:hidden mt-6">
           <ActionHistory />
         </div>
-        <BackendStatusIndicator />
+        <BackendStatusIndicator 
+          status={status} 
+          isChecking={isChecking} 
+          onRetry={checkStatus}
+        />
       </main>
     </div>
   );
