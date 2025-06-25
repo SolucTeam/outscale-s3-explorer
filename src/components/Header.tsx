@@ -4,25 +4,18 @@ import { Button } from '@/components/ui/button';
 import { useS3Store } from '../hooks/useS3Store';
 import { useBackendApi } from '../hooks/useBackendApi';
 import { Cloud, LogOut, ArrowLeft } from 'lucide-react';
-import { useNavigate, useLocation } from 'react-router-dom';
 
 export const Header = () => {
   const { credentials, currentBucket, setCurrentBucket } = useS3Store();
   const { logout } = useBackendApi();
-  const navigate = useNavigate();
-  const location = useLocation();
 
   const handleBackToBuckets = () => {
     setCurrentBucket(null);
-    navigate('/dashboard');
   };
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
   };
-
-  const isOnBucketPage = location.pathname.startsWith('/bucket/');
 
   return (
     <header className="bg-white border-b border-gray-200 shadow-sm">
@@ -41,7 +34,7 @@ export const Header = () => {
               </div>
             </div>
             
-            {isOnBucketPage && currentBucket && (
+            {currentBucket && (
               <>
                 <div className="h-6 w-px bg-gray-300" />
                 <Button

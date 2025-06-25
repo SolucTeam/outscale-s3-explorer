@@ -1,6 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,57 +10,27 @@ import { useBackendApi } from '../hooks/useBackendApi';
 import { OUTSCALE_REGIONS } from '../data/regions';
 import { useToast } from '@/hooks/use-toast';
 import { Cloud, Shield, AlertCircle, Globe, Server } from 'lucide-react';
-import { AuthTokenService } from '../services/authTokenService';
-import { CredentialsValidator } from '../services/credentialsValidator';
 
 export const LoginForm = () => {
   const [accessKey, setAccessKey] = useState('');
   const [secretKey, setSecretKey] = useState('');
   const [region, setRegion] = useState('eu-west-2');
   const [isLoading, setIsLoading] = useState(false);
-  const [accessKeyError, setAccessKeyError] = useState<string | null>(null);
-  const [secretKeyError, setSecretKeyError] = useState<string | null>(null);
 
-  const navigate = useNavigate();
-  const location = useLocation();
   const { login } = useS3Store();
   const { initialize } = useBackendApi();
   const { toast } = useToast();
-  const authTokenService = AuthTokenService.getInstance();
-
-  // Redirect if already authenticated
-  useEffect(() => {
-    if (authTokenService.isTokenValid()) {
-      const from = (location.state as any)?.from?.pathname || '/dashboard';
-      navigate(from, { replace: true });
-    }
-  }, [navigate, location]);
 
   // Get the selected region details
   const selectedRegion = OUTSCALE_REGIONS.find(r => r.id === region);
 
-  // Validate credentials on change
-  useEffect(() => {
-    if (accessKey) {
-      setAccessKeyError(CredentialsValidator.getAccessKeyError(accessKey));
-    }
-  }, [accessKey]);
-
-  useEffect(() => {
-    if (secretKey) {
-      setSecretKeyError(CredentialsValidator.getSecretKeyError(secretKey));
-    }
-  }, [secretKey]);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate credentials format
-    const validation = CredentialsValidator.validateCredentials(accessKey, secretKey);
-    if (!validation.isValid) {
+    if (!accessKey || !secretKey) {
       toast({
-        title: "Erreur de validation",
-        description: validation.errors.join(', '),
+        title: "Erreur",
+        description: "Veuillez remplir tous les champs",
         variant: "destructive"
       });
       return;
@@ -85,10 +54,6 @@ export const LoginForm = () => {
           title: "Connexion réussie",
           description: "Vous êtes maintenant connecté à votre compte Outscale"
         });
-        
-        // Redirect to intended page or dashboard
-        const from = (location.state as any)?.from?.pathname || '/dashboard';
-        navigate(from, { replace: true });
       }
     } catch (error) {
       console.error('Login error:', error);
@@ -141,6 +106,7 @@ export const LoginForm = () => {
                 </SelectContent>
               </Select>
               
+              {/* Display endpoint for selected region */}
               {selectedRegion && (
                 <div className="mt-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
                   <div className="flex items-center space-x-2 text-sm text-blue-800">
@@ -163,14 +129,11 @@ export const LoginForm = () => {
                 type="text" 
                 value={accessKey} 
                 onChange={e => setAccessKey(e.target.value)} 
-                placeholder="AKXXXXXXXXXXXXXXXX" 
+                placeholder="Votre Access Key Outscale" 
                 required 
                 disabled={isLoading}
-                className={`w-full ${accessKeyError ? 'border-red-500' : ''}`}
+                className="w-full" 
               />
-              {accessKeyError && (
-                <p className="text-sm text-red-600">{accessKeyError}</p>
-              )}
             </div>
             
             <div className="space-y-2">
@@ -182,20 +145,17 @@ export const LoginForm = () => {
                 type="password" 
                 value={secretKey} 
                 onChange={e => setSecretKey(e.target.value)} 
-                placeholder="40 caractères alphanumériques" 
+                placeholder="Votre Secret Key" 
                 required 
                 disabled={isLoading}
-                className={`w-full ${secretKeyError ? 'border-red-500' : ''}`}
+                className="w-full" 
               />
-              {secretKeyError && (
-                <p className="text-sm text-red-600">{secretKeyError}</p>
-              )}
             </div>
             
             <Button 
               type="submit" 
               className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white py-3 rounded-lg font-medium transition-all duration-200 shadow-lg hover:shadow-xl" 
-              disabled={!accessKey || !secretKey || !!accessKeyError || !!secretKeyError || isLoading}
+              disabled={!accessKey || !secretKey || isLoading}
             >
               <Shield className="w-4 h-4 mr-2" />
               {isLoading ? 'Connexion...' : 'Se connecter'}
