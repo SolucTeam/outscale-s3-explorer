@@ -1,4 +1,3 @@
-
 import { 
   S3Client, 
   ListBucketsCommand, 
@@ -12,6 +11,7 @@ import {
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { S3Credentials, S3Bucket, S3Object } from '../types/s3';
+import { OutscaleConfig } from './outscaleConfig';
 
 export interface DirectS3Response<T> {
   success: boolean;
@@ -24,23 +24,21 @@ class DirectS3Service {
   private client: S3Client | null = null;
   private credentials: S3Credentials | null = null;
 
-  private getEndpointUrl(region: string): string {
-    const endpoints = {
-      'eu-west-2': 'https://oos.eu-west-2.outscale.com',
-      'us-east-2': 'https://oos.us-east-2.outscale.com',
-      'us-west-1': 'https://oos.us-west-1.outscale.com',
-      'cloudgouv-eu-west-1': 'https://oos.cloudgouv-eu-west-1.outscale.com',
-      'ap-northeast-1': 'https://oos.ap-northeast-1.outscale.com'
-    };
-    return endpoints[region as keyof typeof endpoints] || endpoints['eu-west-2'];
-  }
-
   async initialize(credentials: S3Credentials): Promise<DirectS3Response<boolean>> {
     try {
+      // Valider la région
+      if (!OutscaleConfig.isValidRegion(credentials.region)) {
+        return {
+          success: false,
+          error: 'Région non supportée',
+          message: 'La région spécifiée n\'est pas supportée par Outscale'
+        };
+      }
+
       this.credentials = credentials;
       this.client = new S3Client({
         region: credentials.region,
-        endpoint: this.getEndpointUrl(credentials.region),
+        endpoint: OutscaleConfig.getEndpoint(credentials.region),
         credentials: {
           accessKeyId: credentials.accessKey,
           secretAccessKey: credentials.secretKey,
