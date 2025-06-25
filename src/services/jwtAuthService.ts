@@ -1,6 +1,6 @@
 
 import { S3Credentials } from '../types/s3';
-import { errorService } from './errorService';
+import { ErrorService } from './errorService';
 
 export interface LoginResponse {
   success: boolean;
@@ -182,7 +182,8 @@ class JWTAuthService {
       this.refreshTimer = setTimeout(async () => {
         const success = await this.refreshToken();
         if (!success) {
-          errorService.handleError(new Error('Session expirée'), 'Session timeout');
+          const error = ErrorService.parseError(new Error('Session expirée'));
+          console.error('Session timeout:', error);
           this.clearToken();
           window.location.href = '/login';
         }
