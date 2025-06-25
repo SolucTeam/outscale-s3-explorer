@@ -11,18 +11,22 @@ import { ActionHistory } from '../components/ActionHistory';
 import { RetryIndicator } from '../components/RetryIndicator';
 import { useS3Store } from '../hooks/useS3Store';
 import { useBackendApi } from '../hooks/useBackendApi';
+import { useBackendStatus } from '../hooks/useBackendStatus';
+import { useRetryState } from '../hooks/useRetryState';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const Index = () => {
   const { credentials, currentBucket } = useS3Store();
   const { fetchBuckets } = useBackendApi();
+  const { status, isChecking, checkStatus } = useBackendStatus();
+  const { isRetrying, error, retryAttempt, nextRetryIn, execute, reset } = useRetryState();
   const [activeTab, setActiveTab] = useState('buckets');
 
   useEffect(() => {
     if (credentials) {
-      fetchBuckets();
+      execute(() => fetchBuckets());
     }
-  }, [credentials, fetchBuckets]);
+  }, [credentials, fetchBuckets, execute]);
 
   if (!credentials) {
     return (
@@ -35,7 +39,11 @@ const Index = () => {
             </div>
             <LoginForm />
             <div className="mt-6">
-              <BackendStatusIndicator />
+              <BackendStatusIndicator 
+                status={status} 
+                isChecking={isChecking} 
+                onRetry={checkStatus}
+              />
             </div>
           </div>
         </div>
@@ -46,7 +54,13 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
-      <RetryIndicator />
+      <RetryIndicator 
+        isRetrying={isRetrying}
+        error={error}
+        retryAttempt={retryAttempt}
+        nextRetryIn={nextRetryIn}
+        onManualRetry={reset}
+      />
       
       <div className="container mx-auto px-4 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
