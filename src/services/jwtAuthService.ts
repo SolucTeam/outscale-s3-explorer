@@ -1,4 +1,3 @@
-
 import { S3Credentials } from '../types/s3';
 import { ErrorService } from './errorService';
 
@@ -40,10 +39,16 @@ class JWTAuthService {
   }
 
   /**
-   * Login avec credentials S3
+   * Login avec credentials S3 - amélioration de la gestion d'erreurs
    */
   async login(credentials: S3Credentials): Promise<LoginResponse> {
     try {
+      console.log('Attempting login with credentials:', {
+        accessKey: credentials.accessKey.substring(0, 8) + '...',
+        region: credentials.region,
+        secretKeyLength: credentials.secretKey.length
+      });
+
       const response = await fetch(`${this.API_BASE}/login`, {
         method: 'POST',
         headers: {
@@ -53,6 +58,13 @@ class JWTAuthService {
       });
 
       const data = await response.json();
+      
+      console.log('Login response:', {
+        status: response.status,
+        success: data.success,
+        error: data.error,
+        message: data.message
+      });
 
       if (data.success && data.data?.token) {
         this.setToken(data.data.token);
@@ -61,11 +73,11 @@ class JWTAuthService {
 
       return data;
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('Login network error:', error);
       return {
         success: false,
         error: 'Network error',
-        message: 'Impossible de se connecter au serveur'
+        message: 'Impossible de se connecter au serveur. Vérifiez votre connexion internet.'
       };
     }
   }

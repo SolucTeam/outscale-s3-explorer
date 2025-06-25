@@ -69,19 +69,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setIsLoading(true);
 
     try {
-      // Valider les credentials
+      // Valider les credentials avec validation plus souple
       const sanitizedCredentials = CredentialsValidator.sanitizeCredentials(credentials);
       const validation = CredentialsValidator.validateCredentials(sanitizedCredentials);
 
       if (!validation.isValid) {
+        console.warn('Credentials validation failed:', validation.errors);
         toast({
-          title: "Credentials invalides",
+          title: "Format des identifiants invalide",
           description: validation.errors.join(', '),
           variant: "destructive"
         });
         return false;
       }
 
+      console.log('Attempting login with sanitized credentials...');
       const response = await jwtAuthService.login(sanitizedCredentials);
 
       if (response.success && response.data) {
@@ -96,9 +98,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         return true;
       } else {
+        console.error('Login failed:', response);
+        
+        // Messages d'erreur plus détaillés
+        let errorMessage = response.message || "Credentials invalides";
+        if (response.error === 'Authentication failed') {
+          errorMessage = "Vérifiez vos clés d'accès et votre région";
+        } else if (response.error === 'Network error') {
+          errorMessage = "Erreur de connexion au serveur";
+        }
+        
         toast({
           title: "Erreur de connexion",
-          description: response.message || "Credentials invalides",
+          description: errorMessage,
           variant: "destructive"
         });
         return false;

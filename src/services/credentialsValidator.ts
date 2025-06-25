@@ -2,22 +2,23 @@
 import { S3Credentials } from '../types/s3';
 
 export class CredentialsValidator {
-  private static readonly ACCESS_KEY_PATTERN = /^[A-Z0-9]{20}$/;
-  private static readonly SECRET_KEY_PATTERN = /^[A-Za-z0-9+/]{40}$/;
+  // Patterns plus flexibles pour les clés Outscale
+  private static readonly ACCESS_KEY_PATTERN = /^[A-Z0-9]{20,}$/;
+  private static readonly SECRET_KEY_PATTERN = /^[A-Za-z0-9+/=]{30,}$/;
   private static readonly REGION_PATTERN = /^[a-z0-9-]+$/;
 
   /**
-   * Valider le format d'une access key
+   * Valider le format d'une access key (plus flexible)
    */
   static validateAccessKey(accessKey: string): boolean {
-    return this.ACCESS_KEY_PATTERN.test(accessKey);
+    return accessKey && accessKey.length >= 16 && this.ACCESS_KEY_PATTERN.test(accessKey);
   }
 
   /**
-   * Valider le format d'une secret key
+   * Valider le format d'une secret key (plus flexible)
    */
   static validateSecretKey(secretKey: string): boolean {
-    return this.SECRET_KEY_PATTERN.test(secretKey);
+    return secretKey && secretKey.length >= 30 && this.SECRET_KEY_PATTERN.test(secretKey);
   }
 
   /**
@@ -28,7 +29,7 @@ export class CredentialsValidator {
   }
 
   /**
-   * Valider toutes les credentials
+   * Valider toutes les credentials avec plus de flexibilité
    */
   static validateCredentials(credentials: S3Credentials): {
     isValid: boolean;
@@ -39,13 +40,13 @@ export class CredentialsValidator {
     if (!credentials.accessKey) {
       errors.push('Access key is required');
     } else if (!this.validateAccessKey(credentials.accessKey)) {
-      errors.push('Access key format is invalid (should be 20 uppercase alphanumeric characters)');
+      errors.push('Access key format is invalid (minimum 16 characters, alphanumeric)');
     }
 
     if (!credentials.secretKey) {
       errors.push('Secret key is required');
     } else if (!this.validateSecretKey(credentials.secretKey)) {
-      errors.push('Secret key format is invalid (should be 40 base64 characters)');
+      errors.push('Secret key format is invalid (minimum 30 characters)');
     }
 
     if (!credentials.region) {
