@@ -1,5 +1,5 @@
-
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -14,6 +14,7 @@ import { CreateFolderDialog } from './CreateFolderDialog';
 export const ObjectList = () => {
   const { currentBucket, currentPath, objects, loading, setCurrentPath } = useS3Store();
   const { fetchObjects, deleteObject, downloadObject } = useBackendApi();
+  const navigate = useNavigate();
   const [showUpload, setShowUpload] = useState(false);
   const [showCreateFolder, setShowCreateFolder] = useState(false);
 
@@ -34,7 +35,8 @@ export const ObjectList = () => {
   const handleObjectClick = (object: any) => {
     if (object.isFolder) {
       const newPath = currentPath ? `${currentPath}/${object.key}` : object.key;
-      setCurrentPath(newPath.replace(/\/$/, ''));
+      const encodedPath = encodeURIComponent(newPath.replace(/\/$/, ''));
+      navigate(`/bucket/${currentBucket}/folder/${encodedPath}`);
     }
   };
 
