@@ -239,10 +239,13 @@ class ApiService {
     
     try {
       const response = await RetryService.executeWithRetry(
-        () => this.request('/buckets', {
-          method: 'POST',
-          body: JSON.stringify({ name, region })
-        }),
+        async () => {
+          const result = await this.request<void>('/buckets', {
+            method: 'POST',
+            body: JSON.stringify({ name, region })
+          });
+          return result;
+        },
         config
       );
 
@@ -253,7 +256,12 @@ class ApiService {
 
       return response;
     } catch (error) {
-      return ErrorService.parseError(error) as any;
+      const appError = ErrorService.parseError(error);
+      return {
+        success: false,
+        error: appError.message,
+        message: appError.userMessage
+      };
     }
   }
 
@@ -262,9 +270,12 @@ class ApiService {
     
     try {
       const response = await RetryService.executeWithRetry(
-        () => this.request(`/buckets/${encodeURIComponent(name)}`, {
-          method: 'DELETE'
-        }),
+        async () => {
+          const result = await this.request<void>(`/buckets/${encodeURIComponent(name)}`, {
+            method: 'DELETE'
+          });
+          return result;
+        },
         config
       );
 
@@ -275,7 +286,12 @@ class ApiService {
 
       return response;
     } catch (error) {
-      return ErrorService.parseError(error) as any;
+      const appError = ErrorService.parseError(error);
+      return {
+        success: false,
+        error: appError.message,
+        message: appError.userMessage
+      };
     }
   }
 
