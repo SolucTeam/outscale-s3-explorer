@@ -9,7 +9,7 @@ import { useS3Store } from '../hooks/useS3Store';
 import { useBackendApi } from '../hooks/useBackendApi';
 import { OUTSCALE_REGIONS } from '../data/regions';
 import { useToast } from '@/hooks/use-toast';
-import { Cloud, Shield, AlertCircle, Globe } from 'lucide-react';
+import { Cloud, Shield, AlertCircle, Globe, Server } from 'lucide-react';
 
 export const LoginForm = () => {
   const [accessKey, setAccessKey] = useState('');
@@ -20,6 +20,9 @@ export const LoginForm = () => {
   const { login } = useS3Store();
   const { initialize } = useBackendApi();
   const { toast } = useToast();
+
+  // Get the selected region details
+  const selectedRegion = OUTSCALE_REGIONS.find(r => r.id === region);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,11 +97,27 @@ export const LoginForm = () => {
                 <SelectContent>
                   {OUTSCALE_REGIONS.map(r => (
                     <SelectItem key={r.id} value={r.id}>
-                      {r.name}
+                      <div className="flex items-center space-x-2">
+                        <Globe className="w-4 h-4" />
+                        <span>{r.name}</span>
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              
+              {/* Display endpoint for selected region */}
+              {selectedRegion && (
+                <div className="mt-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="flex items-center space-x-2 text-sm text-blue-800">
+                    <Server className="w-4 h-4" />
+                    <span className="font-medium">Endpoint:</span>
+                    <code className="bg-blue-100 px-2 py-1 rounded text-xs">
+                      {selectedRegion.endpoint}
+                    </code>
+                  </div>
+                </div>
+              )}
             </div>
             
             <div className="space-y-2">

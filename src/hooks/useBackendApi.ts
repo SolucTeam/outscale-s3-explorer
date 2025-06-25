@@ -1,254 +1,285 @@
 
 import { useState, useCallback } from 'react';
-import { apiService, ApiResponse } from '../services/apiService';
+import { apiService } from '../services/apiService';
 import { useS3Store } from './useS3Store';
-import { S3Bucket, S3Object, S3Credentials } from '../types/s3';
 import { useToast } from '@/hooks/use-toast';
+import { S3Credentials, S3Bucket, S3Object } from '../types/s3';
 
 export const useBackendApi = () => {
-  const { 
-    setBuckets, 
-    setObjects, 
-    setLoading, 
-    setError,
-    logout: storeLogout 
-  } = useS3Store();
+  const [isLoading, setIsLoading] = useState(false);
+  const { setBuckets, setObjects, setCredentials, setCurrentBucket } = useS3Store();
   const { toast } = useToast();
-  const [initialized, setInitialized] = useState(false);
-
-  const handleError = (response: ApiResponse<any>, defaultMessage: string) => {
-    const errorMessage = response.error || response.message || defaultMessage;
-    setError(errorMessage);
-    toast({
-      title: "Erreur",
-      description: response.message || errorMessage,
-      variant: "destructive"
-    });
-    return false;
-  };
 
   const initialize = useCallback(async (credentials: S3Credentials): Promise<boolean> => {
-    setLoading(true);
-    setError(null);
-
+    setIsLoading(true);
     try {
-      const response = await apiService.login({
-        accessKey: credentials.accessKey,
-        secretKey: credentials.secretKey,
-        region: credentials.region
-      });
+      const response = await apiService.login(credentials);
       
       if (response.success) {
-        setInitialized(true);
+        setCredentials(credentials);
         return true;
       } else {
-        return handleError(response, 'Erreur lors de l\'authentification');
+        throw new Error(response.message || 'Échec de la connexion');
       }
     } catch (error) {
-      console.error('Initialize error:', error);
-      setError('Erreur de connexion');
+      console.error('Erreur d\'initialisation:', error);
+      toast({
+        title: "Erreur de connexion",
+        description: error instanceof Error ? error.message : "Impossible de se connecter",
+        variant: "destructive"
+      });
       return false;
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
-  }, []);
+  }, [setCredentials, toast]);
 
-  const fetchBuckets = useCallback(async (): Promise<boolean> => {
-    if (!initialized) return false;
-    
-    setLoading(true);
-    setError(null);
-
+  const fetchBuckets = useCallback(async () => {
+    setIsLoading(true);
     try {
       const response = await apiService.getBuckets();
       
       if (response.success && response.data) {
-        setBuckets(response.data);
-        return true;
+        // Convert API response to S3Bucket format
+        const s3Buckets: S3Bucket[] = response.data.map(bucket => ({
+          name: bucket.name,
+          creationDate: new Date(bucket.creationDate),
+          region: bucket.region,
+          objectCount: bucket.objectCount || 0,
+          size: bucket.size || 0
+        }));
+        
+        setBuckets(s3Buckets);
       } else {
-        return handleError(response, 'Erreur lors du chargement des buckets');
+        throw new Error(response.message || 'Erreur lors du chargement des buckets');
       }
     } catch (error) {
-      console.error('Fetch buckets error:', error);
-      setError('Erreur de connexion');
-      return false;
+      console.error('Erreur lors du chargement des buckets:', error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de charger les buckets",
+        variant: "destructive"
+      });
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
-  }, [initialized]);
+  }, [setBuckets, toast]);
 
-  const createBucket = useCallback(async (name: string, region?: string): Promise<boolean> => {
-    if (!initialized) return false;
-    
-    setLoading(true);
-    setError(null);
-
+  const createBucket = useCallback(async (name: string, region?: string) => {
+    setIsLoading(true);
     try {
       const response = await apiService.createBucket(name, region);
       
       if (response.success) {
         toast({
           title: "Succès",
-          description: `Bucket "${name}" créé avec succès`
+          description: `Le bucket "${name}" a été créé avec succès`
         });
-        return true;
+        
+        // Refresh buckets list
+        await fetchBuckets();
       } else {
-        return handleError(response, 'Erreur lors de la création du bucket');
+        throw new Error(response.message || 'Erreur lors de la création du bucket');
       }
     } catch (error) {
-      console.error('Create bucket error:', error);
-      setError('Erreur de connexion');
-      return false;
+      console.error('Erreur lors de la création du bucket:', error);
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Impossible de créer le bucket",
+        variant: "destructive"
+      });
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
-  }, [initialized]);
+  }, [fetchBuckets, toast]);
 
-  const deleteBucket = useCallback(async (name: string): Promise<boolean> => {
-    if (!initialized) return false;
-    
-    setLoading(true);
-    setError(null);
-
+  const deleteBucket = useCallback(async (name: string) => {
+    setIsLoading(true);
     try {
       const response = await apiService.deleteBucket(name);
       
       if (response.success) {
         toast({
           title: "Succès",
-          description: `Bucket "${name}" supprimé avec succès`
+          description: `Le bucket "${name}" a été supprimé avec succès`
         });
+        
+        // Refresh buckets list
         await fetchBuckets();
-        return true;
       } else {
-        return handleError(response, 'Erreur lors de la suppression du bucket');
+        throw new Error(response.message || 'Erreur lors de la suppression du bucket');
       }
     } catch (error) {
-      console.error('Delete bucket error:', error);
-      setError('Erreur de connexion');
-      return false;
+      console.error('Erreur lors de la suppression du bucket:', error);
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Impossible de supprimer le bucket",
+        variant: "destructive"
+      });
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
-  }, [initialized, fetchBuckets]);
+  }, [fetchBuckets, toast]);
 
-  const fetchObjects = useCallback(async (bucket: string, path: string = ''): Promise<boolean> => {
-    if (!initialized) return false;
-    
-    setLoading(true);
-    setError(null);
-
+  const fetchObjects = useCallback(async (bucket: string, path: string = '') => {
+    setIsLoading(true);
     try {
       const response = await apiService.getObjects(bucket, path);
       
       if (response.success && response.data) {
-        setObjects(response.data);
-        return true;
+        // Convert API response to S3Object format
+        const s3Objects: S3Object[] = response.data.map(obj => ({
+          key: obj.key,
+          lastModified: new Date(obj.lastModified),
+          size: obj.size,
+          etag: obj.etag,
+          storageClass: obj.storageClass,
+          isFolder: obj.isFolder
+        }));
+        
+        setObjects(s3Objects);
       } else {
-        return handleError(response, 'Erreur lors du chargement des objets');
+        throw new Error(response.message || 'Erreur lors du chargement des objets');
       }
     } catch (error) {
-      console.error('Fetch objects error:', error);
-      setError('Erreur de connexion');
-      return false;
+      console.error('Erreur lors du chargement des objets:', error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de charger les objets",
+        variant: "destructive"
+      });
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
-  }, [initialized]);
+  }, [setObjects, toast]);
 
-  const uploadFile = useCallback(async (file: File, bucket: string, path: string = ''): Promise<boolean> => {
-    if (!initialized) return false;
-
+  const uploadFile = useCallback(async (file: File, bucket: string, path: string = '') => {
+    setIsLoading(true);
     try {
       const response = await apiService.uploadFile(file, bucket, path);
       
       if (response.success) {
         toast({
           title: "Succès",
-          description: `Fichier "${file.name}" uploadé avec succès`
+          description: `Le fichier "${file.name}" a été uploadé avec succès`
         });
-        return true;
+        
+        // Refresh objects list
+        await fetchObjects(bucket, path);
       } else {
-        return handleError(response, 'Erreur lors de l\'upload');
+        throw new Error(response.message || 'Erreur lors de l\'upload du fichier');
       }
     } catch (error) {
-      console.error('Upload error:', error);
-      setError('Erreur de connexion');
-      return false;
+      console.error('Erreur lors de l\'upload:', error);
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Impossible d'uploader le fichier",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
     }
-  }, [initialized]);
+  }, [fetchObjects, toast]);
 
-  const deleteObject = useCallback(async (bucket: string, objectKey: string): Promise<boolean> => {
-    if (!initialized) return false;
-
+  const deleteObject = useCallback(async (bucket: string, objectKey: string) => {
+    setIsLoading(true);
     try {
       const response = await apiService.deleteObject(bucket, objectKey);
       
       if (response.success) {
         toast({
           title: "Succès",
-          description: "Objet supprimé avec succès"
+          description: "L'objet a été supprimé avec succès"
         });
-        return true;
+        
+        // Refresh objects list
+        await fetchObjects(bucket);
       } else {
-        return handleError(response, 'Erreur lors de la suppression');
+        throw new Error(response.message || 'Erreur lors de la suppression de l\'objet');
       }
     } catch (error) {
-      console.error('Delete object error:', error);
-      setError('Erreur de connexion');
-      return false;
+      console.error('Erreur lors de la suppression:', error);
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Impossible de supprimer l'objet",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
     }
-  }, [initialized]);
+  }, [fetchObjects, toast]);
 
-  const downloadObject = useCallback(async (bucket: string, objectKey: string): Promise<void> => {
-    if (!initialized) return;
-
+  const downloadObject = useCallback(async (bucket: string, objectKey: string) => {
     try {
       const response = await apiService.getDownloadUrl(bucket, objectKey);
       
       if (response.success && response.data?.url) {
         window.open(response.data.url, '_blank');
       } else {
-        handleError(response, 'Erreur lors de la génération du lien de téléchargement');
+        throw new Error(response.message || 'Erreur lors de la génération du lien de téléchargement');
       }
     } catch (error) {
-      console.error('Download error:', error);
-      setError('Erreur de connexion');
+      console.error('Erreur lors du téléchargement:', error);
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Impossible de télécharger l'objet",
+        variant: "destructive"
+      });
     }
-  }, [initialized]);
+  }, [toast]);
 
-  const createFolder = useCallback(async (bucket: string, path: string, folderName: string): Promise<boolean> => {
-    if (!initialized) return false;
-
+  const createFolder = useCallback(async (bucket: string, path: string, folderName: string) => {
+    setIsLoading(true);
     try {
       const response = await apiService.createFolder(bucket, path, folderName);
       
       if (response.success) {
         toast({
           title: "Succès",
-          description: `Dossier "${folderName}" créé avec succès`
+          description: `Le dossier "${folderName}" a été créé avec succès`
         });
-        return true;
+        
+        // Refresh objects list
+        await fetchObjects(bucket, path);
       } else {
-        return handleError(response, 'Erreur lors de la création du dossier');
+        throw new Error(response.message || 'Erreur lors de la création du dossier');
       }
     } catch (error) {
-      console.error('Create folder error:', error);
-      setError('Erreur de connexion');
-      return false;
+      console.error('Erreur lors de la création du dossier:', error);
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Impossible de créer le dossier",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
     }
-  }, [initialized]);
+  }, [fetchObjects, toast]);
 
-  const logout = useCallback(async (): Promise<void> => {
-    if (initialized) {
+  const logout = useCallback(async () => {
+    try {
       await apiService.logout();
+      setCredentials(null);
+      setBuckets([]);
+      setObjects([]);
+      setCurrentBucket(null);
+      
+      toast({
+        title: "Déconnexion",
+        description: "Vous avez été déconnecté avec succès"
+      });
+    } catch (error) {
+      console.error('Erreur lors de la déconnexion:', error);
+      // Even if logout fails on server, clear local state
+      setCredentials(null);
+      setBuckets([]);
+      setObjects([]);
+      setCurrentBucket(null);
     }
-    setInitialized(false);
-    storeLogout();
-  }, [initialized, storeLogout]);
+  }, [setCredentials, setBuckets, setObjects, setCurrentBucket, toast]);
 
   return {
-    initialized,
+    isLoading,
     initialize,
     fetchBuckets,
     createBucket,
