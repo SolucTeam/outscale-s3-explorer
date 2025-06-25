@@ -24,15 +24,23 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
-      <main className="container mx-auto px-6 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          <div className="lg:col-span-3">
+      <main className="container mx-auto px-4 sm:px-6 py-4 sm:py-8">
+        <div className="flex flex-col xl:flex-row gap-4 sm:gap-6">
+          {/* Contenu principal */}
+          <div className="flex-1 min-w-0">
             <Breadcrumb />
             {currentBucket ? <ObjectList /> : <BucketList />}
           </div>
-          <div className="lg:col-span-1">
+          
+          {/* Historique des actions - caché sur mobile, visible sur desktop */}
+          <div className="hidden xl:block w-80 flex-shrink-0">
             <ActionHistory />
           </div>
+        </div>
+        
+        {/* Historique des actions mobile - section séparée en bas */}
+        <div className="xl:hidden mt-8">
+          <ActionHistory />
         </div>
       </main>
     </div>
