@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { OUTSCALE_REGIONS } from '../data/regions';
 import { useToast } from '@/hooks/use-toast';
 import { Cloud, Shield, AlertCircle, Globe, Server } from 'lucide-react';
-import { jwtAuthService } from '../services/jwtAuthService';
+import { useBackendApi } from '../hooks/useBackendApi';
 
 interface LoginFormProps {
   onLoginSuccess?: () => void;
@@ -21,6 +21,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
   const [isLoading, setIsLoading] = useState(false);
 
   const { toast } = useToast();
+  const { login } = useBackendApi();
 
   // Get the selected region details
   const selectedRegion = OUTSCALE_REGIONS.find(r => r.id === region);
@@ -47,7 +48,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
 
       const credentials = { accessKey, secretKey, region };
       
-      const result = await jwtAuthService.login(credentials);
+      const result = await login(credentials);
       
       if (result.success) {
         toast({

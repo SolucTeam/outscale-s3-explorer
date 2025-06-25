@@ -1,19 +1,17 @@
 
-import { jwtAuthService } from '../services/jwtAuthService';
+import { useAuth } from '../hooks/useAuth';
 import { NavigationManager } from '../services/navigationManager';
 
 export class AuthGuard {
-  static async checkAuthentication(): Promise<boolean> {
+  static checkAuthentication(): boolean {
     try {
-      const isValid = await jwtAuthService.isTokenValid();
+      // Utiliser le hook useAuth pour vérifier l'authentification
+      // Note: Cette approche sera refactorisée pour utiliser directement le store
+      const authData = localStorage.getItem('auth-storage');
+      if (!authData) return false;
       
-      if (!isValid) {
-        // Le token n'est pas valide, essayer de le rafraîchir
-        const refreshed = await jwtAuthService.refreshToken();
-        return refreshed;
-      }
-      
-      return true;
+      const parsed = JSON.parse(authData);
+      return parsed?.state?.isAuthenticated || false;
     } catch (error) {
       console.error('Authentication check failed:', error);
       return false;
@@ -29,12 +27,12 @@ export class AuthGuard {
     // Nettoyer l'état de navigation
     NavigationManager.clearAll();
     
-    // Effectuer le logout complet
-    jwtAuthService.logout();
+    // Nettoyer le localStorage auth
+    localStorage.removeItem('auth-storage');
   }
   
-  static async requireAuth(currentPath: string): Promise<boolean> {
-    const isAuthenticated = await this.checkAuthentication();
+  static requireAuth(currentPath: string): boolean {
+    const isAuthenticated = this.checkAuthentication();
     
     if (!isAuthenticated) {
       this.handleAuthenticationFailure(currentPath);
