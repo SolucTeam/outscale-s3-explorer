@@ -11,11 +11,21 @@ import { ActionHistory } from '../components/ActionHistory';
 import { RetryIndicator } from '../components/RetryIndicator';
 import { useS3Store } from '../hooks/useS3Store';
 import { useBackendApi } from '../hooks/useBackendApi';
+import { useBackendStatus } from '../hooks/useBackendStatus';
+import { useRetryState } from '../hooks/useRetryState';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const Index = () => {
   const { credentials, currentBucket } = useS3Store();
   const { fetchBuckets } = useBackendApi();
+  const { status: backendStatus, isChecking, checkStatus } = useBackendStatus();
+  const { 
+    isRetrying, 
+    error, 
+    retryAttempt, 
+    nextRetryIn, 
+    manualRetry 
+  } = useRetryState();
   const [activeTab, setActiveTab] = useState('buckets');
 
   useEffect(() => {
@@ -35,7 +45,11 @@ const Index = () => {
             </div>
             <LoginForm />
             <div className="mt-6">
-              <BackendStatusIndicator />
+              <BackendStatusIndicator 
+                status={backendStatus}
+                isChecking={isChecking}
+                onRetry={checkStatus}
+              />
             </div>
           </div>
         </div>
@@ -43,15 +57,24 @@ const Index = () => {
     );
   }
 
+  // Only show logs and history if backend is online and user is authenticated
+  const showLogsAndHistory = backendStatus.isOnline && credentials;
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
-      <RetryIndicator />
+      <RetryIndicator 
+        isRetrying={isRetrying}
+        error={error}
+        retryAttempt={retryAttempt}
+        nextRetryIn={nextRetryIn}
+        onManualRetry={manualRetry}
+      />
       
       <div className="container mx-auto px-4 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <div className={`grid grid-cols-1 gap-6 ${showLogsAndHistory ? 'lg:grid-cols-4' : ''}`}>
           {/* Contenu principal */}
-          <div className="lg:col-span-3">
+          <div className={showLogsAndHistory ? 'lg:col-span-3' : ''}>
             <div className="space-y-6">
               <Breadcrumb />
               
@@ -74,13 +97,15 @@ const Index = () => {
             </div>
           </div>
           
-          {/* Panneau latéral - Logs et historique */}
-          <div className="lg:col-span-1">
-            <div className="space-y-6">
-              <LogConsole />
-              <ActionHistory />
+          {/* Panneau latéral - Logs et historique - Seulement si backend actif et utilisateur connecté */}
+          {showLogsAndHistory && (
+            <div className="lg:col-span-1">
+              <div className="space-y-6">
+                <LogConsole />
+                <ActionHistory />
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>
