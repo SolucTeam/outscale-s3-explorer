@@ -9,11 +9,14 @@ import { Folder, Calendar, HardDrive, ChevronRight, RefreshCw, Plus, Trash2 } fr
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { CreateBucketDialog } from './CreateBucketDialog';
+import { ForceDeleteBucketDialog } from './ForceDeleteBucketDialog';
 
 export const BucketList = () => {
   const { buckets, loading, setCurrentBucket } = useS3Store();
-  const { fetchBuckets, deleteBucket } = useBackendApi();
+  const { fetchBuckets } = useBackendApi();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [bucketToDelete, setBucketToDelete] = useState<string>('');
 
   useEffect(() => {
     fetchBuckets();
@@ -27,14 +30,15 @@ export const BucketList = () => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const handleDeleteBucket = async (bucketName: string, event: React.MouseEvent) => {
+  const handleDeleteBucket = (bucketName: string, event: React.MouseEvent) => {
     event.stopPropagation();
-    
-    if (!window.confirm(`Êtes-vous sûr de vouloir supprimer le bucket "${bucketName}" ? Cette action est irréversible.`)) {
-      return;
-    }
+    setBucketToDelete(bucketName);
+    setShowDeleteDialog(true);
+  };
 
-    await deleteBucket(bucketName);
+  const handleDeleteCompleted = () => {
+    fetchBuckets();
+    setBucketToDelete('');
   };
 
   const handleRefresh = () => {
@@ -95,6 +99,7 @@ export const BucketList = () => {
                     variant="ghost"
                     onClick={(e) => handleDeleteBucket(bucket.name, e)}
                     className="opacity-0 group-hover:opacity-100 transition-opacity text-red-600 hover:text-red-700 hover:bg-red-50 h-8 w-8 p-0"
+                    title="Supprimer le bucket et son contenu"
                   >
                     <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
                   </Button>
@@ -135,6 +140,13 @@ export const BucketList = () => {
       <CreateBucketDialog 
         open={showCreateDialog} 
         onOpenChange={setShowCreateDialog}
+      />
+
+      <ForceDeleteBucketDialog
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        bucketName={bucketToDelete}
+        onDeleted={handleDeleteCompleted}
       />
     </div>
   );
