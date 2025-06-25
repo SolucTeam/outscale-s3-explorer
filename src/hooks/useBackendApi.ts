@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { rateLimitedApiService } from '../services/rateLimitedApiService';
+import { apiService } from '../services/apiService';
 import { useS3Store } from './useS3Store';
 import { useToast } from '@/hooks/use-toast';
 import { S3Credentials, S3Bucket, S3Object } from '../types/s3';
@@ -20,7 +20,7 @@ export const useBackendApi = () => {
     
     setIsLoading(true);
     try {
-      const response = await rateLimitedApiService.login(credentials);
+      const response = await apiService.login(credentials);
       
       if (response.success) {
         setCredentials(credentials);
@@ -45,15 +45,9 @@ export const useBackendApi = () => {
         undefined,
         'CONNECTION_FAILED'
       );
-      
-      // Show specific error message for rate limiting
-      const errorMessage = error instanceof Error && error.message.toLowerCase().includes('rate limit')
-        ? "Trop de tentatives de connexion. Veuillez patienter avant de réessayer."
-        : error instanceof Error ? error.message : "Impossible de se connecter";
-        
       toast({
         title: "Erreur de connexion",
-        description: errorMessage,
+        description: error instanceof Error ? error.message : "Impossible de se connecter",
         variant: "destructive"
       });
       return false;
@@ -67,7 +61,7 @@ export const useBackendApi = () => {
     
     setIsLoading(true);
     try {
-      const response = await rateLimitedApiService.getBuckets();
+      const response = await apiService.getBuckets();
       
       if (response.success && response.data) {
         const s3Buckets: S3Bucket[] = response.data.map(bucket => ({
@@ -114,7 +108,7 @@ export const useBackendApi = () => {
     
     setIsLoading(true);
     try {
-      const response = await rateLimitedApiService.createBucket(name, region);
+      const response = await apiService.createBucket(name, region);
       
       if (response.success) {
         s3LoggingService.logOperationSuccess(logEntryId, 'bucket_create', name, undefined, 'Bucket créé avec succès');
@@ -152,7 +146,7 @@ export const useBackendApi = () => {
     
     setIsLoading(true);
     try {
-      const response = await rateLimitedApiService.deleteBucket(name);
+      const response = await apiService.deleteBucket(name);
       
       if (response.success) {
         s3LoggingService.logOperationSuccess(logEntryId, 'bucket_delete', name, undefined, 'Bucket supprimé avec succès');
@@ -190,7 +184,7 @@ export const useBackendApi = () => {
     
     setIsLoading(true);
     try {
-      const response = await rateLimitedApiService.getObjects(bucket, path);
+      const response = await apiService.getObjects(bucket, path);
       
       if (response.success && response.data) {
         const s3Objects: S3Object[] = response.data.map(obj => ({
@@ -238,7 +232,7 @@ export const useBackendApi = () => {
     
     setIsLoading(true);
     try {
-      const response = await rateLimitedApiService.uploadFile(file, bucket, path);
+      const response = await apiService.uploadFile(file, bucket, path);
       
       if (response.success) {
         s3LoggingService.logOperationSuccess(logEntryId, 'object_upload', bucket, file.name, 'Upload réussi');
@@ -276,7 +270,7 @@ export const useBackendApi = () => {
     
     setIsLoading(true);
     try {
-      const response = await rateLimitedApiService.deleteObject(bucket, objectKey);
+      const response = await apiService.deleteObject(bucket, objectKey);
       
       if (response.success) {
         s3LoggingService.logOperationSuccess(logEntryId, 'object_delete', bucket, objectKey, 'Suppression réussie');
@@ -314,7 +308,7 @@ export const useBackendApi = () => {
     const logEntryId = s3LoggingService.logOperationStart('object_download', bucket, objectKey);
     
     try {
-      const response = await rateLimitedApiService.getDownloadUrl(bucket, objectKey);
+      const response = await apiService.getDownloadUrl(bucket, objectKey);
       
       if (response.success && response.data?.url) {
         s3LoggingService.logOperationSuccess(logEntryId, 'object_download', bucket, objectKey, 'Lien de téléchargement généré');
@@ -345,7 +339,7 @@ export const useBackendApi = () => {
     
     setIsLoading(true);
     try {
-      const response = await rateLimitedApiService.createFolder(bucket, path, folderName);
+      const response = await apiService.createFolder(bucket, path, folderName);
       
       if (response.success) {
         s3LoggingService.logOperationSuccess(logEntryId, 'folder_create', bucket, folderName, 'Dossier créé avec succès');
@@ -382,14 +376,11 @@ export const useBackendApi = () => {
     const logEntryId = s3LoggingService.logOperationStart('bucket_delete', undefined, undefined, 'Déconnexion en cours');
     
     try {
-      await rateLimitedApiService.logout();
+      await apiService.logout();
       setCredentials(null);
       setBuckets([]);
       setObjects([]);
       setCurrentBucket(null);
-      
-      // Clear any pending requests
-      rateLimitedApiService.clearQueue();
       
       s3LoggingService.logOperationSuccess(logEntryId, 'bucket_delete', undefined, undefined, 'Déconnexion réussie');
       toast({
@@ -411,7 +402,6 @@ export const useBackendApi = () => {
       setBuckets([]);
       setObjects([]);
       setCurrentBucket(null);
-      rateLimitedApiService.clearQueue();
     }
   }, [setCredentials, setBuckets, setObjects, setCurrentBucket, toast]);
 
@@ -426,7 +416,6 @@ export const useBackendApi = () => {
     deleteObject,
     downloadObject,
     createFolder,
-    logout,
-    queueStatus: rateLimitedApiService.getQueueStatus()
+    logout
   };
 };

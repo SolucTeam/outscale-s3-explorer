@@ -5,23 +5,21 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useS3Store } from '../hooks/useS3Store';
+import { useBackendApi } from '../hooks/useBackendApi';
 import { OUTSCALE_REGIONS } from '../data/regions';
 import { useToast } from '@/hooks/use-toast';
 import { Cloud, Shield, AlertCircle, Globe, Server } from 'lucide-react';
-import { useBackendApi } from '../hooks/useBackendApi';
 
-interface LoginFormProps {
-  onLoginSuccess?: () => void;
-}
-
-export const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
+export const LoginForm = () => {
   const [accessKey, setAccessKey] = useState('');
   const [secretKey, setSecretKey] = useState('');
   const [region, setRegion] = useState('eu-west-2');
   const [isLoading, setIsLoading] = useState(false);
 
-  const { toast } = useToast();
+  const { login } = useS3Store();
   const { initialize } = useBackendApi();
+  const { toast } = useToast();
 
   // Get the selected region details
   const selectedRegion = OUTSCALE_REGIONS.find(r => r.id === region);
@@ -48,21 +46,13 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
 
       const credentials = { accessKey, secretKey, region };
       
-      const result = await initialize(credentials);
+      const success = await initialize(credentials);
       
-      if (result) {
+      if (success) {
+        login(credentials);
         toast({
           title: "Connexion réussie",
           description: "Vous êtes maintenant connecté à votre compte Outscale"
-        });
-        
-        // Appeler le callback de succès
-        onLoginSuccess?.();
-      } else {
-        toast({
-          title: "Erreur de connexion",
-          description: "Échec de la connexion",
-          variant: "destructive"
         });
       }
     } catch (error) {
