@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent } from '@/components/ui/card';
-import { useS3Mock } from '../hooks/useS3Mock';
+import { useFlaskApi } from '../hooks/useFlaskApi';
 import { Upload, X, File, CheckCircle, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -30,7 +30,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({
 }) => {
   const [files, setFiles] = useState<UploadFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
-  const { uploadFile } = useS3Mock();
+  const { uploadFile } = useFlaskApi();
   const { toast } = useToast();
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -79,16 +79,16 @@ export const FileUpload: React.FC<FileUploadProps> = ({
         idx === fileIndex ? { ...f, status: 'uploading', progress: 0 } : f
       ));
 
-      // Simuler la progression
+      // Simuler la progression pendant l'upload
       const progressInterval = setInterval(() => {
         setFiles(prev => prev.map((f, idx) => {
           if (idx === fileIndex && f.status === 'uploading') {
-            const newProgress = Math.min(f.progress + Math.random() * 30, 90);
+            const newProgress = Math.min(f.progress + Math.random() * 20, 90);
             return { ...f, progress: newProgress };
           }
           return f;
         }));
-      }, 200);
+      }, 300);
 
       try {
         const success = await uploadFile(pendingFiles[i].file, bucket, path);
@@ -98,27 +98,24 @@ export const FileUpload: React.FC<FileUploadProps> = ({
           setFiles(prev => prev.map((f, idx) => 
             idx === fileIndex ? { ...f, status: 'success', progress: 100 } : f
           ));
-          toast({
-            title: "Upload réussi",
-            description: `${pendingFiles[i].file.name} a été uploadé avec succès.`,
-          });
         } else {
           setFiles(prev => prev.map((f, idx) => 
-            idx === fileIndex ? { ...f, status: 'error', error: 'Échec de l\'upload' } : f
+            idx === fileIndex ? { ...f, status: 'error', progress: 0, error: 'Échec de l\'upload' } : f
           ));
         }
       } catch (error) {
         clearInterval(progressInterval);
         setFiles(prev => prev.map((f, idx) => 
-          idx === fileIndex ? { ...f, status: 'error', error: 'Erreur réseau' } : f
+          idx === fileIndex ? { ...f, status: 'error', progress: 0, error: error instanceof Error ? error.message : 'Erreur réseau' } : f
         ));
       }
     }
 
-    // Fermer après un délai si tous les uploads sont terminés
+    // Fermer après un délai si tous les uploads sont terminés avec succès
     setTimeout(() => {
       const allComplete = files.every(f => f.status === 'success' || f.status === 'error');
-      if (allComplete) {
+      const hasSuccess = files.some(f => f.status === 'success');
+      if (allComplete && hasSuccess) {
         onUploadComplete();
       }
     }, 1000);

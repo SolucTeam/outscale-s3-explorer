@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useS3Mock } from '../hooks/useS3Mock';
+import { useFlaskApi } from '../hooks/useFlaskApi';
 import { useToast } from '@/components/ui/use-toast';
 
 interface CreateFolderDialogProps {
@@ -18,7 +18,7 @@ interface CreateFolderDialogProps {
 export const CreateFolderDialog = ({ open, onOpenChange, bucket, currentPath, onFolderCreated }: CreateFolderDialogProps) => {
   const [folderName, setFolderName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
-  const { createFolder } = useS3Mock();
+  const { createFolder } = useFlaskApi();
   const { toast } = useToast();
 
   const handleCreate = async () => {
@@ -45,10 +45,6 @@ export const CreateFolderDialog = ({ open, onOpenChange, bucket, currentPath, on
     const success = await createFolder(bucket, currentPath, folderName);
     
     if (success) {
-      toast({
-        title: "Succès",
-        description: `Dossier "${folderName}" créé avec succès`
-      });
       setFolderName('');
       onOpenChange(false);
       onFolderCreated();

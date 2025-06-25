@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useS3Store } from '../hooks/useS3Store';
-import { useS3Mock } from '../hooks/useS3Mock';
+import { useFlaskApi } from '../hooks/useFlaskApi';
 import { Upload, Download, Trash2, FolderOpen, File, RefreshCw, Plus, FolderPlus } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -13,7 +13,7 @@ import { CreateFolderDialog } from './CreateFolderDialog';
 
 export const ObjectList = () => {
   const { currentBucket, currentPath, objects, loading, setCurrentPath } = useS3Store();
-  const { fetchObjects, deleteObject } = useS3Mock();
+  const { fetchObjects, deleteObject, downloadObject } = useFlaskApi();
   const [showUpload, setShowUpload] = useState(false);
   const [showCreateFolder, setShowCreateFolder] = useState(false);
 
@@ -40,15 +40,15 @@ export const ObjectList = () => {
 
   const handleDelete = async (objectKey: string) => {
     if (window.confirm('Êtes-vous sûr de vouloir supprimer cet élément ?')) {
-      await deleteObject(currentBucket!, objectKey);
-      fetchObjects(currentBucket!, currentPath);
+      const success = await deleteObject(currentBucket!, objectKey);
+      if (success) {
+        fetchObjects(currentBucket!, currentPath);
+      }
     }
   };
 
-  const handleDownload = (objectKey: string) => {
-    // Simuler le téléchargement
-    console.log(`Téléchargement de ${objectKey}`);
-    // Dans une vraie implémentation, cela génèrerait une URL signée
+  const handleDownload = async (objectKey: string) => {
+    await downloadObject(currentBucket!, objectKey);
   };
 
   const handleFolderCreated = () => {
