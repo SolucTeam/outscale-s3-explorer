@@ -8,8 +8,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useS3Store } from '../hooks/useS3Store';
 import { useDirectS3 } from '../hooks/useDirectS3';
 import { OUTSCALE_REGIONS } from '../data/regions';
+import { OutscaleConfig } from '../services/outscaleConfig';
 import { useToast } from '@/hooks/use-toast';
-import { Cloud, Shield, AlertCircle } from 'lucide-react';
+import { Cloud, Shield, AlertCircle, Globe } from 'lucide-react';
 
 export const LoginForm = () => {
   const [accessKey, setAccessKey] = useState('');
@@ -20,6 +21,9 @@ export const LoginForm = () => {
   const { login } = useS3Store();
   const { initialize } = useDirectS3();
   const { toast } = useToast();
+
+  // Obtenir l'endpoint de la région sélectionnée
+  const selectedEndpoint = OutscaleConfig.getEndpoint(region);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,6 +98,17 @@ export const LoginForm = () => {
                   ))}
                 </SelectContent>
               </Select>
+              
+              {/* Affichage de l'endpoint */}
+              <div className="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                <div className="flex items-center space-x-2 text-sm text-gray-700">
+                  <Globe className="w-4 h-4 text-blue-600" />
+                  <span className="font-medium">Endpoint:</span>
+                  <code className="bg-gray-100 px-2 py-1 rounded text-xs font-mono">
+                    {selectedEndpoint}
+                  </code>
+                </div>
+              </div>
             </div>
             
             <div className="space-y-2">
