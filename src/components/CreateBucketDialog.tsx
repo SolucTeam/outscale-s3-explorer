@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -6,8 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { OUTSCALE_REGIONS } from '../data/regions';
-import { useFlaskApi } from '../hooks/useFlaskApi';
-import { useToast } from '@/components/ui/use-toast';
+import { useDirectS3 } from '../hooks/useDirectS3';
+import { useToast } from '@/hooks/use-toast';
 
 interface CreateBucketDialogProps {
   open: boolean;
@@ -18,7 +17,7 @@ export const CreateBucketDialog = ({ open, onOpenChange }: CreateBucketDialogPro
   const [bucketName, setBucketName] = useState('');
   const [region, setRegion] = useState('');
   const [isCreating, setIsCreating] = useState(false);
-  const { createBucket, fetchBuckets } = useFlaskApi();
+  const { createBucket, fetchBuckets } = useDirectS3();
   const { toast } = useToast();
 
   const handleCreate = async () => {

@@ -1,10 +1,9 @@
-
 import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useS3Store } from '../hooks/useS3Store';
-import { useFlaskApi } from '../hooks/useFlaskApi';
+import { useDirectS3 } from '../hooks/useDirectS3';
 import { Upload, Download, Trash2, FolderOpen, File, RefreshCw, Plus, FolderPlus } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -13,7 +12,7 @@ import { CreateFolderDialog } from './CreateFolderDialog';
 
 export const ObjectList = () => {
   const { currentBucket, currentPath, objects, loading, setCurrentPath } = useS3Store();
-  const { fetchObjects, deleteObject, downloadObject } = useFlaskApi();
+  const { fetchObjects, deleteObject, downloadObject } = useDirectS3();
   const [showUpload, setShowUpload] = useState(false);
   const [showCreateFolder, setShowCreateFolder] = useState(false);
 

@@ -6,12 +6,10 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useS3Store } from '../hooks/useS3Store';
+import { useDirectS3 } from '../hooks/useDirectS3';
 import { OUTSCALE_REGIONS } from '../data/regions';
-import { apiService } from '../services/apiService';
 import { useToast } from '@/hooks/use-toast';
 import { Cloud, Shield, AlertCircle } from 'lucide-react';
-import { useBackendStatus } from '../hooks/useBackendStatus';
-import { BackendStatusIndicator } from './BackendStatusIndicator';
 
 export const LoginForm = () => {
   const [accessKey, setAccessKey] = useState('');
@@ -20,8 +18,8 @@ export const LoginForm = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   const { login } = useS3Store();
+  const { initialize } = useDirectS3();
   const { toast } = useToast();
-  const { status: backendStatus, isChecking, checkStatus } = useBackendStatus();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,47 +33,25 @@ export const LoginForm = () => {
       return;
     }
 
-    if (!backendStatus.isOnline) {
-      toast({
-        title: "Backend inaccessible",
-        description: "Impossible de se connecter avec le backend indisponible",
-        variant: "destructive"
-      });
-      return;
-    }
-
     setIsLoading(true);
 
     try {
-      const response = await apiService.login({
-        accessKey,
-        secretKey,
-        region
-      });
-
-      if (response.success && response.data) {
-        login({
-          accessKey: response.data.user.accessKey,
-          secretKey: '', // Ne pas stocker côté client
-          region: response.data.user.region
-        });
-        
+      const credentials = { accessKey, secretKey, region };
+      
+      const success = await initialize(credentials);
+      
+      if (success) {
+        login(credentials);
         toast({
           title: "Connexion réussie",
           description: "Vous êtes maintenant connecté à votre compte Outscale"
-        });
-      } else {
-        toast({
-          title: "Erreur de connexion",
-          description: response.error || "Identifiants invalides",
-          variant: "destructive"
         });
       }
     } catch (error) {
       console.error('Login error:', error);
       toast({
         title: "Erreur de connexion",
-        description: "Impossible de se connecter au serveur",
+        description: "Impossible de se connecter au service S3",
         variant: "destructive"
       });
     } finally {
@@ -101,14 +77,6 @@ export const LoginForm = () => {
         </CardHeader>
         
         <CardContent>
-          {/* Indicateur de statut du backend */}
-          <BackendStatusIndicator 
-            status={backendStatus}
-            isChecking={isChecking}
-            onRetry={checkStatus}
-            className="mb-6"
-          />
-
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="region" className="text-sm font-medium text-gray-700">
@@ -163,24 +131,24 @@ export const LoginForm = () => {
             <Button 
               type="submit" 
               className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white py-3 rounded-lg font-medium transition-all duration-200 shadow-lg hover:shadow-xl" 
-              disabled={!accessKey || !secretKey || isLoading || !backendStatus.isOnline}
+              disabled={!accessKey || !secretKey || isLoading}
             >
               <Shield className="w-4 h-4 mr-2" />
               {isLoading ? 'Connexion...' : 'Se connecter'}
             </Button>
           </form>
           
-          <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-            <p className="text-sm text-blue-800">
+          <div className="mt-6 p-4 bg-green-50 rounded-lg border border-green-200">
+            <p className="text-sm text-green-800">
               <Shield className="w-4 h-4 inline mr-2" />
-              Vos identifiants sont traités de manière sécurisée côté serveur.
+              Connexion directe et sécurisée à votre infrastructure Outscale.
             </p>
           </div>
 
-          <div className="mt-4 p-4 bg-amber-50 rounded-lg border border-amber-200">
-            <p className="text-sm text-amber-800 flex items-start">
+          <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <p className="text-sm text-blue-800 flex items-start">
               <AlertCircle className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
-              Assurez-vous que votre backend Flask est démarré sur l'URL configurée.
+              Application 100% frontend - Vos identifiants ne transitent jamais par un serveur tiers.
             </p>
           </div>
         </CardContent>

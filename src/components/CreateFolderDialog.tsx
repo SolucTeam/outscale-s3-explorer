@@ -1,11 +1,10 @@
-
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useFlaskApi } from '../hooks/useFlaskApi';
-import { useToast } from '@/components/ui/use-toast';
+import { useDirectS3 } from '../hooks/useDirectS3';
+import { useToast } from '@/hooks/use-toast';
 
 interface CreateFolderDialogProps {
   open: boolean;
@@ -18,7 +17,7 @@ interface CreateFolderDialogProps {
 export const CreateFolderDialog = ({ open, onOpenChange, bucket, currentPath, onFolderCreated }: CreateFolderDialogProps) => {
   const [folderName, setFolderName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
-  const { createFolder } = useFlaskApi();
+  const { createFolder } = useDirectS3();
   const { toast } = useToast();
 
   const handleCreate = async () => {

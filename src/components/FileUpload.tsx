@@ -1,10 +1,9 @@
-
 import React, { useState, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent } from '@/components/ui/card';
-import { useFlaskApi } from '../hooks/useFlaskApi';
+import { useDirectS3 } from '../hooks/useDirectS3';
 import { Upload, X, File, CheckCircle, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -30,7 +29,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({
 }) => {
   const [files, setFiles] = useState<UploadFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
-  const { uploadFile } = useFlaskApi();
+  const { uploadFile } = useDirectS3();
   const { toast } = useToast();
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
