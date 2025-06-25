@@ -2,12 +2,12 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { useS3Store } from '../hooks/useS3Store';
-import { useDirectS3 } from '../hooks/useDirectS3';
+import { useBackendApi } from '../hooks/useBackendApi';
 import { Cloud, LogOut, ArrowLeft } from 'lucide-react';
 
 export const Header = () => {
   const { credentials, currentBucket, setCurrentBucket } = useS3Store();
-  const { logout } = useDirectS3();
+  const { logout } = useBackendApi();
 
   const handleBackToBuckets = () => {
     setCurrentBucket(null);

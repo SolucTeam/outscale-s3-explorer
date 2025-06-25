@@ -1,9 +1,10 @@
+
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useS3Store } from '../hooks/useS3Store';
-import { useDirectS3 } from '../hooks/useDirectS3';
+import { useBackendApi } from '../hooks/useBackendApi';
 import { Folder, Calendar, HardDrive, ChevronRight, RefreshCw, Plus, Trash2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -11,7 +12,7 @@ import { CreateBucketDialog } from './CreateBucketDialog';
 
 export const BucketList = () => {
   const { buckets, loading, setCurrentBucket } = useS3Store();
-  const { fetchBuckets, deleteBucket } = useDirectS3();
+  const { fetchBuckets, deleteBucket } = useBackendApi();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
 
   useEffect(() => {

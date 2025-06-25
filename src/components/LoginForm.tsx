@@ -1,15 +1,13 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useS3Store } from '../hooks/useS3Store';
-import { useDirectS3 } from '../hooks/useDirectS3';
+import { useBackendApi } from '../hooks/useBackendApi';
 import { OUTSCALE_REGIONS } from '../data/regions';
-import { OutscaleConfig } from '../services/outscaleConfig';
-import { configureCorsForOutscale } from '../utils/corsUtils';
 import { useToast } from '@/hooks/use-toast';
 import { Cloud, Shield, AlertCircle, Globe } from 'lucide-react';
 
@@ -20,16 +18,8 @@ export const LoginForm = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   const { login } = useS3Store();
-  const { initialize } = useDirectS3();
+  const { initialize } = useBackendApi();
   const { toast } = useToast();
-
-  // Obtenir l'endpoint de la région sélectionnée
-  const selectedEndpoint = OutscaleConfig.getEndpoint(region);
-
-  // Configurer CORS au montage du composant
-  useEffect(() => {
-    configureCorsForOutscale();
-  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,8 +38,7 @@ export const LoginForm = () => {
     try {
       console.log('Attempting to login with:', {
         accessKey: accessKey.substring(0, 8) + '...',
-        region,
-        endpoint: selectedEndpoint
+        region
       });
 
       const credentials = { accessKey, secretKey, region };
@@ -67,7 +56,7 @@ export const LoginForm = () => {
       console.error('Login error:', error);
       toast({
         title: "Erreur de connexion",
-        description: "Impossible de se connecter au service S3. Vérifiez vos identifiants et votre connexion internet.",
+        description: "Impossible de se connecter au service. Vérifiez vos identifiants et votre connexion internet.",
         variant: "destructive"
       });
     } finally {
@@ -110,17 +99,6 @@ export const LoginForm = () => {
                   ))}
                 </SelectContent>
               </Select>
-              
-              {/* Affichage de l'endpoint */}
-              <div className="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                <div className="flex items-center space-x-2 text-sm text-gray-700">
-                  <Globe className="w-4 h-4 text-blue-600" />
-                  <span className="font-medium">Endpoint:</span>
-                  <code className="bg-gray-100 px-2 py-1 rounded text-xs font-mono">
-                    {selectedEndpoint}
-                  </code>
-                </div>
-              </div>
             </div>
             
             <div className="space-y-2">
@@ -168,14 +146,14 @@ export const LoginForm = () => {
           <div className="mt-6 p-4 bg-green-50 rounded-lg border border-green-200">
             <p className="text-sm text-green-800">
               <Shield className="w-4 h-4 inline mr-2" />
-              Connexion directe et sécurisée à votre infrastructure Outscale.
+              Connexion sécurisée via notre backend à votre infrastructure Outscale.
             </p>
           </div>
 
           <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
             <p className="text-sm text-blue-800 flex items-start">
               <AlertCircle className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
-              Application 100% frontend - Vos identifiants ne transitent jamais par un serveur tiers.
+              Vos identifiants sont sécurisés et stockés uniquement durant votre session.
             </p>
           </div>
         </CardContent>
