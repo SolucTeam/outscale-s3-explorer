@@ -1,25 +1,21 @@
 
 import React from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { useAuth } from '../contexts/AuthContext';
+import { useS3Store } from '../hooks/useS3Store';
+import { useBackendApi } from '../hooks/useBackendApi';
 import { Cloud, LogOut, ArrowLeft } from 'lucide-react';
 
 export const Header = () => {
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
+  const { credentials, currentBucket, setCurrentBucket } = useS3Store();
+  const { logout } = useBackendApi();
 
   const handleBackToBuckets = () => {
-    navigate('/dashboard');
+    setCurrentBucket(null);
   };
 
-  const handleLogout = async () => {
-    await logout();
-    navigate('/login');
+  const handleLogout = () => {
+    logout();
   };
-
-  const isOnBucketPage = location.pathname.startsWith('/bucket/');
 
   return (
     <header className="bg-white border-b border-gray-200 shadow-sm">
@@ -33,12 +29,12 @@ export const Header = () => {
               <div>
                 <h1 className="text-xl font-bold text-gray-900">NumS3 Console</h1>
                 <p className="text-sm text-gray-600">
-                  {user?.region} • {user?.accessKey}
+                  {credentials?.region} • {credentials?.accessKey}
                 </p>
               </div>
             </div>
             
-            {isOnBucketPage && (
+            {currentBucket && (
               <>
                 <div className="h-6 w-px bg-gray-300" />
                 <Button

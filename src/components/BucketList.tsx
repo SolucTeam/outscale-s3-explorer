@@ -1,6 +1,5 @@
 
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -13,9 +12,8 @@ import { CreateBucketDialog } from './CreateBucketDialog';
 import { ForceDeleteBucketDialog } from './ForceDeleteBucketDialog';
 
 export const BucketList = () => {
-  const { buckets, loading } = useS3Store();
+  const { buckets, loading, setCurrentBucket } = useS3Store();
   const { fetchBuckets } = useBackendApi();
-  const navigate = useNavigate();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [bucketToDelete, setBucketToDelete] = useState<string>('');
@@ -45,10 +43,6 @@ export const BucketList = () => {
 
   const handleRefresh = () => {
     fetchBuckets();
-  };
-
-  const handleBucketClick = (bucketName: string) => {
-    navigate(`/bucket/${bucketName}`);
   };
 
   if (loading) {
@@ -83,11 +77,7 @@ export const BucketList = () => {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
         {buckets.map((bucket) => (
-          <Card 
-            key={bucket.name} 
-            className="hover:shadow-lg transition-all duration-200 cursor-pointer group"
-            onClick={() => handleBucketClick(bucket.name)}
-          >
+          <Card key={bucket.name} className="hover:shadow-lg transition-all duration-200 cursor-pointer group">
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center space-x-3 min-w-0 flex-1">
@@ -133,6 +123,15 @@ export const BucketList = () => {
                   <span>{formatBytes(bucket.size || 0)}</span>
                 </div>
               </div>
+              
+              <Button 
+                className="w-full mt-4 text-sm" 
+                onClick={() => setCurrentBucket(bucket.name)}
+                variant="outline"
+              >
+                Parcourir
+                <ChevronRight className="w-3 h-3 sm:w-4 sm:h-4 ml-2" />
+              </Button>
             </CardContent>
           </Card>
         ))}
