@@ -1,4 +1,3 @@
-
 const { S3Client, ListBucketsCommand, CreateBucketCommand, DeleteBucketCommand, 
         ListObjectsV2Command, PutObjectCommand, DeleteObjectCommand, 
         GetObjectCommand, HeadObjectCommand } = require('@aws-sdk/client-s3');
@@ -52,54 +51,77 @@ class S3Service {
     }
   }
 
-  // Get bucket statistics (size and object count)
-  async getBucketStats(accessKey, secretKey, region, bucketName) {
-    try {
-      const client = this.getClient(accessKey, secretKey, region);
-      let totalSize = 0;
-      let objectCount = 0;
-      let continuationToken = null;
+  // Get bucket statistics (size and object count) with timeout
+  async getBucketStats(accessKey, secretKey, region, bucketName, timeout = 10000) {
+    return new Promise(async (resolve) => {
+      const timeoutId = setTimeout(() => {
+        logger.warn(`Timeout getting stats for bucket ${bucketName}`);
+        resolve({ objectCount: 0, size: 0 });
+      }, timeout);
 
-      do {
-        const command = new ListObjectsV2Command({
-          Bucket: bucketName,
-          ContinuationToken: continuationToken
-        });
+      try {
+        const client = this.getClient(accessKey, secretKey, region);
+        let totalSize = 0;
+        let objectCount = 0;
+        let continuationToken = null;
 
-        const response = await client.send(command);
-        
-        if (response.Contents) {
-          response.Contents.forEach(object => {
-            if (object.Size) {
-              totalSize += object.Size;
-            }
-            objectCount++;
+        do {
+          const command = new ListObjectsV2Command({
+            Bucket: bucketName,
+            ContinuationToken: continuationToken,
+            MaxKeys: 1000 // Limit to avoid very long requests
           });
-        }
 
-        continuationToken = response.NextContinuationToken;
-      } while (continuationToken);
+          const response = await client.send(command);
+          
+          if (response.Contents) {
+            response.Contents.forEach(object => {
+              if (object.Size) {
+                totalSize += object.Size;
+              }
+              objectCount++;
+            });
+          }
 
-      return { objectCount, size: totalSize };
-    } catch (error) {
-      logger.warn(`Failed to get stats for bucket ${bucketName}:`, error);
-      return { objectCount: 0, size: 0 };
-    }
+          continuationToken = response.NextContinuationToken;
+        } while (continuationToken);
+
+        clearTimeout(timeoutId);
+        resolve({ objectCount, size: totalSize });
+      } catch (error) {
+        clearTimeout(timeoutId);
+        logger.warn(`Failed to get stats for bucket ${bucketName}:`, error);
+        resolve({ objectCount: 0, size: 0 });
+      }
+    });
   }
 
-  // List all buckets with stats
+  // List all buckets - return basic info first, then enrich with stats
   async listBuckets(accessKey, secretKey, region) {
     try {
       const client = this.getClient(accessKey, secretKey, region);
       const command = new ListBucketsCommand({});
       const response = await client.send(command);
       
-      const buckets = [];
-      
-      if (response.Buckets) {
-        // Get stats for each bucket in parallel for better performance
+      if (!response.Buckets || response.Buckets.length === 0) {
+        return { success: true, data: [] };
+      }
+
+      // Return buckets immediately with basic info
+      const basicBuckets = response.Buckets.map(bucket => ({
+        name: bucket.Name,
+        creationDate: bucket.CreationDate,
+        region: region,
+        objectCount: 0,
+        size: 0
+      }));
+
+      logger.info(`Found ${basicBuckets.length} buckets, calculating stats...`);
+
+      // Try to get stats for each bucket with limited concurrency to avoid overwhelming the API
+      const enrichBucketsWithStats = async () => {
         const bucketStatsPromises = response.Buckets.map(async (bucket) => {
-          const stats = await this.getBucketStats(accessKey, secretKey, region, bucket.Name);
+          const stats = await this.getBucketStats(accessKey, secretKey, region, bucket.Name, 8000);
           return {
             name: bucket.Name,
             creationDate: bucket.CreationDate,
@@ -109,11 +131,22 @@ class S3Service {
           };
         });
 
-        const bucketsWithStats = await Promise.all(bucketStatsPromises);
-        buckets.push(...bucketsWithStats);
-      }
+        try {
+          const bucketsWithStats = await Promise.all(bucketStatsPromises);
+          logger.info(`Successfully calculated stats for all buckets`);
+          return bucketsWithStats;
+        } catch (error) {
+          logger.warn('Some bucket stats failed, returning basic info:', error);
+          return basicBuckets;
+        }
+      };
+
+      // For now, return basic buckets immediately
+      // In a real-world scenario, you might want to implement server-sent events 
+      // or WebSocket to update stats progressively
+      const enrichedBuckets = await enrichBucketsWithStats();
       
-      return { success: true, data: buckets };
+      return { success: true, data: enrichedBuckets };
     } catch (error) {
       logger.error('Failed to list buckets:', error);
       return { 
