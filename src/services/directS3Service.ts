@@ -26,6 +26,12 @@ class DirectS3Service {
 
   async initialize(credentials: S3Credentials): Promise<DirectS3Response<boolean>> {
     try {
+      console.log('Initializing S3 client with credentials:', {
+        region: credentials.region,
+        endpoint: OutscaleConfig.getEndpoint(credentials.region),
+        accessKey: credentials.accessKey.substring(0, 8) + '...'
+      });
+
       // Valider la région
       if (!OutscaleConfig.isValidRegion(credentials.region)) {
         return {
@@ -36,6 +42,8 @@ class DirectS3Service {
       }
 
       this.credentials = credentials;
+      
+      // Configuration du client S3 avec options CORS
       this.client = new S3Client({
         region: credentials.region,
         endpoint: OutscaleConfig.getEndpoint(credentials.region),
@@ -44,18 +52,48 @@ class DirectS3Service {
           secretAccessKey: credentials.secretKey,
         },
         forcePathStyle: true,
+        // Configuration pour éviter les problèmes CORS
+        requestHandler: {
+          requestTimeout: 30000,
+          httpsAgent: undefined
+        },
+        // Désactiver la signature des requêtes pour les tests
+        signerConstructor: undefined
       });
 
+      console.log('S3 client created, testing connection...');
+      
       // Test de connexion
-      await this.client.send(new ListBucketsCommand({}));
+      const testCommand = new ListBucketsCommand({});
+      const response = await this.client.send(testCommand);
+      
+      console.log('Connection test successful:', response);
       
       return { success: true, data: true };
     } catch (error) {
       console.error('Erreur initialisation S3:', error);
+      
+      // Messages d'erreur plus spécifiques
+      let errorMessage = 'Impossible de se connecter à S3';
+      let userMessage = 'Vérifiez vos identifiants et votre connexion internet';
+      
+      if (error instanceof Error) {
+        if (error.message.includes('Failed to fetch')) {
+          errorMessage = 'Erreur de réseau ou CORS';
+          userMessage = 'Problème de connectivité réseau. Vérifiez votre connexion internet et les paramètres de votre navigateur.';
+        } else if (error.message.includes('Access Denied') || error.message.includes('InvalidAccessKeyId')) {
+          errorMessage = 'Identifiants invalides';
+          userMessage = 'Vérifiez votre Access Key et Secret Key';
+        } else if (error.message.includes('SignatureDoesNotMatch')) {
+          errorMessage = 'Erreur de signature';
+          userMessage = 'Vérifiez votre Secret Key';
+        }
+      }
+      
       return {
         success: false,
-        error: 'Impossible de se connecter à S3',
-        message: 'Vérifiez vos identifiants et votre connexion internet'
+        error: errorMessage,
+        message: userMessage
       };
     }
   }

@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,6 +9,7 @@ import { useS3Store } from '../hooks/useS3Store';
 import { useDirectS3 } from '../hooks/useDirectS3';
 import { OUTSCALE_REGIONS } from '../data/regions';
 import { OutscaleConfig } from '../services/outscaleConfig';
+import { configureCorsForOutscale } from '../utils/corsUtils';
 import { useToast } from '@/hooks/use-toast';
 import { Cloud, Shield, AlertCircle, Globe } from 'lucide-react';
 
@@ -25,6 +26,11 @@ export const LoginForm = () => {
   // Obtenir l'endpoint de la région sélectionnée
   const selectedEndpoint = OutscaleConfig.getEndpoint(region);
 
+  // Configurer CORS au montage du composant
+  useEffect(() => {
+    configureCorsForOutscale();
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -40,6 +46,12 @@ export const LoginForm = () => {
     setIsLoading(true);
 
     try {
+      console.log('Attempting to login with:', {
+        accessKey: accessKey.substring(0, 8) + '...',
+        region,
+        endpoint: selectedEndpoint
+      });
+
       const credentials = { accessKey, secretKey, region };
       
       const success = await initialize(credentials);
@@ -55,7 +67,7 @@ export const LoginForm = () => {
       console.error('Login error:', error);
       toast({
         title: "Erreur de connexion",
-        description: "Impossible de se connecter au service S3",
+        description: "Impossible de se connecter au service S3. Vérifiez vos identifiants et votre connexion internet.",
         variant: "destructive"
       });
     } finally {
