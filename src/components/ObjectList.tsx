@@ -40,10 +40,8 @@ export const ObjectList = () => {
 
   const handleDelete = async (objectKey: string) => {
     if (window.confirm('Êtes-vous sûr de vouloir supprimer cet élément ?')) {
-      const success = await deleteObject(currentBucket!, objectKey);
-      if (success) {
-        fetchObjects(currentBucket!, currentPath);
-      }
+      await deleteObject(currentBucket!, objectKey);
+      fetchObjects(currentBucket!, currentPath);
     }
   };
 

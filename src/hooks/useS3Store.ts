@@ -16,6 +16,7 @@ interface S3Store {
   // Actions
   login: (credentials: S3Credentials) => void;
   logout: () => void;
+  setCredentials: (credentials: S3Credentials | null) => void;
   setCurrentBucket: (bucket: string | null) => void;
   setCurrentPath: (path: string) => void;
   setBuckets: (buckets: S3Bucket[]) => void;
@@ -51,6 +52,11 @@ export const useS3Store = create<S3Store>()(
         buckets: [],
         objects: [],
         error: null
+      }),
+
+      setCredentials: (credentials) => set({ 
+        credentials,
+        isAuthenticated: !!credentials 
       }),
       
       setCurrentBucket: (bucket) => {

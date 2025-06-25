@@ -1,6 +1,7 @@
+
 import { useS3Store } from './useS3Store';
 import { apiService, ApiResponse } from '../services/apiService';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 import { S3Bucket, S3Object } from '../types/s3';
 import { useRetryState } from './useRetryState';
 import { RetryService } from '../services/retryService';
@@ -212,7 +213,7 @@ export const useFlaskApi = () => {
   const downloadObject = async (bucket: string, objectKey: string): Promise<void> => {
     try {
       const response = await retryState.execute(
-        () => apiService.downloadObject(bucket, objectKey),
+        () => apiService.getDownloadUrl(bucket, objectKey),
         RetryService.getRetryConfig('object')
       );
       
@@ -275,8 +276,6 @@ export const useFlaskApi = () => {
     downloadObject,
     createFolder,
     logout,
-    retryState, // Exposer l'état de retry pour les composants
-    cacheStats: apiService.getCacheStats,
-    clearCache: apiService.clearCache
+    retryState // Exposer l'état de retry pour les composants
   };
 };
