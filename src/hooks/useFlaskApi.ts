@@ -1,8 +1,9 @@
-
 import { useS3Store } from './useS3Store';
 import { apiService, ApiResponse } from '../services/apiService';
 import { useToast } from '@/components/ui/use-toast';
 import { S3Bucket, S3Object } from '../types/s3';
+import { useRetryState } from './useRetryState';
+import { RetryService } from '../services/retryService';
 
 export const useFlaskApi = () => {
   const { 
@@ -13,13 +14,14 @@ export const useFlaskApi = () => {
     logout: storeLogout 
   } = useS3Store();
   const { toast } = useToast();
+  const retryState = useRetryState();
 
   const handleApiError = (response: ApiResponse<any>, defaultMessage: string) => {
     const errorMessage = response.error || response.message || defaultMessage;
     setError(errorMessage);
     toast({
       title: "Erreur",
-      description: errorMessage,
+      description: response.message || errorMessage,
       variant: "destructive"
     });
     return false;
@@ -30,7 +32,10 @@ export const useFlaskApi = () => {
     setError(null);
 
     try {
-      const response = await apiService.getBuckets();
+      const response = await retryState.execute(
+        () => apiService.getBuckets(),
+        RetryService.getRetryConfig('bucket')
+      );
       
       if (response.success && response.data) {
         const buckets: S3Bucket[] = response.data.map(bucket => ({
@@ -48,7 +53,9 @@ export const useFlaskApi = () => {
       }
     } catch (error) {
       console.error('Fetch buckets error:', error);
-      setError('Erreur de connexion');
+      if (!retryState.isRetrying) {
+        setError('Erreur de connexion');
+      }
       return false;
     } finally {
       setLoading(false);
@@ -60,7 +67,10 @@ export const useFlaskApi = () => {
     setError(null);
 
     try {
-      const response = await apiService.createBucket(name, region);
+      const response = await retryState.execute(
+        () => apiService.createBucket(name, region),
+        RetryService.getRetryConfig('bucket')
+      );
       
       if (response.success) {
         toast({
@@ -73,7 +83,9 @@ export const useFlaskApi = () => {
       }
     } catch (error) {
       console.error('Create bucket error:', error);
-      setError('Erreur de connexion');
+      if (!retryState.isRetrying) {
+        setError('Erreur de connexion');
+      }
       return false;
     } finally {
       setLoading(false);
@@ -85,7 +97,10 @@ export const useFlaskApi = () => {
     setError(null);
 
     try {
-      const response = await apiService.deleteBucket(name);
+      const response = await retryState.execute(
+        () => apiService.deleteBucket(name),
+        RetryService.getRetryConfig('bucket')
+      );
       
       if (response.success) {
         toast({
@@ -99,7 +114,9 @@ export const useFlaskApi = () => {
       }
     } catch (error) {
       console.error('Delete bucket error:', error);
-      setError('Erreur de connexion');
+      if (!retryState.isRetrying) {
+        setError('Erreur de connexion');
+      }
       return false;
     } finally {
       setLoading(false);
@@ -111,7 +128,10 @@ export const useFlaskApi = () => {
     setError(null);
 
     try {
-      const response = await apiService.getObjects(bucket, path);
+      const response = await retryState.execute(
+        () => apiService.getObjects(bucket, path),
+        RetryService.getRetryConfig('object')
+      );
       
       if (response.success && response.data) {
         const objects: S3Object[] = response.data.map(obj => ({
@@ -130,7 +150,9 @@ export const useFlaskApi = () => {
       }
     } catch (error) {
       console.error('Fetch objects error:', error);
-      setError('Erreur de connexion');
+      if (!retryState.isRetrying) {
+        setError('Erreur de connexion');
+      }
       return false;
     } finally {
       setLoading(false);
@@ -139,7 +161,10 @@ export const useFlaskApi = () => {
 
   const uploadFile = async (file: File, bucket: string, path: string = ''): Promise<boolean> => {
     try {
-      const response = await apiService.uploadFile(file, bucket, path);
+      const response = await retryState.execute(
+        () => apiService.uploadFile(file, bucket, path),
+        RetryService.getRetryConfig('upload')
+      );
       
       if (response.success) {
         toast({
@@ -152,14 +177,19 @@ export const useFlaskApi = () => {
       }
     } catch (error) {
       console.error('Upload error:', error);
-      setError('Erreur de connexion');
+      if (!retryState.isRetrying) {
+        setError('Erreur de connexion');
+      }
       return false;
     }
   };
 
   const deleteObject = async (bucket: string, objectKey: string): Promise<boolean> => {
     try {
-      const response = await apiService.deleteObject(bucket, objectKey);
+      const response = await retryState.execute(
+        () => apiService.deleteObject(bucket, objectKey),
+        RetryService.getRetryConfig('object')
+      );
       
       if (response.success) {
         toast({
@@ -172,14 +202,19 @@ export const useFlaskApi = () => {
       }
     } catch (error) {
       console.error('Delete object error:', error);
-      setError('Erreur de connexion');
+      if (!retryState.isRetrying) {
+        setError('Erreur de connexion');
+      }
       return false;
     }
   };
 
   const downloadObject = async (bucket: string, objectKey: string): Promise<void> => {
     try {
-      const response = await apiService.downloadObject(bucket, objectKey);
+      const response = await retryState.execute(
+        () => apiService.downloadObject(bucket, objectKey),
+        RetryService.getRetryConfig('object')
+      );
       
       if (response.success && response.data?.url) {
         // Ouvrir l'URL de téléchargement dans un nouvel onglet
@@ -189,13 +224,18 @@ export const useFlaskApi = () => {
       }
     } catch (error) {
       console.error('Download error:', error);
-      setError('Erreur de connexion');
+      if (!retryState.isRetrying) {
+        setError('Erreur de connexion');
+      }
     }
   };
 
   const createFolder = async (bucket: string, path: string, folderName: string): Promise<boolean> => {
     try {
-      const response = await apiService.createFolder(bucket, path, folderName);
+      const response = await retryState.execute(
+        () => apiService.createFolder(bucket, path, folderName),
+        RetryService.getRetryConfig('object')
+      );
       
       if (response.success) {
         toast({
@@ -208,7 +248,9 @@ export const useFlaskApi = () => {
       }
     } catch (error) {
       console.error('Create folder error:', error);
-      setError('Erreur de connexion');
+      if (!retryState.isRetrying) {
+        setError('Erreur de connexion');
+      }
       return false;
     }
   };
@@ -232,6 +274,9 @@ export const useFlaskApi = () => {
     deleteObject,
     downloadObject,
     createFolder,
-    logout
+    logout,
+    retryState, // Exposer l'état de retry pour les composants
+    cacheStats: apiService.getCacheStats,
+    clearCache: apiService.clearCache
   };
 };
