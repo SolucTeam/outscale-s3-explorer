@@ -24,7 +24,7 @@ const Index = () => {
     error, 
     retryAttempt, 
     nextRetryIn, 
-    manualRetry 
+    reset 
   } = useRetryState();
   const [activeTab, setActiveTab] = useState('buckets');
 
@@ -68,7 +68,7 @@ const Index = () => {
         error={error}
         retryAttempt={retryAttempt}
         nextRetryIn={nextRetryIn}
-        onManualRetry={manualRetry}
+        onManualRetry={reset}
       />
       
       <div className="container mx-auto px-4 py-6">
