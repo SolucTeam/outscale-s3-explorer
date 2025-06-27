@@ -9,14 +9,19 @@ import { useS3Store } from '../hooks/useS3Store';
 
 const FolderView = () => {
   const { name, path } = useParams<{ name: string; path: string }>();
-  const { setCurrentBucket, setCurrentPath } = useS3Store();
+  const { setCurrentBucket, setCurrentPath, currentBucket, currentPath: storePath } = useS3Store();
 
   useEffect(() => {
     if (name && path) {
-      setCurrentBucket(name);
-      setCurrentPath(decodeURIComponent(path));
+      const decodedPath = decodeURIComponent(path);
+      console.log('FolderView: Setting bucket and path', { name, path, decodedPath, currentBucket, storePath });
+      
+      if (name !== currentBucket || decodedPath !== storePath) {
+        setCurrentBucket(name);
+        setCurrentPath(decodedPath);
+      }
     }
-  }, [name, path, setCurrentBucket, setCurrentPath]);
+  }, [name, path, setCurrentBucket, setCurrentPath, currentBucket, storePath]);
 
   return (
     <div className="min-h-screen bg-gray-50">

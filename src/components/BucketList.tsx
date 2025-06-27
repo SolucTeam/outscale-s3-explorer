@@ -12,7 +12,7 @@ import { CreateBucketDialog } from './CreateBucketDialog';
 import { ForceDeleteBucketDialog } from './ForceDeleteBucketDialog';
 
 export const BucketList = () => {
-  const { buckets, loading } = useS3Store();
+  const { buckets, loading, setCurrentBucket, setCurrentPath, setObjects } = useS3Store();
   const { fetchBuckets } = useBackendApi();
   const navigate = useNavigate();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -20,8 +20,14 @@ export const BucketList = () => {
   const [bucketToDelete, setBucketToDelete] = useState<string>('');
 
   useEffect(() => {
+    // Réinitialiser l'état quand on arrive sur la liste des buckets
+    setCurrentBucket(null);
+    setCurrentPath('');
+    setObjects([]);
+    
+    // Charger les buckets
     fetchBuckets();
-  }, []);
+  }, [fetchBuckets, setCurrentBucket, setCurrentPath, setObjects]);
 
   const formatBytes = (bytes: number) => {
     if (bytes === 0) return '0 B';

@@ -1,5 +1,6 @@
 
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useS3Store } from '../hooks/useS3Store';
 import { BreadcrumbItem } from '../types/s3';
@@ -7,6 +8,7 @@ import { ChevronRight, Home, Folder } from 'lucide-react';
 
 export const Breadcrumb = () => {
   const { currentBucket, currentPath, setCurrentBucket, setCurrentPath } = useS3Store();
+  const navigate = useNavigate();
 
   if (!currentBucket) return null;
 
@@ -29,13 +31,16 @@ export const Breadcrumb = () => {
 
   const handleBreadcrumbClick = (item: BreadcrumbItem) => {
     if (item.path === '') {
-      setCurrentBucket(null);
-      setCurrentPath('');
+      // Retour à la liste des buckets
+      navigate('/dashboard');
     } else if (item.path === currentBucket) {
-      setCurrentPath('');
+      // Retour à la racine du bucket
+      navigate(`/bucket/${encodeURIComponent(currentBucket)}`);
     } else {
+      // Navigation vers un dossier spécifique
       const newPath = item.path.replace(`${currentBucket}/`, '');
-      setCurrentPath(newPath);
+      const encodedPath = encodeURIComponent(newPath);
+      navigate(`/bucket/${encodeURIComponent(currentBucket)}/folder/${encodedPath}`);
     }
   };
 

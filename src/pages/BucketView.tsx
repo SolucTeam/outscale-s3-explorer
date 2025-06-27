@@ -9,14 +9,15 @@ import { useS3Store } from '../hooks/useS3Store';
 
 const BucketView = () => {
   const { name } = useParams<{ name: string }>();
-  const { setCurrentBucket, setCurrentPath } = useS3Store();
+  const { setCurrentBucket, setCurrentPath, currentBucket } = useS3Store();
 
   useEffect(() => {
-    if (name) {
+    if (name && name !== currentBucket) {
+      console.log('BucketView: Setting bucket and path', { name, currentBucket });
       setCurrentBucket(name);
       setCurrentPath('');
     }
-  }, [name, setCurrentBucket, setCurrentPath]);
+  }, [name, setCurrentBucket, setCurrentPath, currentBucket]);
 
   return (
     <div className="min-h-screen bg-gray-50">
