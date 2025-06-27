@@ -42,8 +42,8 @@ export const Breadcrumb = () => {
   return (
     <nav className="flex items-center space-x-2 text-sm text-gray-600 mb-6 bg-gray-50 p-3 rounded-lg">
       {breadcrumbItems.map((item, index) => (
-        <React.Fragment key={`${item.path}-${index}`}>
-          {index > 0 && <ChevronRight className="w-4 h-4 text-gray-400" />}
+        <div key={`${item.path}-${index}`} className="flex items-center">
+          {index > 0 && <ChevronRight className="w-4 h-4 text-gray-400 mr-2" />}
           <Button
             variant="ghost"
             size="sm"
@@ -62,7 +62,7 @@ export const Breadcrumb = () => {
             ) : null}
             {item.name}
           </Button>
-        </React.Fragment>
+        </div>
       ))}
     </nav>
   );

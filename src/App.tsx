@@ -46,7 +46,7 @@ const App = () => (
               </ErrorBoundary>
             } />
             
-            <Route path="/bucket/:name/folder/:path*" element={
+            <Route path="/bucket/:name/folder/:path/*" element={
               <ErrorBoundary>
                 <ProtectedRoute>
                   <FolderView />
