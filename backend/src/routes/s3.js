@@ -1,4 +1,3 @@
-
 const express = require('express');
 const multer = require('multer');
 const { body, param, query, validationResult } = require('express-validator');
@@ -98,9 +97,10 @@ router.post('/buckets', [
   }
 });
 
-// Delete bucket
+// Delete bucket - with optional force parameter
 router.delete('/buckets/:bucketName', [
-  param('bucketName').notEmpty().withMessage('Bucket name is required')
+  param('bucketName').notEmpty().withMessage('Bucket name is required'),
+  query('force').optional().isBoolean().withMessage('Force parameter must be boolean')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -113,14 +113,16 @@ router.delete('/buckets/:bucketName', [
     }
 
     const { bucketName } = req.params;
+    const { force } = req.query;
     const { accessKey, secretKey, region } = req.credentials;
     
-    const result = await s3Service.deleteBucket(accessKey, secretKey, region, bucketName);
+    const forceDelete = force === 'true';
+    const result = await s3Service.deleteBucket(accessKey, secretKey, region, bucketName, forceDelete);
     
     if (result.success) {
       res.json({
         success: true,
-        message: `Bucket "${bucketName}" deleted successfully`
+        message: `Bucket "${bucketName}" deleted successfully${forceDelete ? ' (including all contents)' : ''}`
       });
     } else {
       res.status(400).json({
@@ -139,7 +141,7 @@ router.delete('/buckets/:bucketName', [
   }
 });
 
-// Get objects in bucket
+// Get objects in bucket - improved path handling
 router.get('/buckets/:bucketName/objects', [
   param('bucketName').notEmpty().withMessage('Bucket name is required'),
   query('path').optional().isString()
@@ -155,8 +157,15 @@ router.get('/buckets/:bucketName/objects', [
     }
 
     const { bucketName } = req.params;
-    const { path = '' } = req.query;
+    let { path = '' } = req.query;
     const { accessKey, secretKey, region } = req.credentials;
+    
+    // Clean up the path - remove leading/trailing slashes and decode
+    if (path) {
+      path = decodeURIComponent(path).replace(/^\/+|\/+$/g, '');
+    }
+    
+    logger.info(`Listing objects in bucket ${bucketName} with path: "${path}"`);
     
     const result = await s3Service.listObjects(accessKey, secretKey, region, bucketName, path);
     
@@ -242,7 +251,7 @@ router.post('/buckets/:bucketName/upload', [
   }
 });
 
-// Delete object
+// Delete object - improved key handling
 router.delete('/buckets/:bucketName/objects/:objectKey(*)', [
   param('bucketName').notEmpty().withMessage('Bucket name is required'),
   param('objectKey').notEmpty().withMessage('Object key is required')
@@ -260,7 +269,12 @@ router.delete('/buckets/:bucketName/objects/:objectKey(*)', [
     const { bucketName, objectKey } = req.params;
     const { accessKey, secretKey, region } = req.credentials;
     
-    const result = await s3Service.deleteObject(accessKey, secretKey, region, bucketName, objectKey);
+    // Decode the object key properly
+    const decodedObjectKey = decodeURIComponent(objectKey);
+    
+    logger.info(`Deleting object: ${decodedObjectKey} from bucket: ${bucketName}`);
+    
+    const result = await s3Service.deleteObject(accessKey, secretKey, region, bucketName, decodedObjectKey);
     
     if (result.success) {
       res.json({
@@ -326,7 +340,7 @@ router.get('/buckets/:bucketName/objects/:objectKey(*)/download', [
   }
 });
 
-// Create folder
+// Create folder - improved path handling
 router.post('/buckets/:bucketName/folders', [
   param('bucketName').notEmpty().withMessage('Bucket name is required'),
   body('path').optional().isString(),
@@ -343,10 +357,17 @@ router.post('/buckets/:bucketName/folders', [
     }
 
     const { bucketName } = req.params;
-    const { path = '', folderName } = req.body;
+    let { path = '', folderName } = req.body;
     const { accessKey, secretKey, region } = req.credentials;
     
+    // Clean up the path
+    if (path) {
+      path = path.replace(/^\/+|\/+$/g, '');
+    }
+    
     const folderPath = path ? `${path}/${folderName}` : folderName;
+    
+    logger.info(`Creating folder: ${folderPath} in bucket: ${bucketName}`);
     
     const result = await s3Service.createFolder(accessKey, secretKey, region, bucketName, folderPath);
     

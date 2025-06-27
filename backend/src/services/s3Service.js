@@ -51,6 +51,56 @@ class S3Service {
     }
   }
 
+  // Helper method to delete all objects in a bucket
+  async deleteAllObjectsInBucket(accessKey, secretKey, region, bucketName) {
+    const client = this.getClient(accessKey, secretKey, region);
+    let deletedCount = 0;
+    let hasMoreObjects = true;
+
+    while (hasMoreObjects) {
+      try {
+        // List objects in the bucket
+        const listCommand = new ListObjectsV2Command({
+          Bucket: bucketName,
+          MaxKeys: 1000
+        });
+        
+        const listResponse = await client.send(listCommand);
+        
+        if (!listResponse.Contents || listResponse.Contents.length === 0) {
+          hasMoreObjects = false;
+          break;
+        }
+
+        // Delete objects in batch
+        for (const object of listResponse.Contents) {
+          if (object.Key) {
+            try {
+              const deleteCommand = new DeleteObjectCommand({
+                Bucket: bucketName,
+                Key: object.Key
+              });
+              
+              await client.send(deleteCommand);
+              deletedCount++;
+              logger.info(`Deleted object: ${object.Key} from bucket: ${bucketName}`);
+            } catch (deleteError) {
+              logger.warn(`Failed to delete object ${object.Key}:`, deleteError);
+            }
+          }
+        }
+
+        // Check if there are more objects
+        hasMoreObjects = listResponse.IsTruncated || false;
+      } catch (error) {
+        logger.error(`Error listing/deleting objects in bucket ${bucketName}:`, error);
+        hasMoreObjects = false;
+      }
+    }
+
+    return deletedCount;
+  }
+
   // Get bucket statistics (size and object count) with timeout
   async getBucketStats(accessKey, secretKey, region, bucketName, timeout = 10000) {
     return new Promise(async (resolve) => {
@@ -141,9 +191,6 @@ class S3Service {
         }
       };
 
-      // For now, return basic buckets immediately
-      // In a real-world scenario, you might want to implement server-sent events 
-      // or WebSocket to update stats progressively
       const enrichedBuckets = await enrichBucketsWithStats();
       
       return { success: true, data: enrichedBuckets };
@@ -174,10 +221,18 @@ class S3Service {
     }
   }
 
-  // Delete bucket
-  async deleteBucket(accessKey, secretKey, region, bucketName) {
+  // Delete bucket - now with force delete capability
+  async deleteBucket(accessKey, secretKey, region, bucketName, forceDelete = false) {
     try {
       const client = this.getClient(accessKey, secretKey, region);
+      
+      if (forceDelete) {
+        // First, delete all objects in the bucket
+        const deletedObjects = await this.deleteAllObjectsInBucket(accessKey, secretKey, region, bucketName);
+        logger.info(`Deleted ${deletedObjects} objects from bucket ${bucketName} before deletion`);
+      }
+      
+      // Then delete the bucket
       const command = new DeleteBucketCommand({ Bucket: bucketName });
       await client.send(command);
       
@@ -192,49 +247,73 @@ class S3Service {
     }
   }
 
-  // List objects in bucket
+  // List objects in bucket - improved folder detection
   async listObjects(accessKey, secretKey, region, bucketName, prefix = '') {
     try {
       const client = this.getClient(accessKey, secretKey, region);
+      
+      // Ensure prefix ends with / if it's not empty and doesn't already end with /
+      const normalizedPrefix = prefix && !prefix.endsWith('/') ? `${prefix}/` : prefix;
+      
       const command = new ListObjectsV2Command({
         Bucket: bucketName,
-        Prefix: prefix,
+        Prefix: normalizedPrefix,
         Delimiter: '/'
       });
       
       const response = await client.send(command);
       const objects = [];
       
-      // Add folders (common prefixes)
+      // Add folders (common prefixes) - these represent "virtual directories"
       if (response.CommonPrefixes) {
         response.CommonPrefixes.forEach(commonPrefix => {
-          objects.push({
-            key: commonPrefix.Prefix,
-            lastModified: new Date(),
-            size: 0,
-            etag: '',
-            storageClass: 'FOLDER',
-            isFolder: true
-          });
+          if (commonPrefix.Prefix && 
+              commonPrefix.Prefix !== normalizedPrefix && 
+              !commonPrefix.Prefix.endsWith('/')) {
+            
+            // Extract folder name from the prefix
+            const folderName = commonPrefix.Prefix.replace(normalizedPrefix, '').replace('/', '');
+            if (folderName) {
+              objects.push({
+                key: folderName,
+                lastModified: new Date(),
+                size: 0,
+                etag: '',
+                storageClass: 'FOLDER',
+                isFolder: true
+              });
+            }
+          }
         });
       }
       
       // Add files
       if (response.Contents) {
         response.Contents.forEach(object => {
-          if (object.Key && object.Key !== prefix) {
-            objects.push({
-              key: object.Key,
-              lastModified: object.LastModified,
-              size: object.Size,
-              etag: object.ETag,
-              storageClass: object.StorageClass,
-              isFolder: false
-            });
+          // Skip the prefix itself and folder markers
+          if (object.Key && 
+              object.Key !== normalizedPrefix && 
+              !object.Key.endsWith('/')) {
+            
+            // Extract file name from the key
+            const fileName = object.Key.replace(normalizedPrefix, '');
+            
+            // Only add if it's a direct child (no additional slashes)
+            if (fileName && !fileName.includes('/')) {
+              objects.push({
+                key: fileName,
+                lastModified: object.LastModified,
+                size: object.Size,
+                etag: object.ETag,
+                storageClass: object.StorageClass,
+                isFolder: false
+              });
+            }
           }
         });
       }
       
+      logger.info(`Listed ${objects.length} objects in bucket ${bucketName} with prefix "${normalizedPrefix}"`);
       return { success: true, data: objects };
     } catch (error) {
       logger.error(`Failed to list objects in bucket ${bucketName}:`, error);

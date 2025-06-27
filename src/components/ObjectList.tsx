@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -34,9 +35,23 @@ export const ObjectList = () => {
 
   const handleObjectClick = (object: any) => {
     if (object.isFolder) {
+      // Construire le nouveau chemin
       const newPath = currentPath ? `${currentPath}/${object.key}` : object.key;
-      const encodedPath = encodeURIComponent(newPath.replace(/\/$/, ''));
-      navigate(`/bucket/${currentBucket}/folder/${encodedPath}`);
+      
+      // Nettoyer le chemin et encoder correctement pour l'URL
+      const cleanPath = newPath.replace(/\/+/g, '/').replace(/^\/+|\/+$/g, '');
+      const encodedPath = encodeURIComponent(cleanPath);
+      
+      console.log('Navigating to folder:', { 
+        objectKey: object.key, 
+        currentPath, 
+        newPath, 
+        cleanPath, 
+        encodedPath 
+      });
+      
+      // Naviguer vers la nouvelle route
+      navigate(`/bucket/${encodeURIComponent(currentBucket!)}/folder/${encodedPath}`);
     }
   };
 
@@ -47,15 +62,35 @@ export const ObjectList = () => {
       : `Êtes-vous sûr de vouloir supprimer ce ${itemType} ?`;
     
     if (window.confirm(confirmMessage)) {
-      // For folders, we need to delete the folder with trailing slash
-      const keyToDelete = isFolder && !objectKey.endsWith('/') ? `${objectKey}/` : objectKey;
-      await deleteObject(currentBucket!, keyToDelete);
-      fetchObjects(currentBucket!, currentPath);
+      try {
+        // Pour les dossiers, construire le chemin complet avec le préfixe actuel
+        let keyToDelete = objectKey;
+        if (isFolder) {
+          keyToDelete = currentPath ? `${currentPath}/${objectKey}/` : `${objectKey}/`;
+        } else if (currentPath) {
+          keyToDelete = `${currentPath}/${objectKey}`;
+        }
+        
+        console.log('Deleting object:', { objectKey, isFolder, currentPath, keyToDelete });
+        
+        await deleteObject(currentBucket!, keyToDelete);
+        
+        // Rafraîchir la liste après suppression
+        fetchObjects(currentBucket!, currentPath);
+      } catch (error) {
+        console.error('Error deleting object:', error);
+      }
     }
   };
 
   const handleDownload = async (objectKey: string) => {
-    await downloadObject(currentBucket!, objectKey);
+    try {
+      // Construire le chemin complet pour le téléchargement
+      const fullKey = currentPath ? `${currentPath}/${objectKey}` : objectKey;
+      await downloadObject(currentBucket!, fullKey);
+    } catch (error) {
+      console.error('Error downloading object:', error);
+    }
   };
 
   const handleFolderCreated = () => {
@@ -81,6 +116,9 @@ export const ObjectList = () => {
         <div>
           <h3 className="text-xl font-semibold text-gray-900">
             Contenu de {currentBucket}
+            {currentPath && (
+              <span className="text-gray-500 font-normal"> / {currentPath}</span>
+            )}
           </h3>
           <p className="text-gray-600">
             {objects.length} élément{objects.length > 1 ? 's' : ''}
@@ -159,7 +197,7 @@ export const ObjectList = () => {
                     <div className="flex-1">
                       <div className="flex items-center space-x-2">
                         <h4 className="font-medium text-gray-900 hover:text-blue-600 transition-colors">
-                          {object.key.replace(/\/$/, '')}
+                          {object.key}
                         </h4>
                         {object.isFolder && (
                           <Badge variant="secondary">Dossier</Badge>
