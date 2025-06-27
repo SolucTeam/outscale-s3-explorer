@@ -1,9 +1,19 @@
-
 import { useActionHistoryStore, LogLevel, ActionHistoryEntry } from '../stores/actionHistoryStore';
+import { useS3Store } from '../hooks/useS3Store';
 
 class S3LoggingService {
   private getStore() {
     return useActionHistoryStore.getState();
+  }
+
+  private ensureUserIsSet() {
+    const store = this.getStore();
+    const s3Store = useS3Store.getState();
+    
+    if (!store.currentUserId && s3Store.credentials) {
+      const userId = `${s3Store.credentials.accessKey.substring(0, 8)}_${s3Store.credentials.region}`;
+      store.setCurrentUser(userId);
+    }
   }
 
   logOperationStart(
@@ -12,8 +22,13 @@ class S3LoggingService {
     objectName?: string,
     details?: string
   ): string {
+    this.ensureUserIsSet();
     const store = this.getStore();
-    if (!store.isLoggingEnabled) return '';
+    
+    if (!store.currentUserId) return '';
+    
+    const currentUserHistory = store.userHistories[store.currentUserId];
+    if (!currentUserHistory?.isLoggingEnabled) return '';
 
     const userMessage = this.generateUserMessage(operationType, 'started', bucketName, objectName);
     
@@ -28,7 +43,8 @@ class S3LoggingService {
     });
 
     // Return the entry ID for future updates
-    return store.entries[0]?.id || '';
+    const entries = store.getCurrentUserEntries();
+    return entries[0]?.id || '';
   }
 
   logOperationProgress(
@@ -36,8 +52,13 @@ class S3LoggingService {
     progress: number,
     details?: string
   ): void {
+    this.ensureUserIsSet();
     const store = this.getStore();
-    if (!store.isLoggingEnabled || !entryId) return;
+    
+    if (!store.currentUserId || !entryId) return;
+    
+    const currentUserHistory = store.userHistories[store.currentUserId];
+    if (!currentUserHistory?.isLoggingEnabled) return;
 
     store.updateEntry(entryId, {
       status: 'progress',
@@ -55,8 +76,13 @@ class S3LoggingService {
     objectName?: string,
     details?: string
   ): void {
+    this.ensureUserIsSet();
     const store = this.getStore();
-    if (!store.isLoggingEnabled) return;
+    
+    if (!store.currentUserId) return;
+    
+    const currentUserHistory = store.userHistories[store.currentUserId];
+    if (!currentUserHistory?.isLoggingEnabled) return;
 
     const userMessage = this.generateUserMessage(operationType, 'success', bucketName, objectName);
 
@@ -88,8 +114,13 @@ class S3LoggingService {
     objectName?: string,
     errorCode?: string
   ): void {
+    this.ensureUserIsSet();
     const store = this.getStore();
-    if (!store.isLoggingEnabled) return;
+    
+    if (!store.currentUserId) return;
+    
+    const currentUserHistory = store.userHistories[store.currentUserId];
+    if (!currentUserHistory?.isLoggingEnabled) return;
 
     const errorMessage = error instanceof Error ? error.message : error;
     const userMessage = this.generateUserMessage(operationType, 'error', bucketName, objectName, errorMessage);
@@ -160,10 +191,14 @@ class S3LoggingService {
     return message;
   }
 
-  // Bulk operation logging
   logBulkOperationStart(operationType: string, totalItems: number): string {
+    this.ensureUserIsSet();
     const store = this.getStore();
-    if (!store.isLoggingEnabled) return '';
+    
+    if (!store.currentUserId) return '';
+    
+    const currentUserHistory = store.userHistories[store.currentUserId];
+    if (!currentUserHistory?.isLoggingEnabled) return '';
 
     store.addEntry({
       operationType: operationType as ActionHistoryEntry['operationType'],
@@ -173,7 +208,8 @@ class S3LoggingService {
       userFriendlyMessage: `Démarrage de l'opération en lot: ${totalItems} éléments`
     });
 
-    return store.entries[0]?.id || '';
+    const entries = store.getCurrentUserEntries();
+    return entries[0]?.id || '';
   }
 
   logBulkOperationProgress(entryId: string, completed: number, total: number): void {
