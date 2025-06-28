@@ -1,3 +1,4 @@
+
 const express = require('express');
 const multer = require('multer');
 const { body, param, query, validationResult } = require('express-validator');
@@ -97,10 +98,10 @@ router.post('/buckets', [
   }
 });
 
-// Delete bucket - with optional force parameter
+// Delete bucket - with optional force parameter (fixed validation)
 router.delete('/buckets/:bucketName', [
   param('bucketName').notEmpty().withMessage('Bucket name is required'),
-  query('force').optional().isBoolean().withMessage('Force parameter must be boolean')
+  query('force').optional().isIn(['true', 'false']).withMessage('Force parameter must be "true" or "false"')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -116,7 +117,10 @@ router.delete('/buckets/:bucketName', [
     const { force } = req.query;
     const { accessKey, secretKey, region } = req.credentials;
     
+    // Convert string to boolean properly
     const forceDelete = force === 'true';
+    logger.info(`Deleting bucket ${bucketName} with force=${forceDelete}`);
+    
     const result = await s3Service.deleteBucket(accessKey, secretKey, region, bucketName, forceDelete);
     
     if (result.success) {
