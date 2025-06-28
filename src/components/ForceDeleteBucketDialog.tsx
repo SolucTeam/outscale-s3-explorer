@@ -74,12 +74,12 @@ export const ForceDeleteBucketDialog: React.FC<ForceDeleteBucketDialogProps> = (
             </AlertDialogTitle>
           </div>
           <AlertDialogDescription className="space-y-2">
-            <p>
+            <div>
               Cette action va <strong>définitivement supprimer</strong> le bucket <strong>"{bucketName}"</strong> et <strong>tous ses objets</strong> (fichiers et dossiers).
-            </p>
-            <p className="text-red-600 font-medium">
+            </div>
+            <div className="text-red-600 font-medium">
               ⚠️ Cette action est irréversible !
-            </p>
+            </div>
           </AlertDialogDescription>
         </AlertDialogHeader>
 
