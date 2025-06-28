@@ -1,3 +1,4 @@
+
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
@@ -46,7 +47,7 @@ router.post('/login', [
       });
     }
 
-    // Create JWT token with longer expiration (8 hours)
+    // Create JWT token
     const tokenPayload = {
       accessKey,
       region,
@@ -54,7 +55,7 @@ router.post('/login', [
     };
 
     const token = jwt.sign(tokenPayload, process.env.JWT_SECRET, {
-      expiresIn: '8h' // Durée prolongée à 8 heures
+      expiresIn: process.env.JWT_EXPIRES_IN || '24h'
     });
 
     // Store encrypted credentials in session
@@ -63,12 +64,10 @@ router.post('/login', [
       accessKey,
       secretKey: hashedSecretKey,
       region,
-      createdAt: Date.now(),
-      lastActivity: Date.now(), // Tracker la dernière activité
-      activeOperations: 0 // Compteur d'opérations en cours
+      createdAt: Date.now()
     });
 
-    logger.info(`User authenticated: ${accessKey.substring(0, 8)}... in region: ${region} (session: 8h)`);
+    logger.info(`User authenticated: ${accessKey.substring(0, 8)}... in region: ${region}`);
 
     res.json({
       success: true,
@@ -87,68 +86,6 @@ router.post('/login', [
       error: 'Server error',
       message: 'Authentication failed'
     });
-  }
-});
-
-// Endpoint pour incrémenter le compteur d'opérations
-router.post('/operation/start', authenticateToken, (req, res) => {
-  try {
-    const sessionId = req.user.sessionId;
-    const session = sessions.get(sessionId);
-    
-    if (session) {
-      session.activeOperations = (session.activeOperations || 0) + 1;
-      session.lastActivity = Date.now();
-      sessions.set(sessionId, session);
-      
-      logger.info(`Operation started. Active operations: ${session.activeOperations}`);
-    }
-    
-    res.json({ success: true, activeOperations: session?.activeOperations || 0 });
-  } catch (error) {
-    logger.error('Operation start error:', error);
-    res.status(500).json({ success: false, error: 'Server error' });
-  }
-});
-
-// Endpoint pour décrémenter le compteur d'opérations
-router.post('/operation/end', authenticateToken, (req, res) => {
-  try {
-    const sessionId = req.user.sessionId;
-    const session = sessions.get(sessionId);
-    
-    if (session) {
-      session.activeOperations = Math.max((session.activeOperations || 0) - 1, 0);
-      session.lastActivity = Date.now();
-      sessions.set(sessionId, session);
-      
-      logger.info(`Operation ended. Active operations: ${session.activeOperations}`);
-    }
-    
-    res.json({ success: true, activeOperations: session?.activeOperations || 0 });
-  } catch (error) {
-    logger.error('Operation end error:', error);
-    res.status(500).json({ success: false, error: 'Server error' });
-  }
-});
-
-// Endpoint pour obtenir le statut des opérations
-router.get('/operations/status', authenticateToken, (req, res) => {
-  try {
-    const sessionId = req.user.sessionId;
-    const session = sessions.get(sessionId);
-    
-    res.json({
-      success: true,
-      data: {
-        activeOperations: session?.activeOperations || 0,
-        lastActivity: session?.lastActivity || Date.now(),
-        sessionValid: !!session
-      }
-    });
-  } catch (error) {
-    logger.error('Operations status error:', error);
-    res.status(500).json({ success: false, error: 'Server error' });
   }
 });
 
@@ -239,10 +176,6 @@ const getCredentials = (req, res, next) => {
       message: 'Please login again'
     });
   }
-  
-  // Mettre à jour la dernière activité
-  session.lastActivity = Date.now();
-  sessions.set(sessionId, session);
   
   req.credentials = session;
   next();
