@@ -40,7 +40,7 @@ export const BackendConsole = () => {
 
   const connectToBackendLogs = () => {
     try {
-      const eventSource = new EventSource('http://localhost:5000/api/logs/stream');
+      const eventSource = new EventSource('http://localhost:5001/api/logs/stream');
       eventSourceRef.current = eventSource;
 
       eventSource.onopen = () => {
