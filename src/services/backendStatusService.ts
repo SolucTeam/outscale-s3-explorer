@@ -9,13 +9,13 @@ class BackendStatusService {
   private baseUrl: string;
 
   constructor() {
-    this.baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api';
+    this.baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
   }
 
   async checkStatus(): Promise<BackendStatus> {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5001); // 5s timeout
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
 
       const response = await fetch(`${this.baseUrl}/health`, {
         method: 'GET',
