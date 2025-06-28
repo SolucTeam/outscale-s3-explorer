@@ -57,7 +57,7 @@ export const BucketList = () => {
 
   const handleRefresh = async () => {
     console.log('Actualisation des buckets demandée');
-    await fetchBukets();
+    await fetchBuckets();
   };
 
   const handleBucketClick = (bucketName: string) => {
