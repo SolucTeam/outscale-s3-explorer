@@ -101,7 +101,13 @@ router.post('/buckets', [
 // Delete bucket - with optional force parameter (fixed validation)
 router.delete('/buckets/:bucketName', [
   param('bucketName').notEmpty().withMessage('Bucket name is required'),
-  query('force').optional().isIn(['true', 'false']).withMessage('Force parameter must be "true" or "false"')
+  // Accepter les valeurs string mais les valider correctement
+  query('force').optional().custom((value) => {
+    if (value !== undefined && value !== 'true' && value !== 'false') {
+      throw new Error('Force parameter must be "true" or "false"');
+    }
+    return true;
+  })
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
