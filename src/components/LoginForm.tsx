@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,10 +17,18 @@ export const LoginForm = () => {
   const [region, setRegion] = useState('eu-west-2');
   const [isLoading, setIsLoading] = useState(false);
 
-  const { login } = useS3Store();
+  const { login, isAuthenticated } = useS3Store();
   const { initialize } = useBackendApi();
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  // Rediriger immédiatement si déjà connecté
+  useEffect(() => {
+    if (isAuthenticated) {
+      console.log('User already authenticated, redirecting to dashboard');
+      navigate('/dashboard', { replace: true });
+    }
+  }, [isAuthenticated, navigate]);
 
   // Get the selected region details
   const selectedRegion = OUTSCALE_REGIONS.find(r => r.id === region);
@@ -50,14 +58,22 @@ export const LoginForm = () => {
       const success = await initialize(credentials);
       
       if (success) {
+        // D'abord connecter l'utilisateur
         login(credentials);
+        
+        console.log('Login successful, will redirect to dashboard');
+        
         toast({
           title: "Connexion réussie",
-          description: "Vous êtes maintenant connecté à votre compte Outscale"
+          description: "Redirection vers le dashboard...",
         });
         
-        // Redirection vers le dashboard
-        navigate('/dashboard');
+        // Redirection immédiate avec replace pour éviter de revenir à la page de login
+        setTimeout(() => {
+          navigate('/dashboard', { replace: true });
+        }, 500);
+      } else {
+        throw new Error('Échec de l\'initialisation');
       }
     } catch (error) {
       console.error('Login error:', error);
