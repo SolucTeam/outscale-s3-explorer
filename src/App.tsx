@@ -62,10 +62,10 @@ const App = () => (
               </Routes>
             </div>
             
-            {/* Console Backend fixe à droite sur toutes les pages protégées */}
+            {/* Console Backend fixe à droite sur toutes les pages protégées - positionnée plus bas */}
             <ProtectedRoute>
               <div className="w-80 flex-shrink-0 border-l bg-white">
-                <div className="sticky top-0 h-screen overflow-y-auto">
+                <div className="sticky top-16 h-[calc(100vh-4rem)] overflow-y-auto pt-4">
                   <BackendConsole />
                 </div>
               </div>
