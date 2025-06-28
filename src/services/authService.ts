@@ -1,4 +1,3 @@
-
 import { S3Credentials } from '../types/s3';
 
 export type StorageType = 'localStorage' | 'sessionStorage' | 'memory';
@@ -7,6 +6,8 @@ export class AuthService {
   private static instance: AuthService;
   private memoryCredentials: S3Credentials | null = null;
   private readonly STORAGE_KEY = 's3-outscale-credentials';
+  private readonly TOKEN_KEY = 'auth_token';
+  private readonly TOKEN_EXPIRY_KEY = 'auth_token_expiry';
 
   private constructor() {}
 
@@ -34,6 +35,34 @@ export class AuthService {
   }
 
   /**
+   * Vérifier si le token est expiré
+   */
+  isTokenExpired(): boolean {
+    const expiry = localStorage.getItem(this.TOKEN_EXPIRY_KEY);
+    if (!expiry) return true;
+    
+    const expiryTime = parseInt(expiry);
+    const currentTime = Date.now();
+    
+    return currentTime > expiryTime;
+  }
+
+  /**
+   * Définir l'expiration du token (4 heures par défaut)
+   */
+  setTokenExpiry(hours: number = 4): void {
+    const expiryTime = Date.now() + (hours * 60 * 60 * 1000);
+    localStorage.setItem(this.TOKEN_EXPIRY_KEY, expiryTime.toString());
+  }
+
+  /**
+   * Supprimer les données d'expiration du token
+   */
+  clearTokenExpiry(): void {
+    localStorage.removeItem(this.TOKEN_EXPIRY_KEY);
+  }
+
+  /**
    * Sauvegarder les credentials selon le type de stockage choisi
    */
   saveCredentials(credentials: S3Credentials, storageType: StorageType = 'localStorage'): void {
@@ -42,12 +71,17 @@ export class AuthService {
     switch (storageType) {
       case 'localStorage':
         localStorage.setItem(this.STORAGE_KEY, this.encrypt(serialized));
+        // Définir l'expiration à 4 heures
+        this.setTokenExpiry(4);
         break;
       case 'sessionStorage':
         sessionStorage.setItem(this.STORAGE_KEY, this.encrypt(serialized));
+        // Pour sessionStorage, on garde l'expiration mais plus courte
+        this.setTokenExpiry(2);
         break;
       case 'memory':
         this.memoryCredentials = credentials;
+        // Pas d'expiration pour la mémoire dans cette session
         break;
     }
   }
@@ -126,5 +160,18 @@ export class AuthService {
     this.clearCredentials('localStorage');
     this.clearCredentials('sessionStorage');
     this.clearCredentials('memory');
+    this.clearTokenExpiry();
+    localStorage.removeItem(this.TOKEN_KEY);
+  }
+
+  /**
+   * Vérifier la validité de la session
+   */
+  isSessionValid(storageType: StorageType = 'localStorage'): boolean {
+    if (storageType === 'memory') {
+      return this.memoryCredentials !== null;
+    }
+    
+    return this.hasCredentials(storageType) && !this.isTokenExpired();
   }
 }

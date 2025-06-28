@@ -1,4 +1,3 @@
-
 interface ApiResponse<T> {
   success: boolean;
   data?: T;
@@ -40,16 +39,46 @@ interface ObjectData {
 class ApiService {
   private baseUrl: string;
   private token: string | null = null;
+  private tokenExpiry: number | null = null;
 
   constructor() {
     this.baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
     this.token = localStorage.getItem('auth_token');
+    const expiry = localStorage.getItem('auth_token_expiry');
+    this.tokenExpiry = expiry ? parseInt(expiry) : null;
+  }
+
+  private isTokenExpired(): boolean {
+    if (!this.tokenExpiry) return true;
+    return Date.now() > this.tokenExpiry;
+  }
+
+  private clearExpiredToken(): void {
+    if (this.isTokenExpired()) {
+      this.token = null;
+      this.tokenExpiry = null;
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('auth_token_expiry');
+      
+      // Déclencher une déconnexion automatique
+      window.dispatchEvent(new CustomEvent('auth:expired'));
+    }
+  }
+
+  private setTokenWithExpiry(token: string, expiryHours: number = 4): void {
+    this.token = token;
+    this.tokenExpiry = Date.now() + (expiryHours * 60 * 60 * 1000);
+    localStorage.setItem('auth_token', token);
+    localStorage.setItem('auth_token_expiry', this.tokenExpiry.toString());
   }
 
   private async request<T>(
     endpoint: string, 
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
+    // Vérifier l'expiration du token avant chaque requête
+    this.clearExpiredToken();
+
     const url = `${this.baseUrl}${endpoint}`;
     
     const headers: HeadersInit = {
@@ -57,7 +86,7 @@ class ApiService {
       ...options.headers,
     };
 
-    if (this.token) {
+    if (this.token && !this.isTokenExpired()) {
       headers['Authorization'] = `Bearer ${this.token}`;
     }
 
@@ -68,6 +97,16 @@ class ApiService {
       });
 
       const data = await response.json();
+
+      // Gérer les erreurs d'authentification
+      if (response.status === 401 || response.status === 403) {
+        this.clearExpiredToken();
+        return {
+          success: false,
+          error: 'Authentication expired',
+          message: 'Please login again'
+        };
+      }
 
       if (!response.ok) {
         return {
@@ -99,8 +138,8 @@ class ApiService {
     });
 
     if (response.success && response.data?.token) {
-      this.token = response.data.token;
-      localStorage.setItem('auth_token', this.token);
+      // Définir le token avec une expiration de 4 heures
+      this.setTokenWithExpiry(response.data.token, 4);
     }
 
     return response;
@@ -112,7 +151,9 @@ class ApiService {
     });
 
     this.token = null;
+    this.tokenExpiry = null;
     localStorage.removeItem('auth_token');
+    localStorage.removeItem('auth_token_expiry');
     return response;
   }
 
@@ -220,11 +261,19 @@ class ApiService {
 
   // Utils
   isAuthenticated(): boolean {
-    return !!this.token;
+    return !!this.token && !this.isTokenExpired();
   }
 
   getToken(): string | null {
+    if (this.isTokenExpired()) {
+      this.clearExpiredToken();
+      return null;
+    }
     return this.token;
+  }
+
+  getTokenExpiry(): number | null {
+    return this.tokenExpiry;
   }
 }
 
