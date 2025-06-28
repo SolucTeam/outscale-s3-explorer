@@ -9,6 +9,27 @@ if (!fs.existsSync(logsDir)) {
   fs.mkdirSync(logsDir, { recursive: true });
 }
 
+// Custom transport for streaming logs to frontend
+class StreamTransport extends winston.Transport {
+  constructor(opts) {
+    super(opts);
+    this.logStreamer = require('./logStreamer');
+  }
+
+  log(info, callback) {
+    // Stream to connected clients
+    this.logStreamer.broadcast({
+      level: info.level,
+      message: info.message,
+      service: info.service || 'nums3-backend',
+      timestamp: info.timestamp,
+      ...info
+    });
+
+    callback();
+  }
+}
+
 const logger = winston.createLogger({
   level: process.env.LOG_LEVEL || 'info',
   format: winston.format.combine(
@@ -24,7 +45,8 @@ const logger = winston.createLogger({
     }),
     new winston.transports.File({
       filename: path.join(logsDir, 'combined.log')
-    })
+    }),
+    new StreamTransport()
   ]
 });
 

@@ -9,6 +9,7 @@ const logger = require('./utils/logger');
 const errorHandler = require('./middleware/errorHandler');
 const { router: authRoutes } = require('./routes/auth');
 const s3Routes = require('./routes/s3');
+const logRoutes = require('./routes/logs');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -59,6 +60,7 @@ app.get('/health', (req, res) => {
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/s3', s3Routes);
+app.use('/api/logs', logRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {

@@ -1,28 +1,28 @@
 
 import React from 'react';
-import { Header } from '../components/Header';
 import { BucketList } from '../components/BucketList';
 import { ActionHistory } from '../components/ActionHistory';
+import { BackendConsole } from '../components/BackendConsole';
+import { BackendStatusIndicator } from '../components/BackendStatusIndicator';
 
-const Dashboard = () => {
+export const Dashboard = () => {
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header />
-      <main className="container mx-auto px-4 sm:px-6 py-4 sm:py-8">
-        <div className="flex flex-col xl:flex-row gap-4 sm:gap-6">
-          <div className="flex-1 min-w-0">
+      <div className="container mx-auto px-4 py-6">
+        <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+          {/* Main content */}
+          <div className="xl:col-span-3 space-y-6">
+            <BackendStatusIndicator />
             <BucketList />
           </div>
-          <div className="hidden xl:block w-80 flex-shrink-0">
+          
+          {/* Sidebar */}
+          <div className="xl:col-span-1 space-y-4">
             <ActionHistory />
+            <BackendConsole />
           </div>
         </div>
-        <div className="xl:hidden mt-8">
-          <ActionHistory />
-        </div>
-      </main>
+      </div>
     </div>
   );
 };
-
-export default Dashboard;
