@@ -1,9 +1,9 @@
-
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useS3Store } from '../hooks/useS3Store';
 import { useBackendApi } from '../hooks/useBackendApi';
 import { Folder, Calendar, HardDrive, ChevronRight, RefreshCw, Plus, Trash2, Cloud } from 'lucide-react';
@@ -14,11 +14,12 @@ import { ForceDeleteBucketDialog } from './ForceDeleteBucketDialog';
 
 export const BucketList = () => {
   const { buckets, loading, setCurrentBucket, setCurrentPath, setObjects } = useS3Store();
-  const { fetchBuckets } = useBackendApi();
+  const { fetchBuckets, isLoading } = useBackendApi();
   const navigate = useNavigate();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [bucketToDelete, setBucketToDelete] = useState<string>('');
+  const [hasInitiallyLoaded, setHasInitiallyLoaded] = useState(false);
 
   useEffect(() => {
     // Réinitialiser l'état quand on arrive sur la liste des buckets
@@ -26,8 +27,13 @@ export const BucketList = () => {
     setCurrentPath('');
     setObjects([]);
     
-    // Charger les buckets
-    fetchBuckets();
+    // Charger les buckets avec un indicateur de première charge
+    const loadBuckets = async () => {
+      await fetchBuckets();
+      setHasInitiallyLoaded(true);
+    };
+    
+    loadBuckets();
   }, [fetchBuckets, setCurrentBucket, setCurrentPath, setObjects]);
 
   const formatBytes = (bytes: number) => {
@@ -49,20 +55,54 @@ export const BucketList = () => {
     setBucketToDelete('');
   };
 
-  const handleRefresh = () => {
-    fetchBuckets();
+  const handleRefresh = async () => {
+    console.log('Actualisation des buckets demandée');
+    await fetchBukets();
   };
 
   const handleBucketClick = (bucketName: string) => {
+    console.log(`Accès au bucket: ${bucketName}`);
     navigate(`/bucket/${bucketName}`);
   };
 
-  if (loading) {
+  if ((loading || isLoading) && !hasInitiallyLoaded) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="flex items-center space-x-2 text-blue-600">
-          <RefreshCw className="w-5 h-5 animate-spin" />
-          <span>Chargement des buckets...</span>
+      <div className="space-y-4 sm:space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Mes Buckets S3</h2>
+            <p className="text-sm sm:text-base text-gray-600">Gérez vos espaces de stockage Outscale</p>
+          </div>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+            <Skeleton className="h-10 w-32" />
+            <Skeleton className="h-10 w-24" />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
+          {[1, 2, 3].map((i) => (
+            <Card key={i} className="animate-pulse">
+              <CardHeader className="pb-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center space-x-3 min-w-0 flex-1">
+                    <Skeleton className="w-10 h-10 rounded-lg" />
+                    <div className="min-w-0 flex-1">
+                      <Skeleton className="h-5 w-32 mb-2" />
+                      <Skeleton className="h-4 w-20" />
+                    </div>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Skeleton className="h-4 w-full" />
+                <div className="flex justify-between">
+                  <Skeleton className="h-4 w-16" />
+                  <Skeleton className="h-4 w-24" />
+                </div>
+                <Skeleton className="h-9 w-full" />
+              </CardContent>
+            </Card>
+          ))}
         </div>
       </div>
     );
@@ -80,14 +120,21 @@ export const BucketList = () => {
             <Plus className="w-4 h-4 mr-2" />
             Nouveau bucket
           </Button>
-          <Button onClick={handleRefresh} variant="outline" size="sm" className="w-full sm:w-auto">
-            <RefreshCw className="w-4 h-4 mr-2" />
+          <Button 
+            onClick={handleRefresh} 
+            variant="outline" 
+            size="sm" 
+            className="w-full sm:w-auto"
+            disabled={loading || isLoading}
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${(loading || isLoading) ? 'animate-spin' : ''}`} />
             Actualiser
           </Button>
         </div>
       </div>
 
-      {buckets.length === 0 ? (
+      {/* Afficher le message "aucun bucket" seulement si on a fini de charger ET qu'il n'y a vraiment aucun bucket */}
+      {hasInitiallyLoaded && buckets.length === 0 && !loading && !isLoading ? (
         <div className="text-center py-12">
           <div className="w-16 h-16 mx-auto mb-4 bg-blue-100 rounded-full flex items-center justify-center">
             <Cloud className="w-8 h-8 text-blue-600" />
@@ -165,6 +212,16 @@ export const BucketList = () => {
               </CardContent>
             </Card>
           ))}
+        </div>
+      )}
+
+      {/* Indicateur de chargement lors des rafraîchissements */}
+      {(loading || isLoading) && hasInitiallyLoaded && (
+        <div className="flex items-center justify-center py-4">
+          <div className="flex items-center space-x-2 text-blue-600">
+            <RefreshCw className="w-4 h-4 animate-spin" />
+            <span className="text-sm">Actualisation en cours...</span>
+          </div>
         </div>
       )}
 
