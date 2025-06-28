@@ -12,7 +12,7 @@ import BucketView from "./pages/BucketView";
 import FolderView from "./pages/FolderView";
 import NotFound from "./pages/NotFound";
 import Index from "./pages/Index";
-import Header from "./components/Header";
+import { Header } from "./components/Header";
 
 const queryClient = new QueryClient();
 
