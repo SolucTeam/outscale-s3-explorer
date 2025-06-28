@@ -1,3 +1,4 @@
+
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { S3Credentials, S3Bucket, S3Object } from '../types/s3';
@@ -118,10 +119,8 @@ export const useS3Store = create<S3Store>()(
           const authService = AuthService.getInstance();
           const isValid = authService.isSessionValid('localStorage');
           
-          if (!isValid && get().isAuthenticated) {
-            console.log('Session invalid, logging out');
-            get().logout();
-          }
+          // Ne pas déclencher de logout automatiquement ici pour éviter les setState pendant le rendu
+          // Le logout sera géré par les événements auth:expired ou dans useEffect
           
           return isValid;
         }
