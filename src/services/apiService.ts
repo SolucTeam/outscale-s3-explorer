@@ -1,4 +1,3 @@
-
 interface ApiResponse<T> {
   success: boolean;
   data?: T;
@@ -43,7 +42,21 @@ class ApiService {
   private tokenExpiry: number | null = null;
 
   constructor() {
-    this.baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+    // Récupérer l'URL du backend depuis les variables d'environnement
+    const envUrl = import.meta.env.VITE_API_BASE_URL;
+    const envPort = import.meta.env.VITE_API_PORT;
+    
+    if (envUrl) {
+      this.baseUrl = `${envUrl}/api`;
+    } else if (envPort) {
+      this.baseUrl = `http://localhost:${envPort}/api`;
+    } else {
+      // Fallback par défaut uniquement si aucune variable n'est définie
+      this.baseUrl = 'http://localhost:5000/api';
+    }
+
+    console.log('API URL configurée:', this.baseUrl);
+    
     this.token = localStorage.getItem('auth_token');
     const expiry = localStorage.getItem('auth_token_expiry');
     this.tokenExpiry = expiry ? parseInt(expiry) : null;

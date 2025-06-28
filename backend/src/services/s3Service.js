@@ -101,8 +101,8 @@ class S3Service {
     return deletedCount;
   }
 
-  // Get bucket statistics (size and object count) with timeout
-  async getBucketStats(accessKey, secretKey, region, bucketName, timeout = 10000) {
+  // Get bucket statistics (size and object count) with proper counting
+  async getBucketStats(accessKey, secretKey, region, bucketName, timeout = 15000) {
     return new Promise(async (resolve) => {
       const timeoutId = setTimeout(() => {
         logger.warn(`Timeout getting stats for bucket ${bucketName}`);
@@ -115,28 +115,39 @@ class S3Service {
         let objectCount = 0;
         let continuationToken = null;
 
+        logger.info(`Calculating stats for bucket: ${bucketName}`);
+
         do {
           const command = new ListObjectsV2Command({
             Bucket: bucketName,
             ContinuationToken: continuationToken,
-            MaxKeys: 1000 // Limit to avoid very long requests
+            MaxKeys: 1000
           });
 
           const response = await client.send(command);
           
           if (response.Contents) {
             response.Contents.forEach(object => {
-              if (object.Size) {
-                totalSize += object.Size;
+              // Ne compter que les objets réels, pas les dossiers vides
+              if (object.Key && !object.Key.endsWith('/')) {
+                if (object.Size) {
+                  totalSize += object.Size;
+                }
+                objectCount++;
               }
-              objectCount++;
             });
           }
 
           continuationToken = response.NextContinuationToken;
+          
+          // Log du progrès
+          if (objectCount > 0) {
+            logger.info(`Bucket ${bucketName}: ${objectCount} objets trouvés, ${totalSize} bytes`);
+          }
         } while (continuationToken);
 
         clearTimeout(timeoutId);
+        logger.info(`Stats finales pour ${bucketName}: ${objectCount} objets, ${totalSize} bytes`);
         resolve({ objectCount, size: totalSize });
       } catch (error) {
         clearTimeout(timeoutId);
@@ -146,7 +157,7 @@ class S3Service {
     });
   }
 
-  // List all buckets - return basic info first, then enrich with stats
+  // List all buckets - return enriched data with stats
   async listBuckets(accessKey, secretKey, region) {
     try {
       const client = this.getClient(accessKey, secretKey, region);
@@ -157,21 +168,12 @@ class S3Service {
         return { success: true, data: [] };
       }
 
-      // Return buckets immediately with basic info
-      const basicBuckets = response.Buckets.map(bucket => ({
-        name: bucket.Name,
-        creationDate: bucket.CreationDate,
-        region: region,
-        objectCount: 0,
-        size: 0
-      }));
+      logger.info(`Found ${response.Buckets.length} buckets, calculating stats...`);
 
-      logger.info(`Found ${basicBuckets.length} buckets, calculating stats...`);
-
-      // Try to get stats for each bucket with limited concurrency to avoid overwhelming the API
-      const enrichBucketsWithStats = async () => {
-        const bucketStatsPromises = response.Buckets.map(async (bucket) => {
-          const stats = await this.getBucketStats(accessKey, secretKey, region, bucket.Name, 8000);
+      // Calculer les statistiques pour chaque bucket avec limitation de concurrence
+      const bucketStatsPromises = response.Buckets.map(async (bucket) => {
+        try {
+          const stats = await this.getBucketStats(accessKey, secretKey, region, bucket.Name, 12000);
           return {
             name: bucket.Name,
             creationDate: bucket.CreationDate,
@@ -179,21 +181,29 @@ class S3Service {
             objectCount: stats.objectCount,
             size: stats.size
           };
-        });
-
-        try {
-          const bucketsWithStats = await Promise.all(bucketStatsPromises);
-          logger.info(`Successfully calculated stats for all buckets`);
-          return bucketsWithStats;
         } catch (error) {
-          logger.warn('Some bucket stats failed, returning basic info:', error);
-          return basicBuckets;
+          logger.warn(`Failed to get stats for bucket ${bucket.Name}:`, error);
+          return {
+            name: bucket.Name,
+            creationDate: bucket.CreationDate,
+            region: region,
+            objectCount: 0,
+            size: 0
+          };
         }
-      };
+      });
 
-      const enrichedBuckets = await enrichBucketsWithStats();
-      
-      return { success: true, data: enrichedBuckets };
+      // Exécuter les promesses avec un délai pour éviter de surcharger l'API
+      const bucketsWithStats = [];
+      for (const promise of bucketStatsPromises) {
+        const result = await promise;
+        bucketsWithStats.push(result);
+        // Petit délai entre les buckets pour éviter la surcharge
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+
+      logger.info(`Successfully calculated stats for ${bucketsWithStats.length} buckets`);
+      return { success: true, data: bucketsWithStats };
     } catch (error) {
       logger.error('Failed to list buckets:', error);
       return { 
@@ -268,11 +278,10 @@ class S3Service {
       if (response.CommonPrefixes) {
         response.CommonPrefixes.forEach(commonPrefix => {
           if (commonPrefix.Prefix && 
-              commonPrefix.Prefix !== normalizedPrefix && 
-              !commonPrefix.Prefix.endsWith('/')) {
+              commonPrefix.Prefix !== normalizedPrefix) {
             
             // Extract folder name from the prefix
-            const folderName = commonPrefix.Prefix.replace(normalizedPrefix, '').replace('/', '');
+            const folderName = commonPrefix.Prefix.replace(normalizedPrefix, '').replace(/\/+$/, '');
             if (folderName) {
               objects.push({
                 key: folderName,

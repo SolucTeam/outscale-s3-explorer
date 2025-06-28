@@ -18,12 +18,27 @@ export const ObjectList = () => {
   const navigate = useNavigate();
   const [showUpload, setShowUpload] = useState(false);
   const [showCreateFolder, setShowCreateFolder] = useState(false);
+  const [isLoadingObjects, setIsLoadingObjects] = useState(false);
 
   useEffect(() => {
     if (currentBucket) {
-      fetchObjects(currentBucket, currentPath);
+      console.log('ObjectList: Loading objects for bucket:', currentBucket, 'path:', currentPath);
+      loadObjects();
     }
   }, [currentBucket, currentPath]);
+
+  const loadObjects = async () => {
+    if (!currentBucket) return;
+    
+    setIsLoadingObjects(true);
+    try {
+      await fetchObjects(currentBucket, currentPath);
+    } catch (error) {
+      console.error('Error loading objects:', error);
+    } finally {
+      setIsLoadingObjects(false);
+    }
+  };
 
   const formatBytes = (bytes: number) => {
     if (bytes === 0) return '0 B';
@@ -76,7 +91,7 @@ export const ObjectList = () => {
         await deleteObject(currentBucket!, keyToDelete);
         
         // Rafraîchir la liste après suppression
-        fetchObjects(currentBucket!, currentPath);
+        loadObjects();
       } catch (error) {
         console.error('Error deleting object:', error);
       }
@@ -94,12 +109,18 @@ export const ObjectList = () => {
   };
 
   const handleFolderCreated = () => {
-    fetchObjects(currentBucket!, currentPath);
+    loadObjects();
+  };
+
+  const handleUploadComplete = () => {
+    setShowUpload(false);
+    loadObjects();
   };
 
   if (!currentBucket) return null;
 
-  if (loading) {
+  // Afficher le loading pendant le chargement initial ou lors du rafraîchissement
+  if (loading || isLoadingObjects) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="flex items-center space-x-2 text-blue-600">
@@ -141,11 +162,12 @@ export const ObjectList = () => {
             Uploader
           </Button>
           <Button 
-            onClick={() => fetchObjects(currentBucket, currentPath)}
+            onClick={loadObjects}
             variant="outline"
             size="sm"
+            disabled={isLoadingObjects}
           >
-            <RefreshCw className="w-4 h-4" />
+            <RefreshCw className={`w-4 h-4 ${isLoadingObjects ? 'animate-spin' : ''}`} />
           </Button>
         </div>
       </div>
@@ -248,10 +270,7 @@ export const ObjectList = () => {
           bucket={currentBucket}
           path={currentPath}
           onClose={() => setShowUpload(false)}
-          onUploadComplete={() => {
-            setShowUpload(false);
-            fetchObjects(currentBucket, currentPath);
-          }}
+          onUploadComplete={handleUploadComplete}
         />
       )}
 

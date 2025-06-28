@@ -9,7 +9,20 @@ class BackendStatusService {
   private baseUrl: string;
 
   constructor() {
-    this.baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+    // Récupérer l'URL du backend depuis les variables d'environnement
+    const envUrl = import.meta.env.VITE_API_BASE_URL;
+    const envPort = import.meta.env.VITE_API_PORT;
+    
+    if (envUrl) {
+      this.baseUrl = envUrl;
+    } else if (envPort) {
+      this.baseUrl = `http://localhost:${envPort}`;
+    } else {
+      // Fallback par défaut uniquement si aucune variable n'est définie
+      this.baseUrl = 'http://localhost:5000';
+    }
+
+    console.log('Backend URL configurée:', this.baseUrl);
   }
 
   async checkStatus(): Promise<BackendStatus> {
