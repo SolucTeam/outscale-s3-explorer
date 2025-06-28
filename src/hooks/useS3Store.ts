@@ -1,4 +1,3 @@
-
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { S3Credentials, S3Bucket, S3Object } from '../types/s3';
@@ -38,8 +37,14 @@ export const useS3Store = create<S3Store>()(
         window.addEventListener('auth:expired', () => {
           const state = get();
           if (state.isAuthenticated) {
-            console.log('Auth expired event received, logging out');
+            console.log('Auth expired event received, logging out and redirecting');
             state.logout();
+            // Redirection immédiate vers login
+            setTimeout(() => {
+              if (window.location.pathname !== '/login' && window.location.pathname !== '/') {
+                window.location.href = '/login';
+              }
+            }, 500);
           }
         });
       }

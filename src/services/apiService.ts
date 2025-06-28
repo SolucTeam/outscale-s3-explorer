@@ -1,3 +1,4 @@
+
 interface ApiResponse<T> {
   success: boolean;
   data?: T;
@@ -65,6 +66,24 @@ class ApiService {
     }
   }
 
+  private handleAuthError(): void {
+    console.log('Authentication error detected, clearing credentials and redirecting');
+    this.token = null;
+    this.tokenExpiry = null;
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('auth_token_expiry');
+    
+    // Déclencher une déconnexion automatique
+    window.dispatchEvent(new CustomEvent('auth:expired'));
+    
+    // Rediriger vers la page de connexion après un court délai
+    setTimeout(() => {
+      if (window.location.pathname !== '/login' && window.location.pathname !== '/') {
+        window.location.href = '/login';
+      }
+    }, 1000);
+  }
+
   private setTokenWithExpiry(token: string, expiryHours: number = 4): void {
     this.token = token;
     this.tokenExpiry = Date.now() + (expiryHours * 60 * 60 * 1000);
@@ -98,13 +117,14 @@ class ApiService {
 
       const data = await response.json();
 
-      // Gérer les erreurs d'authentification
+      // Gérer les erreurs d'authentification - improved handling
       if (response.status === 401 || response.status === 403) {
-        this.clearExpiredToken();
+        console.log('401/403 error received, handling auth error');
+        this.handleAuthError();
         return {
           success: false,
           error: 'Authentication expired',
-          message: 'Please login again'
+          message: 'Votre session a expiré. Vous allez être redirigé vers la page de connexion.'
         };
       }
 
