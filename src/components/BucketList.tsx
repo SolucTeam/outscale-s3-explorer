@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -5,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useS3Store } from '../hooks/useS3Store';
 import { useBackendApi } from '../hooks/useBackendApi';
-import { Folder, Calendar, HardDrive, ChevronRight, RefreshCw, Plus, Trash2 } from 'lucide-react';
+import { Folder, Calendar, HardDrive, ChevronRight, RefreshCw, Plus, Trash2, Cloud } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { CreateBucketDialog } from './CreateBucketDialog';
@@ -86,70 +87,86 @@ export const BucketList = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
-        {buckets.map((bucket) => (
-          <Card key={bucket.name} className="hover:shadow-lg transition-all duration-200 cursor-pointer group" onClick={() => handleBucketClick(bucket.name)}>
-            <CardHeader className="pb-3">
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex items-center space-x-3 min-w-0 flex-1">
-                  <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-200 transition-colors flex-shrink-0">
-                    <Folder className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
+      {buckets.length === 0 ? (
+        <div className="text-center py-12">
+          <div className="w-16 h-16 mx-auto mb-4 bg-blue-100 rounded-full flex items-center justify-center">
+            <Cloud className="w-8 h-8 text-blue-600" />
+          </div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Aucun bucket trouvé</h3>
+          <p className="text-gray-600 mb-6 max-w-md mx-auto">
+            Vous n'avez pas encore de buckets S3. Créez votre premier bucket pour commencer à stocker vos fichiers dans le cloud.
+          </p>
+          <Button onClick={() => setShowCreateDialog(true)} className="bg-blue-600 hover:bg-blue-700">
+            <Plus className="w-4 h-4 mr-2" />
+            Créer mon premier bucket
+          </Button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
+          {buckets.map((bucket) => (
+            <Card key={bucket.name} className="hover:shadow-lg transition-all duration-200 cursor-pointer group" onClick={() => handleBucketClick(bucket.name)}>
+              <CardHeader className="pb-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center space-x-3 min-w-0 flex-1">
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-200 transition-colors flex-shrink-0">
+                      <Folder className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <CardTitle className="text-sm sm:text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors truncate">
+                        {bucket.name}
+                      </CardTitle>
+                      <Badge variant="secondary" className="text-xs mt-1">
+                        {bucket.region}
+                      </Badge>
+                    </div>
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <CardTitle className="text-sm sm:text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors truncate">
-                      {bucket.name}
-                    </CardTitle>
-                    <Badge variant="secondary" className="text-xs mt-1">
-                      {bucket.region}
-                    </Badge>
+                  <div className="flex items-center space-x-1 flex-shrink-0">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={(e) => handleDeleteBucket(bucket.name, e)}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity text-red-600 hover:text-red-700 hover:bg-red-50 h-8 w-8 p-0"
+                      title="Supprimer le bucket et son contenu"
+                    >
+                      <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
+                    </Button>
+                    <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 group-hover:text-blue-600 transition-colors" />
                   </div>
                 </div>
-                <div className="flex items-center space-x-1 flex-shrink-0">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={(e) => handleDeleteBucket(bucket.name, e)}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity text-red-600 hover:text-red-700 hover:bg-red-50 h-8 w-8 p-0"
-                    title="Supprimer le bucket et son contenu"
-                  >
-                    <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
-                  </Button>
-                  <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 group-hover:text-blue-600 transition-colors" />
-                </div>
-              </div>
-            </CardHeader>
-            
-            <CardContent className="space-y-3">
-              <div className="flex items-center justify-between text-xs sm:text-sm">
-                <div className="flex items-center space-x-2 text-gray-600 min-w-0">
-                  <Calendar className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
-                  <span className="truncate">Créé {formatDistanceToNow(bucket.creationDate, { addSuffix: true, locale: fr })}</span>
-                </div>
-              </div>
+              </CardHeader>
               
-              <div className="flex items-center justify-between text-xs sm:text-sm">
-                <span className="text-gray-600">{bucket.objectCount || 0} objets</span>
-                <div className="flex items-center space-x-2 text-gray-600">
-                  <HardDrive className="w-3 h-3 sm:w-4 sm:h-4" />
-                  <span>{formatBytes(bucket.size || 0)}</span>
+              <CardContent className="space-y-3">
+                <div className="flex items-center justify-between text-xs sm:text-sm">
+                  <div className="flex items-center space-x-2 text-gray-600 min-w-0">
+                    <Calendar className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                    <span className="truncate">Créé {formatDistanceToNow(bucket.creationDate, { addSuffix: true, locale: fr })}</span>
+                  </div>
                 </div>
-              </div>
-              
-              <Button 
-                className="w-full mt-4 text-sm" 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleBucketClick(bucket.name);
-                }}
-                variant="outline"
-              >
-                Parcourir
-                <ChevronRight className="w-3 h-3 sm:w-4 sm:h-4 ml-2" />
-              </Button>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+                
+                <div className="flex items-center justify-between text-xs sm:text-sm">
+                  <span className="text-gray-600">{bucket.objectCount || 0} objets</span>
+                  <div className="flex items-center space-x-2 text-gray-600">
+                    <HardDrive className="w-3 h-3 sm:w-4 sm:h-4" />
+                    <span>{formatBytes(bucket.size || 0)}</span>
+                  </div>
+                </div>
+                
+                <Button 
+                  className="w-full mt-4 text-sm" 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleBucketClick(bucket.name);
+                  }}
+                  variant="outline"
+                >
+                  Parcourir
+                  <ChevronRight className="w-3 h-3 sm:w-4 sm:h-4 ml-2" />
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
       <CreateBucketDialog 
         open={showCreateDialog} 
