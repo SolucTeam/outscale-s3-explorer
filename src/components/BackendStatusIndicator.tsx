@@ -1,82 +1,115 @@
 
 import React from 'react';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Check, AlertTriangle, X, RefreshCw } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { RefreshCw, CheckCircle, AlertCircle, XCircle, Activity } from 'lucide-react';
 import { BackendStatus } from '../services/backendStatusService';
+import { useOperationStatus } from '../hooks/useOperationStatus';
 
 interface BackendStatusIndicatorProps {
   status: BackendStatus;
   isChecking: boolean;
-  onRetry?: () => void;
-  className?: string;
+  onRetry: () => void;
 }
 
 export const BackendStatusIndicator: React.FC<BackendStatusIndicatorProps> = ({
   status,
   isChecking,
-  onRetry,
-  className = ''
+  onRetry
 }) => {
-  const getIcon = () => {
-    if (isChecking) {
-      return <RefreshCw className="h-4 w-4 animate-spin" />;
+  const { status: operationStatus } = useOperationStatus();
+
+  const getStatusIcon = () => {
+    if (operationStatus.activeOperations > 0) {
+      return <Activity className="w-5 h-5 text-blue-600 animate-pulse" />;
     }
     
     switch (status.variant) {
       case 'success':
-        return <Check className="h-4 w-4" />;
+        return <CheckCircle className="w-5 h-5 text-green-600" />;
       case 'warning':
-        return <AlertTriangle className="h-4 w-4" />;
+        return <AlertCircle className="w-5 h-5 text-yellow-600" />;
       case 'error':
-        return <X className="h-4 w-4" />;
+        return <XCircle className="w-5 h-5 text-red-600" />;
       default:
-        return <AlertTriangle className="h-4 w-4" />;
+        return <RefreshCw className="w-5 h-5 text-gray-600" />;
     }
-  };
-
-  const getAlertVariant = () => {
-    return status.variant === 'error' ? 'destructive' : 'default';
   };
 
   const getStatusColor = () => {
+    if (operationStatus.activeOperations > 0) {
+      return 'bg-blue-50 border-blue-200';
+    }
+    
     switch (status.variant) {
       case 'success':
-        return 'text-green-600';
+        return 'bg-green-50 border-green-200';
       case 'warning':
-        return 'text-yellow-600';
+        return 'bg-yellow-50 border-yellow-200';
       case 'error':
-        return 'text-red-600';
+        return 'bg-red-50 border-red-200';
       default:
-        return 'text-gray-600';
+        return 'bg-gray-50 border-gray-200';
     }
   };
 
+  const getPrimaryMessage = () => {
+    if (operationStatus.activeOperations > 0) {
+      return `${operationStatus.activeOperations} opération${operationStatus.activeOperations > 1 ? 's' : ''} en cours...`;
+    }
+    return status.message;
+  };
+
   return (
-    <div className={className}>
-      <Alert variant={getAlertVariant()}>
-        <div className={getStatusColor()}>
-          {getIcon()}
-        </div>
-        <AlertDescription>
-          <div className="flex items-center justify-between">
-            <span className={`font-medium ${getStatusColor()}`}>
-              {status.message}
-            </span>
-            {!status.isOnline && onRetry && !isChecking && (
-              <Button 
-                size="sm" 
-                variant="outline" 
+    <Card className={`${getStatusColor()} transition-all duration-200`}>
+      <CardContent className="p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            {getStatusIcon()}
+            <div>
+              <p className="text-sm font-medium text-gray-900">
+                {getPrimaryMessage()}
+              </p>
+              {operationStatus.activeOperations > 0 && (
+                <p className="text-xs text-gray-600 mt-1">
+                  Backend connecté - Opérations S3 en cours
+                </p>
+              )}
+              {operationStatus.activeOperations === 0 && status.variant === 'success' && (
+                <p className="text-xs text-green-700 mt-1">
+                  Dernière activité : {new Date(operationStatus.lastActivity).toLocaleTimeString()}
+                </p>
+              )}
+            </div>
+          </div>
+          
+          <div className="flex items-center space-x-2">
+            {operationStatus.activeOperations > 0 && (
+              <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300">
+                <Activity className="w-3 h-3 mr-1" />
+                {operationStatus.activeOperations}
+              </Badge>
+            )}
+            
+            {!status.isOnline && (
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={onRetry}
-                className="ml-2"
+                disabled={isChecking}
+                className="text-xs"
               >
-                <RefreshCw className="w-4 h-4 mr-1" />
-                Vérifier
+                {isChecking ? (
+                  <RefreshCw className="w-3 h-3 animate-spin" />
+                ) : (
+                  'Reconnecter'
+                )}
               </Button>
             )}
           </div>
-        </AlertDescription>
-      </Alert>
-    </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 };
