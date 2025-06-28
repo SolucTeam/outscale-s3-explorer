@@ -47,7 +47,7 @@ router.post('/login', [
       });
     }
 
-    // Create JWT token
+    // Create JWT token with extended expiration (8 hours)
     const tokenPayload = {
       accessKey,
       region,
@@ -55,7 +55,7 @@ router.post('/login', [
     };
 
     const token = jwt.sign(tokenPayload, process.env.JWT_SECRET, {
-      expiresIn: process.env.JWT_EXPIRES_IN || '24h'
+      expiresIn: '8h' // Extended to 8 hours
     });
 
     // Store encrypted credentials in session
@@ -64,10 +64,11 @@ router.post('/login', [
       accessKey,
       secretKey: hashedSecretKey,
       region,
-      createdAt: Date.now()
+      createdAt: Date.now(),
+      expiresAt: Date.now() + (8 * 60 * 60 * 1000) // 8 hours expiration
     });
 
-    logger.info(`User authenticated: ${accessKey.substring(0, 8)}... in region: ${region}`);
+    logger.info(`User authenticated: ${accessKey.substring(0, 8)}... in region: ${region} - Session expires in 8 hours`);
 
     res.json({
       success: true,
@@ -76,7 +77,8 @@ router.post('/login', [
         user: {
           accessKey: accessKey.substring(0, 8) + '...',
           region
-        }
+        },
+        expiresIn: '8h'
       }
     });
   } catch (error) {

@@ -3,18 +3,26 @@ import { S3Credentials } from '../types/s3';
 import { AuthService, StorageType } from '../services/authService';
 import { OutscaleConfig } from '../services/outscaleConfig';
 import { useToast } from '@/hooks/use-toast';
+import { useOperationProgress } from './useOperationProgress';
 
 export const useAuth = (storageType: StorageType = 'localStorage') => {
   const [credentials, setCredentials] = useState<S3Credentials | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
+  const { hasActiveOperations } = useOperationProgress();
   const authService = AuthService.getInstance();
 
-  // Vérifier l'expiration du token périodiquement
+  // Vérifier l'expiration du token périodiquement, mais respecter les opérations en cours
   useEffect(() => {
     const checkTokenExpiry = () => {
       if (isAuthenticated && authService.isTokenExpired()) {
+        // Ne pas déconnecter si des opérations sont en cours
+        if (hasActiveOperations) {
+          console.log('🔒 Token expiré mais opérations en cours - maintien de la session');
+          return;
+        }
+        
         console.log('Token expiré, déconnexion automatique');
         logout();
         toast({
@@ -29,7 +37,7 @@ export const useAuth = (storageType: StorageType = 'localStorage') => {
     const interval = setInterval(checkTokenExpiry, 30000);
     
     return () => clearInterval(interval);
-  }, [isAuthenticated]);
+  }, [isAuthenticated, hasActiveOperations]);
 
   // Charger les credentials au montage
   useEffect(() => {
@@ -84,17 +92,15 @@ export const useAuth = (storageType: StorageType = 'localStorage') => {
         return false;
       }
 
-      // Sauvegarder les credentials avec expiration étendue
+      // Sauvegarder les credentials avec expiration étendue à 8 heures
       authService.saveCredentials(newCredentials, storageType);
+      authService.setTokenExpiry(8); // 8 heures
       setCredentials(newCredentials);
       setIsAuthenticated(true);
 
-      const sessionDuration = storageType === 'localStorage' ? '4 heures' : 
-                             storageType === 'sessionStorage' ? '2 heures' : 'cette session';
-
       toast({
         title: "Connexion réussie",
-        description: `Session valide pendant ${sessionDuration}`,
+        description: "Session valide pendant 8 heures",
       });
 
       return true;
@@ -112,9 +118,18 @@ export const useAuth = (storageType: StorageType = 'localStorage') => {
   }, [storageType, toast]);
 
   /**
-   * Déconnecter l'utilisateur
+   * Déconnecter l'utilisateur (seulement si aucune opération en cours)
    */
   const logout = useCallback(() => {
+    if (hasActiveOperations) {
+      toast({
+        title: "Impossible de se déconnecter",
+        description: "Des opérations sont en cours. Veuillez attendre leur fin.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     authService.clearAllCredentials();
     setCredentials(null);
     setIsAuthenticated(false);
@@ -123,7 +138,7 @@ export const useAuth = (storageType: StorageType = 'localStorage') => {
       title: "Déconnexion",
       description: "Vous avez été déconnecté avec succès",
     });
-  }, [toast]);
+  }, [toast, hasActiveOperations]);
 
   /**
    * Changer le type de stockage
@@ -156,6 +171,7 @@ export const useAuth = (storageType: StorageType = 'localStorage') => {
     changeStorageType,
     updateCredentials,
     hasCredentials: authService.hasCredentials(storageType),
-    isSessionValid: authService.isSessionValid(storageType)
+    isSessionValid: authService.isSessionValid(storageType),
+    hasActiveOperations
   };
 };
