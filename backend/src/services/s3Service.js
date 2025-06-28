@@ -52,10 +52,14 @@ class S3Service {
   }
 
   // Helper method to delete all objects in a bucket
-  async deleteAllObjectsInBucket(accessKey, secretKey, region, bucketName) {
+  async deleteAllObjectsInBucket(accessKey, secretKey, region, bucketName, debugMode = false) {
     const client = this.getClient(accessKey, secretKey, region);
     let deletedCount = 0;
     let hasMoreObjects = true;
+
+    if (debugMode) {
+      logger.info(`[DEBUG] Starting to delete all objects in bucket: ${bucketName}`);
+    }
 
     while (hasMoreObjects) {
       try {
@@ -72,6 +76,10 @@ class S3Service {
           break;
         }
 
+        if (debugMode) {
+          logger.info(`[DEBUG] Found ${listResponse.Contents.length} objects to delete in batch`);
+        }
+
         // Delete objects in batch
         for (const object of listResponse.Contents) {
           if (object.Key) {
@@ -83,7 +91,12 @@ class S3Service {
               
               await client.send(deleteCommand);
               deletedCount++;
-              logger.info(`Deleted object: ${object.Key} from bucket: ${bucketName}`);
+              
+              if (debugMode) {
+                logger.info(`[DEBUG] Deleted object: ${object.Key} from bucket: ${bucketName}`);
+              } else {
+                logger.info(`Deleted object: ${object.Key} from bucket: ${bucketName}`);
+              }
             } catch (deleteError) {
               logger.warn(`Failed to delete object ${object.Key}:`, deleteError);
             }
@@ -92,10 +105,18 @@ class S3Service {
 
         // Check if there are more objects
         hasMoreObjects = listResponse.IsTruncated || false;
+        
+        if (debugMode && hasMoreObjects) {
+          logger.info(`[DEBUG] More objects to delete, continuing...`);
+        }
       } catch (error) {
         logger.error(`Error listing/deleting objects in bucket ${bucketName}:`, error);
         hasMoreObjects = false;
       }
+    }
+
+    if (debugMode) {
+      logger.info(`[DEBUG] Finished deleting objects. Total deleted: ${deletedCount}`);
     }
 
     return deletedCount;
@@ -231,25 +252,44 @@ class S3Service {
     }
   }
 
-  // Delete bucket - now with force delete capability
-  async deleteBucket(accessKey, secretKey, region, bucketName, forceDelete = false) {
+  // Delete bucket - now with force delete capability and debug mode
+  async deleteBucket(accessKey, secretKey, region, bucketName, forceDelete = false, debugMode = false) {
     try {
       const client = this.getClient(accessKey, secretKey, region);
+      let deletedObjects = 0;
+      
+      if (debugMode) {
+        logger.info(`[DEBUG] Starting bucket deletion: ${bucketName}, force=${forceDelete}`);
+      }
       
       if (forceDelete) {
         // First, delete all objects in the bucket
-        const deletedObjects = await this.deleteAllObjectsInBucket(accessKey, secretKey, region, bucketName);
-        logger.info(`Deleted ${deletedObjects} objects from bucket ${bucketName} before deletion`);
+        deletedObjects = await this.deleteAllObjectsInBucket(accessKey, secretKey, region, bucketName, debugMode);
+        
+        if (debugMode) {
+          logger.info(`[DEBUG] Deleted ${deletedObjects} objects from bucket ${bucketName} before deletion`);
+        } else {
+          logger.info(`Deleted ${deletedObjects} objects from bucket ${bucketName} before deletion`);
+        }
       }
       
       // Then delete the bucket
       const command = new DeleteBucketCommand({ Bucket: bucketName });
       await client.send(command);
       
-      logger.info(`Bucket deleted: ${bucketName}`);
-      return { success: true };
+      if (debugMode) {
+        logger.info(`[DEBUG] Bucket deleted successfully: ${bucketName}`);
+      } else {
+        logger.info(`Bucket deleted: ${bucketName}`);
+      }
+      
+      return { success: true, deletedObjects };
     } catch (error) {
-      logger.error(`Failed to delete bucket ${bucketName}:`, error);
+      if (debugMode) {
+        logger.error(`[DEBUG] Failed to delete bucket ${bucketName}:`, error);
+      } else {
+        logger.error(`Failed to delete bucket ${bucketName}:`, error);
+      }
       return { 
         success: false, 
         error: this.parseS3Error(error) 

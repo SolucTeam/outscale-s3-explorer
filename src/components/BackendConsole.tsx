@@ -221,17 +221,17 @@ export const BackendConsole = () => {
           </div>
         ) : (
           <ScrollArea className="h-64 xl:h-96" ref={scrollAreaRef}>
-            <div className="p-2 space-y-1 font-mono text-xs">
+            <div className="divide-y divide-gray-200">
               {logs.map((log, index) => (
                 <div
                   key={log.id}
-                  className={`group relative p-2 rounded border transition-all duration-200 hover:shadow-sm ${
-                    index === 0 && !isPaused ? 'bg-green-50/30 border-green-200' : 'bg-white border-gray-200 hover:border-gray-300'
+                  className={`p-4 transition-all duration-200 hover:bg-gray-50 ${
+                    index === 0 && !isPaused ? 'bg-green-50/30 border-l-2 border-l-green-500' : ''
                   }`}
                 >
-                  <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center space-x-2 min-w-0 flex-1">
-                      <span className="text-xs">{getLevelIcon(log.level)}</span>
+                      <span className="text-sm">{getLevelIcon(log.level)}</span>
                       <Badge
                         variant="secondary"
                         className={`text-xs flex-shrink-0 border ${getLevelColor(log.level)}`}
@@ -242,17 +242,17 @@ export const BackendConsole = () => {
                         {log.timestamp.toLocaleTimeString()}
                       </span>
                     </div>
-                    <span className="text-xs text-gray-400">
+                    <span className="text-xs text-gray-400 flex-shrink-0">
                       {formatDistanceToNow(log.timestamp, { addSuffix: true, locale: fr })}
                     </span>
                   </div>
                   
-                  <div className="mt-1 pl-6">
-                    <p className="text-xs text-gray-800 break-all">
+                  <div className="mt-2">
+                    <p className="text-sm text-gray-800 break-words font-mono">
                       {log.message}
                     </p>
                     {log.service && (
-                      <span className="inline-block mt-1 px-1.5 py-0.5 bg-gray-100 rounded text-xs text-gray-600">
+                      <span className="inline-block mt-2 px-2 py-1 bg-gray-100 rounded text-xs text-gray-600">
                         {log.service}
                       </span>
                     )}

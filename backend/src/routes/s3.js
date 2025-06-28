@@ -107,6 +107,12 @@ router.delete('/buckets/:bucketName', [
       throw new Error('Force parameter must be "true" or "false"');
     }
     return true;
+  }),
+  query('debug').optional().custom((value) => {
+    if (value !== undefined && value !== 'true' && value !== 'false') {
+      throw new Error('Debug parameter must be "true" or "false"');
+    }
+    return true;
   })
 ], async (req, res) => {
   try {
@@ -120,25 +126,45 @@ router.delete('/buckets/:bucketName', [
     }
 
     const { bucketName } = req.params;
-    const { force } = req.query;
+    const { force, debug } = req.query;
     const { accessKey, secretKey, region } = req.credentials;
     
     // Convert string to boolean properly
     const forceDelete = force === 'true';
-    logger.info(`Deleting bucket ${bucketName} with force=${forceDelete}`);
+    const debugMode = debug === 'true';
     
-    const result = await s3Service.deleteBucket(accessKey, secretKey, region, bucketName, forceDelete);
+    logger.info(`Deleting bucket ${bucketName} with force=${forceDelete}, debug=${debugMode}`);
+    
+    const debugInfo = debugMode ? {
+      startTime: new Date().toISOString(),
+      bucketName,
+      forceDelete,
+      region,
+      accessKey: accessKey.substring(0, 8) + '...'
+    } : undefined;
+    
+    const result = await s3Service.deleteBucket(accessKey, secretKey, region, bucketName, forceDelete, debugMode);
     
     if (result.success) {
-      res.json({
+      const responseData = {
         success: true,
         message: `Bucket "${bucketName}" deleted successfully${forceDelete ? ' (including all contents)' : ''}`
-      });
+      };
+      
+      if (debugMode && debugInfo) {
+        debugInfo.endTime = new Date().toISOString();
+        debugInfo.deletedObjects = result.deletedObjects || 0;
+        responseData.debugInfo = debugInfo;
+        logger.info(`Debug info for bucket deletion:`, debugInfo);
+      }
+      
+      res.json(responseData);
     } else {
       res.status(400).json({
         success: false,
         error: result.error,
-        message: result.error
+        message: result.error,
+        debugInfo: debugMode ? debugInfo : undefined
       });
     }
   } catch (error) {

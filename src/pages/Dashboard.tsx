@@ -1,6 +1,5 @@
 
 import React from 'react';
-import { Header } from '../components/Header';
 import { BucketList } from '../components/BucketList';
 import { ActionHistory } from '../components/ActionHistory';
 import { OperationStatusIndicator } from '../components/OperationStatusIndicator';
@@ -8,7 +7,6 @@ import { OperationStatusIndicator } from '../components/OperationStatusIndicator
 export const Dashboard = () => {
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header />
       <div className="container mx-auto px-4 py-6">
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           {/* Main content */}
