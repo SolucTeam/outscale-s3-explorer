@@ -44,6 +44,22 @@ if [ "${NODE_ENV}" = "production" ]; then
     echo "🚀 Démarrage en mode production"
     npm start
 else
-    echo "🔧 Démarrage en mode développement"
-    npm run dev
+    echo "🔧 Démarrage en mode développement avec protection anti-redémarrage"
+    # Utiliser node directement au lieu de nodemon pour éviter les redémarrages
+    # pendant les opérations longues
+    if [ "${DISABLE_NODEMON}" = "true" ]; then
+        echo "⚠️  Nodemon désactivé - redémarrage manuel requis"
+        node src/server.js
+    else
+        echo "🔄 Mode développement avec nodemon (utiliser DISABLE_NODEMON=true pour désactiver)"
+        # Configurer nodemon pour ignorer les fichiers de logs et être moins sensible
+        npx nodemon \
+            --ignore logs/ \
+            --ignore node_modules/ \
+            --ignore *.log \
+            --delay 2000ms \
+            --watch src/ \
+            --ext js \
+            src/server.js
+    fi
 fi
