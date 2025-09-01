@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useS3Store } from '../hooks/useS3Store';
-import { useBackendApi } from '../hooks/useBackendApi';
+import { useEnhancedDirectS3 } from '../hooks/useEnhancedDirectS3';
 import { Folder, Calendar, HardDrive, ChevronRight, RefreshCw, Plus, Trash2, Cloud } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -14,7 +14,7 @@ import { ForceDeleteBucketDialog } from './ForceDeleteBucketDialog';
 
 export const BucketList = () => {
   const { buckets, loading, setCurrentBucket, setCurrentPath, setObjects } = useS3Store();
-  const { fetchBuckets, isLoading } = useBackendApi();
+  const { fetchBuckets, initialized } = useEnhancedDirectS3();
   const navigate = useNavigate();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -22,6 +22,8 @@ export const BucketList = () => {
   const [hasInitiallyLoaded, setHasInitiallyLoaded] = useState(false);
 
   useEffect(() => {
+    if (!initialized) return;
+    
     // Réinitialiser l'état quand on arrive sur la liste des buckets
     setCurrentBucket(null);
     setCurrentPath('');
@@ -34,7 +36,7 @@ export const BucketList = () => {
     };
     
     loadBuckets();
-  }, [fetchBuckets, setCurrentBucket, setCurrentPath, setObjects]);
+  }, [initialized, fetchBuckets, setCurrentBucket, setCurrentPath, setObjects]);
 
   const formatBytes = (bytes: number) => {
     if (bytes === 0) return '0 B';
@@ -56,8 +58,8 @@ export const BucketList = () => {
   };
 
   const handleRefresh = async () => {
-    console.log('Actualisation des buckets demandée');
-    await fetchBuckets();
+    console.log('🔄 Actualisation des buckets demandée');
+    await fetchBuckets(true); // Force refresh
   };
 
   const handleBucketClick = (bucketName: string) => {
@@ -65,7 +67,7 @@ export const BucketList = () => {
     navigate(`/bucket/${bucketName}`);
   };
 
-  if ((loading || isLoading) && !hasInitiallyLoaded) {
+  if (loading && !hasInitiallyLoaded) {
     return (
       <div className="space-y-4 sm:space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -125,16 +127,16 @@ export const BucketList = () => {
             variant="outline" 
             size="sm" 
             className="w-full sm:w-auto"
-            disabled={loading || isLoading}
+            disabled={loading}
           >
-            <RefreshCw className={`w-4 h-4 mr-2 ${(loading || isLoading) ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Actualiser
           </Button>
         </div>
       </div>
 
       {/* Afficher le message "aucun bucket" seulement si on a fini de charger ET qu'il n'y a vraiment aucun bucket */}
-      {hasInitiallyLoaded && buckets.length === 0 && !loading && !isLoading ? (
+      {hasInitiallyLoaded && buckets.length === 0 && !loading ? (
         <div className="text-center py-12">
           <div className="w-16 h-16 mx-auto mb-4 bg-blue-100 rounded-full flex items-center justify-center">
             <Cloud className="w-8 h-8 text-blue-600" />
@@ -216,7 +218,7 @@ export const BucketList = () => {
       )}
 
       {/* Indicateur de chargement lors des rafraîchissements */}
-      {(loading || isLoading) && hasInitiallyLoaded && (
+      {loading && hasInitiallyLoaded && (
         <div className="flex items-center justify-center py-4">
           <div className="flex items-center space-x-2 text-blue-600">
             <RefreshCw className="w-4 h-4 animate-spin" />

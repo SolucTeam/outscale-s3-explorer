@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useS3Store } from '../hooks/useS3Store';
-import { useBackendApi } from '../hooks/useBackendApi';
+import { useEnhancedDirectS3 } from '../hooks/useEnhancedDirectS3';
 import { OUTSCALE_REGIONS } from '../data/regions';
 import { useToast } from '@/hooks/use-toast';
 import { Cloud, Shield, AlertCircle, Globe, Server } from 'lucide-react';
@@ -18,7 +18,7 @@ export const LoginForm = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   const { login, isAuthenticated } = useS3Store();
-  const { initialize } = useBackendApi();
+  const { initialize } = useEnhancedDirectS3();
   const { toast } = useToast();
   const navigate = useNavigate();
 

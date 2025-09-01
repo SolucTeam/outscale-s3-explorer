@@ -1,146 +1,145 @@
+/**
+ * Service de cache intelligent multi-niveaux
+ * Cache Map avec invalidation TTL pour performance optimale
+ */
 
-interface CacheEntry<T> {
+export interface CacheEntry<T> {
   data: T;
   timestamp: number;
   ttl: number;
-  key: string;
-}
-
-interface CacheStats {
-  hits: number;
-  misses: number;
-  entries: number;
-  hitRate: number;
 }
 
 export class CacheService {
-  private static cache = new Map<string, CacheEntry<any>>();
-  private static stats = { hits: 0, misses: 0 };
-
-  // TTL par type de données (en millisecondes)
-  private static ttlConfig = {
-    buckets: 5 * 60 * 1000,      // 5 minutes
-    objects: 2 * 60 * 1000,      // 2 minutes
-    regions: 30 * 60 * 1000,     // 30 minutes
-    user: 10 * 60 * 1000,        // 10 minutes
-    metadata: 1 * 60 * 1000      // 1 minute
+  private static instance: CacheService;
+  private cache = new Map<string, CacheEntry<any>>();
+  
+  // TTL par type de données
+  static readonly TTL = {
+    BUCKETS: 5 * 60 * 1000,      // 5 minutes
+    OBJECTS: 2 * 60 * 1000,      // 2 minutes
+    CREDENTIALS: 30 * 60 * 1000,  // 30 minutes
+    METADATA: 10 * 60 * 1000     // 10 minutes
   };
 
-  static set<T>(key: string, data: T, type: keyof typeof CacheService.ttlConfig = 'metadata'): void {
-    const ttl = this.ttlConfig[type];
-    const entry: CacheEntry<T> = {
+  static getInstance(): CacheService {
+    if (!this.instance) {
+      this.instance = new CacheService();
+    }
+    return this.instance;
+  }
+
+  /**
+   * Met en cache avec TTL
+   */
+  set<T>(key: string, data: T, ttl: number): void {
+    this.cache.set(key, {
       data,
       timestamp: Date.now(),
-      ttl,
-      key
-    };
-
-    this.cache.set(key, entry);
-    this.cleanupExpired();
-  }
-
-  static get<T>(key: string): T | null {
-    const entry = this.cache.get(key);
-    
-    if (!entry) {
-      this.stats.misses++;
-      return null;
-    }
-
-    // Vérifier si l'entrée a expiré
-    if (Date.now() - entry.timestamp > entry.ttl) {
-      this.cache.delete(key);
-      this.stats.misses++;
-      return null;
-    }
-
-    this.stats.hits++;
-    return entry.data as T;
-  }
-
-  static has(key: string): boolean {
-    const entry = this.cache.get(key);
-    if (!entry) return false;
-    
-    if (Date.now() - entry.timestamp > entry.ttl) {
-      this.cache.delete(key);
-      return false;
-    }
-    
-    return true;
-  }
-
-  static delete(key: string): boolean {
-    return this.cache.delete(key);
-  }
-
-  static clear(): void {
-    this.cache.clear();
-    this.stats = { hits: 0, misses: 0 };
-  }
-
-  static invalidatePattern(pattern: string): void {
-    const keysToDelete: string[] = [];
-    
-    this.cache.forEach((entry, key) => {
-      if (key.includes(pattern)) {
-        keysToDelete.push(key);
-      }
+      ttl
     });
 
-    keysToDelete.forEach(key => this.cache.delete(key));
+    // Auto-nettoyage après expiration
+    setTimeout(() => {
+      this.delete(key);
+    }, ttl);
   }
 
-  static getStats(): CacheStats {
-    const total = this.stats.hits + this.stats.misses;
+  /**
+   * Récupère depuis le cache
+   */
+  get<T>(key: string): T | null {
+    const entry = this.cache.get(key);
+    
+    if (!entry) return null;
+    
+    const now = Date.now();
+    const age = now - entry.timestamp;
+    
+    // Vérifie si expiré
+    if (age > entry.ttl) {
+      this.cache.delete(key);
+      return null;
+    }
+    
+    return entry.data;
+  }
+
+  /**
+   * Supprime une entrée
+   */
+  delete(key: string): void {
+    this.cache.delete(key);
+  }
+
+  /**
+   * Vide le cache par pattern
+   */
+  clearByPattern(pattern: string): void {
+    for (const key of this.cache.keys()) {
+      if (key.includes(pattern)) {
+        this.cache.delete(key);
+      }
+    }
+  }
+
+  /**
+   * Vide tout le cache
+   */
+  clear(): void {
+    this.cache.clear();
+  }
+
+  /**
+   * Statistiques du cache
+   */
+  getStats() {
+    const now = Date.now();
+    let validEntries = 0;
+    let expiredEntries = 0;
+    
+    for (const entry of this.cache.values()) {
+      const age = now - entry.timestamp;
+      if (age > entry.ttl) {
+        expiredEntries++;
+      } else {
+        validEntries++;
+      }
+    }
+    
     return {
-      ...this.stats,
-      entries: this.cache.size,
-      hitRate: total > 0 ? (this.stats.hits / total) * 100 : 0
+      total: this.cache.size,
+      valid: validEntries,
+      expired: expiredEntries,
+      hitRate: validEntries / (validEntries + expiredEntries) || 0
     };
   }
 
-  private static cleanupExpired(): void {
+  /**
+   * Nettoyage des entrées expirées
+   */
+  cleanup(): void {
     const now = Date.now();
     const keysToDelete: string[] = [];
-
-    this.cache.forEach((entry, key) => {
-      if (now - entry.timestamp > entry.ttl) {
+    
+    for (const [key, entry] of this.cache.entries()) {
+      const age = now - entry.timestamp;
+      if (age > entry.ttl) {
         keysToDelete.push(key);
       }
-    });
-
+    }
+    
     keysToDelete.forEach(key => this.cache.delete(key));
   }
 
-  // Méthodes utilitaires pour générer des clés de cache
-  static getBucketsCacheKey(region: string, userId: string): string {
-    return `buckets:${region}:${userId}`;
-  }
-
-  static getObjectsCacheKey(bucket: string, path: string, userId: string): string {
-    return `objects:${bucket}:${path}:${userId}`;
-  }
-
-  static getRegionsCacheKey(): string {
-    return 'regions:list';
-  }
-
-  static getUserCacheKey(userId: string): string {
-    return `user:${userId}`;
-  }
-
-  // Invalidation intelligente
-  static invalidateBucket(bucketName: string, userId: string): void {
-    this.invalidatePattern(`buckets:${userId}`);
-    this.invalidatePattern(`objects:${bucketName}:${userId}`);
-  }
-
-  static invalidateObjects(bucketName: string, userId: string): void {
-    this.invalidatePattern(`objects:${bucketName}:${userId}`);
-  }
-
-  static invalidateUser(userId: string): void {
-    this.invalidatePattern(userId);
+  /**
+   * Auto-nettoyage périodique
+   */
+  startAutoCleanup(interval: number = 5 * 60 * 1000): void {
+    setInterval(() => {
+      this.cleanup();
+    }, interval);
   }
 }
+
+// Instance globale
+export const cacheService = CacheService.getInstance();

@@ -1,8 +1,8 @@
 
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 import { S3Credentials, S3Bucket, S3Object } from '../types/s3';
-import { AuthService } from '../services/authService';
+import { EncryptionService } from '../services/encryptionService';
+import { cacheService, CacheService } from '../services/cacheService';
 
 interface S3Store {
   isAuthenticated: boolean;
@@ -30,27 +30,41 @@ interface S3Store {
   checkSessionValidity: () => boolean;
 }
 
-export const useS3Store = create<S3Store>()(
-  persist(
-    (set, get) => {
-      // Écouter les événements d'expiration de token
-      if (typeof window !== 'undefined') {
-        window.addEventListener('auth:expired', () => {
-          const state = get();
-          if (state.isAuthenticated) {
-            console.log('Auth expired event received, logging out and redirecting');
-            state.logout();
-            // Redirection immédiate vers login
-            setTimeout(() => {
-              if (window.location.pathname !== '/login' && window.location.pathname !== '/') {
-                window.location.href = '/login';
-              }
-            }, 500);
-          }
+export const useS3Store = create<S3Store>()((set, get) => {
+  // Initialiser le cache auto-cleanup
+  cacheService.startAutoCleanup();
+  
+  // Vérifier session au démarrage
+  const initializeFromSession = () => {
+    if (EncryptionService.hasActiveSession() && EncryptionService.isSessionValid()) {
+      const sessionData = EncryptionService.loadFromSession();
+      if (sessionData?.credentials) {
+        console.log('🔐 Session valide trouvée, restauration automatique');
+        set({
+          isAuthenticated: true,
+          credentials: sessionData.credentials
         });
       }
+    }
+  };
 
-      return {
+  // Auto-refresh session toutes les 5 minutes
+  if (typeof window !== 'undefined') {
+    initializeFromSession();
+    
+    setInterval(() => {
+      if (EncryptionService.hasActiveSession()) {
+        if (EncryptionService.isSessionValid()) {
+          EncryptionService.refreshSession();
+        } else {
+          console.log('🕒 Session expirée, déconnexion automatique');
+          get().logout();
+        }
+      }
+    }, 5 * 60 * 1000); // Vérification toutes les 5 minutes
+  }
+
+  return {
         isAuthenticated: false,
         credentials: null,
         currentBucket: null,
@@ -60,15 +74,31 @@ export const useS3Store = create<S3Store>()(
         loading: false,
         error: null,
         
-        login: (credentials) => set({ 
-          isAuthenticated: true, 
-          credentials,
-          error: null 
-        }),
+        login: (credentials) => {
+          console.log('🔐 Connexion sécurisée, chiffrement des credentials');
+          
+          // Sauvegarder en session chiffrée
+          EncryptionService.saveToSession({
+            credentials,
+            timestamp: Date.now()
+          });
+          
+          set({ 
+            isAuthenticated: true, 
+            credentials,
+            error: null 
+          });
+        },
         
         logout: () => {
-          // Nettoyer complètement l'état
-          AuthService.getInstance().clearAllCredentials();
+          console.log('🚪 Déconnexion et nettoyage sécurisé');
+          
+          // Nettoyer session chiffrée
+          EncryptionService.clearSession();
+          
+          // Vider le cache
+          cacheService.clear();
+          
           set({ 
             isAuthenticated: false, 
             credentials: null,
@@ -78,6 +108,11 @@ export const useS3Store = create<S3Store>()(
             objects: [],
             error: null
           });
+          
+          // Redirection
+          if (typeof window !== 'undefined') {
+            window.location.href = '/login';
+          }
         },
 
         setCredentials: (credentials) => set({ 
@@ -116,22 +151,7 @@ export const useS3Store = create<S3Store>()(
         },
 
         checkSessionValidity: () => {
-          const authService = AuthService.getInstance();
-          const isValid = authService.isSessionValid('localStorage');
-          
-          // Ne pas déclencher de logout automatiquement ici pour éviter les setState pendant le rendu
-          // Le logout sera géré par les événements auth:expired ou dans useEffect
-          
-          return isValid;
+          return EncryptionService.hasActiveSession() && EncryptionService.isSessionValid();
         }
       };
-    },
-    {
-      name: 's3-storage',
-      partialize: (state) => ({ 
-        isAuthenticated: state.isAuthenticated,
-        credentials: state.credentials 
-      })
-    }
-  )
-);
+    });

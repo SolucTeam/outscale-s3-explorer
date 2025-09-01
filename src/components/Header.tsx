@@ -7,7 +7,7 @@ import { Cloud, LogOut, ArrowLeft } from 'lucide-react';
 
 export const Header = () => {
   const { credentials, currentBucket } = useS3Store();
-  const { logout } = useBackendApi();
+  const { logout } = useEnhancedDirectS3();
   const navigate = useNavigate();
 
   const handleBackToDashboard = () => {

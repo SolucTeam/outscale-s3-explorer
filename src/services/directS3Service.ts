@@ -12,6 +12,7 @@ import {
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { S3Credentials, S3Bucket, S3Object } from '../types/s3';
 import { OutscaleConfig } from './outscaleConfig';
+import { cacheService, CacheService } from './cacheService';
 
 export interface DirectS3Response<T> {
   success: boolean;
@@ -103,7 +104,16 @@ class DirectS3Service {
       return { success: false, error: 'Client S3 non initialisé' };
     }
 
+    // Vérifier le cache d'abord
+    const cacheKey = `buckets_${this.credentials?.region}`;
+    const cached = cacheService.get<S3Bucket[]>(cacheKey);
+    if (cached) {
+      console.log('📦 Buckets récupérés depuis le cache');
+      return { success: true, data: cached };
+    }
+
     try {
+      console.log('🌐 Chargement des buckets depuis l\'API...');
       const command = new ListBucketsCommand({});
       const response = await this.client.send(command);
 
@@ -115,9 +125,13 @@ class DirectS3Service {
         size: 0
       }));
 
+      // Mettre en cache
+      cacheService.set(cacheKey, buckets, CacheService.TTL.BUCKETS);
+      console.log(`✅ ${buckets.length} buckets chargés et mis en cache`);
+
       return { success: true, data: buckets };
     } catch (error) {
-      console.error('Erreur getBuckets:', error);
+      console.error('❌ Erreur getBuckets:', error);
       return {
         success: false,
         error: 'Erreur lors de la récupération des buckets',
@@ -132,12 +146,18 @@ class DirectS3Service {
     }
 
     try {
+      console.log(`🆕 Création du bucket: ${name}`);
       const command = new CreateBucketCommand({ Bucket: name });
       await this.client.send(command);
       
+      // Invalider le cache des buckets
+      const cacheKey = `buckets_${this.credentials?.region}`;
+      cacheService.delete(cacheKey);
+      console.log(`✅ Bucket "${name}" créé avec succès`);
+      
       return { success: true };
     } catch (error) {
-      console.error('Erreur createBucket:', error);
+      console.error('❌ Erreur createBucket:', error);
       return {
         success: false,
         error: 'Erreur lors de la création du bucket',
@@ -152,12 +172,20 @@ class DirectS3Service {
     }
 
     try {
+      console.log(`🗑️ Suppression du bucket: ${name}`);
       const command = new DeleteBucketCommand({ Bucket: name });
       await this.client.send(command);
       
+      // Invalider tous les caches liés à ce bucket
+      const bucketCacheKey = `buckets_${this.credentials?.region}`;
+      const objectsCacheKey = `objects_${name}`;
+      cacheService.delete(bucketCacheKey);
+      cacheService.clearByPattern(objectsCacheKey);
+      console.log(`✅ Bucket "${name}" supprimé avec succès`);
+      
       return { success: true };
     } catch (error) {
-      console.error('Erreur deleteBucket:', error);
+      console.error('❌ Erreur deleteBucket:', error);
       return {
         success: false,
         error: 'Erreur lors de la suppression du bucket',
@@ -171,7 +199,16 @@ class DirectS3Service {
       return { success: false, error: 'Client S3 non initialisé' };
     }
 
+    // Vérifier le cache d'abord
+    const cacheKey = `objects_${bucket}_${path}`;
+    const cached = cacheService.get<S3Object[]>(cacheKey);
+    if (cached) {
+      console.log(`📂 Objets récupérés depuis le cache pour ${bucket}/${path}`);
+      return { success: true, data: cached };
+    }
+
     try {
+      console.log(`🌐 Chargement des objets pour ${bucket}/${path}...`);
       const command = new ListObjectsV2Command({
         Bucket: bucket,
         Prefix: path,
@@ -214,9 +251,13 @@ class DirectS3Service {
         });
       }
 
+      // Mettre en cache
+      cacheService.set(cacheKey, objects, CacheService.TTL.OBJECTS);
+      console.log(`✅ ${objects.length} objets chargés et mis en cache`);
+
       return { success: true, data: objects };
     } catch (error) {
-      console.error('Erreur getObjects:', error);
+      console.error('❌ Erreur getObjects:', error);
       return {
         success: false,
         error: 'Erreur lors de la récupération des objets',
