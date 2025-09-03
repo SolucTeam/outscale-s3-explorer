@@ -44,7 +44,7 @@ class DirectS3Service {
 
       this.credentials = credentials;
       
-      // Configuration du client S3 avec options CORS
+      // Configuration du client S3 avec options CORS optimisées
       this.client = new S3Client({
         region: credentials.region,
         endpoint: OutscaleConfig.getEndpoint(credentials.region),
@@ -53,13 +53,15 @@ class DirectS3Service {
           secretAccessKey: credentials.secretKey,
         },
         forcePathStyle: true,
-        // Configuration pour éviter les problèmes CORS
+        // Configuration avancée pour CORS
         requestHandler: {
           requestTimeout: 30000,
           httpsAgent: undefined
         },
-        // Désactiver la signature des requêtes pour les tests
-        signerConstructor: undefined
+        // Headers CORS personnalisés
+        customUserAgent: 'nums3-console/1.0',
+        // Désactiver les checks HTTPS pour dev
+        tls: false
       });
 
       console.log('S3 client created, testing connection...');
