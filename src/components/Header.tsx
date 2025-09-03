@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useS3Store } from '../hooks/useS3Store';
-import { useBackendApi } from '../hooks/useBackendApi';
+import { useEnhancedDirectS3 } from '../hooks/useEnhancedDirectS3';
 import { Cloud, LogOut, ArrowLeft } from 'lucide-react';
 
 export const Header = () => {

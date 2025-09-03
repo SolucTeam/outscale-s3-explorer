@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useS3Store } from '../hooks/useS3Store';
-import { useBackendApi } from '../hooks/useBackendApi';
+import { useEnhancedDirectS3 } from '../hooks/useEnhancedDirectS3';
 import { useToast } from '@/hooks/use-toast';
 import { OUTSCALE_REGIONS } from '../data/regions';
 
@@ -18,7 +18,7 @@ export const CreateBucketDialog = ({ open, onOpenChange }: CreateBucketDialogPro
   const [bucketName, setBucketName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const { credentials } = useS3Store();
-  const { createBucket, fetchBuckets } = useBackendApi();
+  const { createBucket, fetchBuckets } = useEnhancedDirectS3();
   const { toast } = useToast();
 
   // Get current region info
@@ -48,11 +48,23 @@ export const CreateBucketDialog = ({ open, onOpenChange }: CreateBucketDialogPro
 
     setIsCreating(true);
     
-    await createBucket(bucketName, currentRegion);
+    const success = await createBucket(bucketName, currentRegion);
     
-    setBucketName('');
-    onOpenChange(false);
-    await fetchBuckets();
+    if (success) {
+      setBucketName('');
+      onOpenChange(false);
+      await fetchBuckets();
+      toast({
+        title: "Succès",
+        description: `Bucket "${bucketName}" créé avec succès`
+      });
+    } else {
+      toast({
+        title: "Erreur",
+        description: "Erreur lors de la création du bucket",
+        variant: "destructive"
+      });
+    }
     
     setIsCreating(false);
   };

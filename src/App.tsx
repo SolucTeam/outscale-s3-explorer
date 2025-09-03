@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { ErrorBoundary } from "./components/ErrorBoundary";
-import { BackendConsole } from "./components/BackendConsole";
+
 import Login from "./pages/Login";
 import { Dashboard } from "./pages/Dashboard";
 import BucketView from "./pages/BucketView";
@@ -70,14 +70,6 @@ const App = () => (
                 </Routes>
               </div>
               
-              {/* Console Backend fixe à droite sur toutes les pages protégées */}
-              <ProtectedRoute>
-                <div className="w-80 flex-shrink-0 border-l bg-white">
-                  <div className="sticky top-0 h-screen overflow-y-auto">
-                    <BackendConsole />
-                  </div>
-                </div>
-              </ProtectedRoute>
             </div>
           </div>
         </BrowserRouter>

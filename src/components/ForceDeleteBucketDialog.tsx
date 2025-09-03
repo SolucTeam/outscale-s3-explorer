@@ -13,7 +13,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { AlertTriangle, Loader2 } from 'lucide-react';
-import { bucketForceDeleteService } from '../services/bucketForceDeleteService';
+import { useEnhancedDirectS3 } from '../hooks/useEnhancedDirectS3';
 import { useToast } from '@/hooks/use-toast';
 
 interface ForceDeleteBucketDialogProps {
@@ -31,24 +31,25 @@ export const ForceDeleteBucketDialog: React.FC<ForceDeleteBucketDialogProps> = (
 }) => {
   const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
+  const { deleteBucket } = useEnhancedDirectS3();
 
   const handleForceDelete = async () => {
     setIsDeleting(true);
     
     try {
-      const result = await bucketForceDeleteService.forceDeleteBucket(bucketName);
+      const success = await deleteBucket(bucketName);
       
-      if (result.success) {
+      if (success) {
         toast({
           title: "Suppression réussie",
-          description: result.message
+          description: `Bucket "${bucketName}" supprimé avec succès`
         });
         onDeleted();
         onOpenChange(false);
       } else {
         toast({
           title: "Erreur de suppression",
-          description: result.message || "Impossible de supprimer le bucket",
+          description: "Impossible de supprimer le bucket",
           variant: "destructive"
         });
       }
