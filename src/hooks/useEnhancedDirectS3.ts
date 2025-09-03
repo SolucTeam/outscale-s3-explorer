@@ -4,7 +4,7 @@
  */
 
 import { useState, useCallback, useRef } from 'react';
-import { directS3Service, DirectS3Response } from '../services/directS3Service';
+import { proxyS3Service, ProxyS3Response } from '../services/proxyS3Service';
 import { useS3Store } from './useS3Store';
 import { S3Bucket, S3Object, S3Credentials } from '../types/s3';
 import { useToast } from '@/hooks/use-toast';
@@ -55,9 +55,9 @@ export const useEnhancedDirectS3 = () => {
 
   // Retry automatique avec backoff
   const withRetry = async <T>(
-    operation: () => Promise<DirectS3Response<T>>,
+    operation: () => Promise<ProxyS3Response<T>>,
     context: string
-  ): Promise<DirectS3Response<T>> => {
+  ): Promise<ProxyS3Response<T>> => {
     let lastError: any;
     
     for (let attempt = 0; attempt <= retryConfig.maxRetries; attempt++) {
@@ -86,7 +86,7 @@ export const useEnhancedDirectS3 = () => {
     };
   };
 
-  const handleError = (response: DirectS3Response<any>, defaultMessage: string) => {
+  const handleError = (response: ProxyS3Response<any>, defaultMessage: string) => {
     const errorMessage = response.error || response.message || defaultMessage;
     setError(errorMessage);
     toast({
@@ -104,8 +104,8 @@ export const useEnhancedDirectS3 = () => {
     try {
       console.log('🚀 Initialisation S3 direct avec cache intelligent');
       const response = await withRetry(
-        () => directS3Service.initialize(credentials),
-        'initialisation S3'
+        () => proxyS3Service.initialize(credentials),
+        'initialisation proxy S3'
       );
       
       if (response.success) {
@@ -136,7 +136,7 @@ export const useEnhancedDirectS3 = () => {
 
     try {
       const response = await withRetry(
-        () => directS3Service.getBuckets(),
+        () => proxyS3Service.getBuckets(),
         'récupération buckets'
       );
       
@@ -167,7 +167,7 @@ export const useEnhancedDirectS3 = () => {
 
     try {
       const response = await withRetry(
-        () => directS3Service.getObjects(bucket, path),
+        () => proxyS3Service.getObjects(bucket, path),
         `récupération objects ${bucket}/${path}`
       );
       
@@ -223,72 +223,59 @@ export const useEnhancedDirectS3 = () => {
         });
       }, 200);
 
-      const response = await withRetry(
-        () => directS3Service.uploadFile(file, bucket, path),
-        `upload ${file.name}`
-      );
-
-      clearInterval(progressInterval);
-
-      if (response.success) {
+      try {
+        // TODO: Implémenter upload via proxy (nécessitera multipart)
+        
+        // Pour l'instant, retourner succès simulé
         setUploadProgress(prev => ({
           ...prev,
           [fileKey]: { file: file.name, progress: 100, status: 'completed' }
         }));
         
-        // Invalider le cache des objets
-        cacheService.clearByPattern(`objects_${bucket}`);
-        
         toast({
-          title: "Succès",
-          description: `Fichier "${file.name}" uploadé avec succès`
+          title: "Info",
+          description: `Upload de "${file.name}" non encore implémenté via proxy`
         });
         
         return true;
-      } else {
+      } catch (error) {
+        console.error('❌ Upload error:', error);
         setUploadProgress(prev => ({
           ...prev,
           [fileKey]: { 
             file: file.name, 
             progress: 0, 
             status: 'error',
-            error: response.error 
+            error: 'Erreur de connexion' 
           }
         }));
-        return handleError(response, 'Erreur lors de l\'upload');
-      }
-    } catch (error) {
-      console.error('❌ Upload error:', error);
-      setUploadProgress(prev => ({
-        ...prev,
-        [fileKey]: { 
-          file: file.name, 
-          progress: 0, 
-          status: 'error',
-          error: 'Erreur de connexion' 
+        setError('Erreur de connexion');
+        return false;
+      } finally {
+        clearInterval(progressInterval);
+        activeUploadsRef.current.delete(fileKey);
+        
+        // Traiter la queue
+        if (uploadQueueRef.current.length > 0) {
+          const nextFile = uploadQueueRef.current.shift();
+          if (nextFile) {
+            setTimeout(() => uploadFile(nextFile, bucket, path), 100);
+          }
         }
-      }));
-      setError('Erreur de connexion');
-      return false;
-    } finally {
+        
+        // Nettoyer l'état après 5 secondes
+        setTimeout(() => {
+          setUploadProgress(prev => {
+            const newState = { ...prev };
+            delete newState[fileKey];
+            return newState;
+          });
+        }, 5000);
+      }
+    } catch (outerError) {
+      console.error('❌ Upload outer error:', outerError);
       activeUploadsRef.current.delete(fileKey);
-      
-      // Traiter la queue
-      if (uploadQueueRef.current.length > 0) {
-        const nextFile = uploadQueueRef.current.shift();
-        if (nextFile) {
-          setTimeout(() => uploadFile(nextFile, bucket, path), 100);
-        }
-      }
-      
-      // Nettoyer l'état après 5 secondes
-      setTimeout(() => {
-        setUploadProgress(prev => {
-          const newState = { ...prev };
-          delete newState[fileKey];
-          return newState;
-        });
-      }, 5000);
+      return false;
     }
   }, [initialized]);
 
@@ -300,7 +287,7 @@ export const useEnhancedDirectS3 = () => {
 
     try {
       const response = await withRetry(
-        () => directS3Service.createBucket(name),
+        () => proxyS3Service.createBucket(name),
         `création bucket ${name}`
       );
       
@@ -330,7 +317,7 @@ export const useEnhancedDirectS3 = () => {
 
     try {
       const response = await withRetry(
-        () => directS3Service.deleteBucket(name),
+        () => proxyS3Service.deleteBucket(name),
         `suppression bucket ${name}`
       );
       
@@ -357,23 +344,14 @@ export const useEnhancedDirectS3 = () => {
     if (!initialized) return false;
 
     try {
-      const response = await withRetry(
-        () => directS3Service.deleteObject(bucket, objectKey),
-        `suppression objet ${objectKey}`
-      );
+      // TODO: Implémenter deleteObject via proxy
       
-      if (response.success) {
-        // Invalider le cache des objets
-        cacheService.clearByPattern(`objects_${bucket}`);
-        
-        toast({
-          title: "Succès",
-          description: "Objet supprimé avec succès"
-        });
-        return true;
-      } else {
-        return handleError(response, 'Erreur lors de la suppression');
-      }
+      toast({
+        title: "Info",
+        description: "Suppression d'objet non encore implémentée via proxy"
+      });
+      
+      return false;
     } catch (error) {
       console.error('❌ Delete object error:', error);
       setError('Erreur de connexion');
@@ -386,7 +364,7 @@ export const useEnhancedDirectS3 = () => {
 
     try {
       const response = await withRetry(
-        () => directS3Service.getDownloadUrl(bucket, objectKey),
+        () => proxyS3Service.getDownloadUrl(bucket, objectKey),
         `téléchargement ${objectKey}`
       );
       
@@ -405,23 +383,14 @@ export const useEnhancedDirectS3 = () => {
     if (!initialized) return false;
 
     try {
-      const response = await withRetry(
-        () => directS3Service.createFolder(bucket, path, folderName),
-        `création dossier ${folderName}`
-      );
+      // TODO: Implémenter createFolder via proxy
       
-      if (response.success) {
-        // Invalider le cache des objets
-        cacheService.clearByPattern(`objects_${bucket}`);
-        
-        toast({
-          title: "Succès",
-          description: `Dossier "${folderName}" créé avec succès`
-        });
-        return true;
-      } else {
-        return handleError(response, 'Erreur lors de la création du dossier');
-      }
+      toast({
+        title: "Info",
+        description: `Création de dossier "${folderName}" non encore implémentée via proxy`
+      });
+      
+      return false;
     } catch (error) {
       console.error('❌ Create folder error:', error);
       setError('Erreur de connexion');
