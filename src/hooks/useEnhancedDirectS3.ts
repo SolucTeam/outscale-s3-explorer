@@ -209,36 +209,55 @@ export const useEnhancedDirectS3 = () => {
     }));
 
     try {
-      // Simuler progression (AWS SDK ne fournit pas de progress natif)
+      // Simuler progression
       const progressInterval = setInterval(() => {
         setUploadProgress(prev => {
           const current = prev[fileKey];
           if (current && current.progress < 90) {
             return {
               ...prev,
-              [fileKey]: { ...current, progress: current.progress + 10 }
+              [fileKey]: { ...current, progress: current.progress + 15 }
             };
           }
           return prev;
         });
-      }, 200);
+      }, 150);
 
       try {
-        // TODO: Implémenter upload via proxy (nécessitera multipart)
-        
-        // Pour l'instant, retourner succès simulé
-        setUploadProgress(prev => ({
-          ...prev,
-          [fileKey]: { file: file.name, progress: 100, status: 'completed' }
-        }));
-        
-        toast({
-          title: "Info",
-          description: `Upload de "${file.name}" non encore implémenté via proxy`
-        });
-        
-        return true;
+        const response = await withRetry(
+          () => proxyS3Service.uploadFile(bucket, path, file),
+          `upload ${file.name}`
+        );
+
+        clearInterval(progressInterval);
+
+        if (response.success) {
+          setUploadProgress(prev => ({
+            ...prev,
+            [fileKey]: { file: file.name, progress: 100, status: 'completed' }
+          }));
+          
+          toast({
+            title: "Succès",
+            description: `"${file.name}" uploadé avec succès`
+          });
+          
+          return true;
+        } else {
+          setUploadProgress(prev => ({
+            ...prev,
+            [fileKey]: { 
+              file: file.name, 
+              progress: 0, 
+              status: 'error',
+              error: response.error || 'Erreur d\'upload' 
+            }
+          }));
+          handleError(response, 'Erreur lors de l\'upload');
+          return false;
+        }
       } catch (error) {
+        clearInterval(progressInterval);
         console.error('❌ Upload error:', error);
         setUploadProgress(prev => ({
           ...prev,
@@ -252,7 +271,6 @@ export const useEnhancedDirectS3 = () => {
         setError('Erreur de connexion');
         return false;
       } finally {
-        clearInterval(progressInterval);
         activeUploadsRef.current.delete(fileKey);
         
         // Traiter la queue
@@ -263,21 +281,21 @@ export const useEnhancedDirectS3 = () => {
           }
         }
         
-        // Nettoyer l'état après 5 secondes
+        // Nettoyer l'état après 3 secondes
         setTimeout(() => {
           setUploadProgress(prev => {
             const newState = { ...prev };
             delete newState[fileKey];
             return newState;
           });
-        }, 5000);
+        }, 3000);
       }
     } catch (outerError) {
       console.error('❌ Upload outer error:', outerError);
       activeUploadsRef.current.delete(fileKey);
       return false;
     }
-  }, [initialized]);
+  }, [initialized, toast]);
 
   const createBucket = useCallback(async (name: string, region: string): Promise<boolean> => {
     if (!initialized) return false;
@@ -344,20 +362,26 @@ export const useEnhancedDirectS3 = () => {
     if (!initialized) return false;
 
     try {
-      // TODO: Implémenter deleteObject via proxy
+      const response = await withRetry(
+        () => proxyS3Service.deleteObject(bucket, objectKey),
+        `suppression ${objectKey}`
+      );
       
-      toast({
-        title: "Info",
-        description: "Suppression d'objet non encore implémentée via proxy"
-      });
-      
-      return false;
+      if (response.success) {
+        toast({
+          title: "Succès",
+          description: `"${objectKey}" supprimé avec succès`
+        });
+        return true;
+      } else {
+        return handleError(response, 'Erreur lors de la suppression');
+      }
     } catch (error) {
       console.error('❌ Delete object error:', error);
       setError('Erreur de connexion');
       return false;
     }
-  }, [initialized]);
+  }, [initialized, toast]);
 
   const downloadObject = useCallback(async (bucket: string, objectKey: string): Promise<void> => {
     if (!initialized) return;
@@ -383,20 +407,26 @@ export const useEnhancedDirectS3 = () => {
     if (!initialized) return false;
 
     try {
-      // TODO: Implémenter createFolder via proxy
+      const response = await withRetry(
+        () => proxyS3Service.createFolder(bucket, path, folderName),
+        `création dossier ${folderName}`
+      );
       
-      toast({
-        title: "Info",
-        description: `Création de dossier "${folderName}" non encore implémentée via proxy`
-      });
-      
-      return false;
+      if (response.success) {
+        toast({
+          title: "Succès",
+          description: `Dossier "${folderName}" créé avec succès`
+        });
+        return true;
+      } else {
+        return handleError(response, 'Erreur lors de la création du dossier');
+      }
     } catch (error) {
       console.error('❌ Create folder error:', error);
       setError('Erreur de connexion');
       return false;
     }
-  }, [initialized]);
+  }, [initialized, toast]);
 
   const logout = useCallback((): void => {
     console.log('🚪 Déconnexion et nettoyage du cache');

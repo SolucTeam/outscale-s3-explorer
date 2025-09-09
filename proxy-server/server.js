@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const multer = require('multer');
 const {
   S3Client,
   ListBucketsCommand,
@@ -23,7 +24,13 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'x-access-key', 'x-secret-key', 'x-region']
 }));
 
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+
+// Configuration multer pour upload de fichiers
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 } // 50MB max
+});
 
 // Endpoints Outscale
 const getOutscaleEndpoint = (region) => {
@@ -202,6 +209,102 @@ app.get('/api/buckets/:bucket/objects/:key/download', extractCredentials, async 
   }
 });
 
+// Upload de fichier
+app.post('/api/buckets/:bucket/objects', extractCredentials, upload.single('file'), async (req, res) => {
+  try {
+    const { bucket } = req.params;
+    const { path = '' } = req.body;
+    
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        error: 'Aucun fichier fourni'
+      });
+    }
+
+    const key = path ? `${path}/${req.file.originalname}` : req.file.originalname;
+    
+    const command = new PutObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      Body: req.file.buffer,
+      ContentType: req.file.mimetype
+    });
+    
+    await req.s3Client.send(command);
+    
+    res.json({ 
+      success: true, 
+      message: `Fichier "${req.file.originalname}" uploadé`,
+      data: { key }
+    });
+  } catch (error) {
+    console.error('Erreur upload fichier:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Erreur lors de l\'upload',
+      message: error.message 
+    });
+  }
+});
+
+// Supprimer un objet
+app.delete('/api/buckets/:bucket/objects/:key(*)', extractCredentials, async (req, res) => {
+  try {
+    const { bucket, key } = req.params;
+    const command = new DeleteObjectCommand({ Bucket: bucket, Key: key });
+    await req.s3Client.send(command);
+    
+    res.json({ success: true, message: `Objet "${key}" supprimé` });
+  } catch (error) {
+    console.error('Erreur suppression objet:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Erreur lors de la suppression',
+      message: error.message 
+    });
+  }
+});
+
+// Créer un dossier
+app.post('/api/buckets/:bucket/folders', extractCredentials, async (req, res) => {
+  try {
+    const { bucket } = req.params;
+    const { path = '', folderName } = req.body;
+    
+    if (!folderName) {
+      return res.status(400).json({
+        success: false,
+        error: 'Nom de dossier requis'
+      });
+    }
+
+    const key = path ? `${path}/${folderName}/` : `${folderName}/`;
+    
+    const command = new PutObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      Body: '',
+      ContentType: 'application/x-directory'
+    });
+    
+    await req.s3Client.send(command);
+    
+    res.json({ 
+      success: true, 
+      message: `Dossier "${folderName}" créé`,
+      data: { key }
+    });
+  } catch (error) {
+    console.error('Erreur création dossier:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Erreur lors de la création du dossier',
+      message: error.message 
+    });
+  }
+});
+
 // Gestion des erreurs
 app.use((error, req, res, next) => {
   console.error('Erreur serveur:', error);
@@ -214,8 +317,13 @@ app.use((error, req, res, next) => {
 app.listen(PORT, () => {
   console.log(`🚀 Proxy CORS NumS3 démarré sur le port ${PORT}`);
   console.log(`📡 Endpoints disponibles:`);
-  console.log(`   GET  /health`);
-  console.log(`   GET  /api/buckets`);
-  console.log(`   POST /api/buckets`);
-  console.log(`   GET  /api/buckets/:bucket/objects`);
+  console.log(`   GET    /health`);
+  console.log(`   GET    /api/buckets`);
+  console.log(`   POST   /api/buckets`);
+  console.log(`   DELETE /api/buckets/:name`);
+  console.log(`   GET    /api/buckets/:bucket/objects`);
+  console.log(`   POST   /api/buckets/:bucket/objects (upload)`);
+  console.log(`   DELETE /api/buckets/:bucket/objects/:key`);
+  console.log(`   POST   /api/buckets/:bucket/folders`);
+  console.log(`   GET    /api/buckets/:bucket/objects/:key/download`);
 });

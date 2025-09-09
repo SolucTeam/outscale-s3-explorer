@@ -59,13 +59,17 @@ class ProxyS3Service {
 
     const url = `${this.baseUrl}${endpoint}`;
     
-    const headers = {
-      'Content-Type': 'application/json',
+    const headers: Record<string, string> = {
       'x-access-key': this.credentials.accessKey,
       'x-secret-key': this.credentials.secretKey,
       'x-region': this.credentials.region,
-      ...options.headers
+      ...options.headers as Record<string, string>
     };
+
+    // N'ajouter Content-Type que si ce n'est pas FormData
+    if (!(options.body instanceof FormData)) {
+      headers['Content-Type'] = 'application/json';
+    }
 
     try {
       const response = await fetch(url, {
@@ -228,6 +232,102 @@ class ProxyS3Service {
       return {
         success: false,
         error: 'Erreur lors de la génération du lien',
+        message: error instanceof Error ? error.message : 'Erreur inconnue'
+      };
+    }
+  }
+
+  async deleteObject(bucket: string, objectKey: string): Promise<ProxyS3Response<void>> {
+    if (!this.credentials) {
+      return { success: false, error: 'Service non initialisé' };
+    }
+
+    try {
+      console.log(`🗑️ Suppression objet: ${bucket}/${objectKey}`);
+      const response = await this.makeRequest<void>(`/buckets/${encodeURIComponent(bucket)}/objects/${encodeURIComponent(objectKey)}`, {
+        method: 'DELETE'
+      });
+      
+      if (response.success) {
+        // Invalider le cache
+        const cacheKey = `objects_${bucket}`;
+        cacheService.clearByPattern(cacheKey);
+        console.log(`✅ Objet "${objectKey}" supprimé`);
+      }
+      
+      return response;
+    } catch (error) {
+      return {
+        success: false,
+        error: 'Erreur lors de la suppression de l\'objet',
+        message: error instanceof Error ? error.message : 'Erreur inconnue'
+      };
+    }
+  }
+
+  async uploadFile(bucket: string, path: string, file: File): Promise<ProxyS3Response<{ key: string }>> {
+    if (!this.credentials) {
+      return { success: false, error: 'Service non initialisé' };
+    }
+
+    try {
+      console.log(`📤 Upload: ${file.name} vers ${bucket}/${path}`);
+      
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('path', path);
+
+      const response = await this.makeRequest<{ key: string }>(`/buckets/${encodeURIComponent(bucket)}/objects`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'x-access-key': this.credentials.accessKey,
+          'x-secret-key': this.credentials.secretKey,
+          'x-region': this.credentials.region
+        }
+      });
+      
+      if (response.success) {
+        // Invalider le cache
+        const cacheKey = `objects_${bucket}`;
+        cacheService.clearByPattern(cacheKey);
+        console.log(`✅ Fichier "${file.name}" uploadé`);
+      }
+      
+      return response;
+    } catch (error) {
+      return {
+        success: false,
+        error: 'Erreur lors de l\'upload du fichier',
+        message: error instanceof Error ? error.message : 'Erreur inconnue'
+      };
+    }
+  }
+
+  async createFolder(bucket: string, path: string, folderName: string): Promise<ProxyS3Response<{ key: string }>> {
+    if (!this.credentials) {
+      return { success: false, error: 'Service non initialisé' };
+    }
+
+    try {
+      console.log(`📁 Création dossier: ${folderName} dans ${bucket}/${path}`);
+      const response = await this.makeRequest<{ key: string }>(`/buckets/${encodeURIComponent(bucket)}/folders`, {
+        method: 'POST',
+        body: JSON.stringify({ path, folderName })
+      });
+      
+      if (response.success) {
+        // Invalider le cache
+        const cacheKey = `objects_${bucket}`;
+        cacheService.clearByPattern(cacheKey);
+        console.log(`✅ Dossier "${folderName}" créé`);
+      }
+      
+      return response;
+    } catch (error) {
+      return {
+        success: false,
+        error: 'Erreur lors de la création du dossier',
         message: error instanceof Error ? error.message : 'Erreur inconnue'
       };
     }
