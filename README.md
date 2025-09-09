@@ -1,73 +1,83 @@
-# Welcome to your Lovable project
+# NumS3 Console
 
-## Project info
+Interface web moderne pour la gestion d'objets S3 compatible Outscale.
 
-**URL**: https://lovable.dev/projects/0422b083-61f3-48c8-9ea7-98254615adb4
+## 🚀 Démarrage rapide
 
-## How can I edit this code?
+### Option 1: Script automatique (recommandé)
 
-There are several ways of editing your application.
+**Linux/Mac:**
+```bash
+chmod +x start.sh
+./start.sh
+```
 
-**Use Lovable**
+**Windows:**
+```cmd
+start.bat
+```
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/0422b083-61f3-48c8-9ea7-98254615adb4) and start prompting.
+### Option 2: Démarrage manuel
 
-Changes made via Lovable will be committed automatically to this repo.
+```bash
+# Terminal 1 - Démarrer le proxy
+cd proxy-server
+npm install
+npm start
 
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Terminal 2 - Démarrer le frontend
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+## 📡 Services
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+- **Frontend**: http://localhost:5173
+- **Proxy API**: http://localhost:3001
 
-**Use GitHub Codespaces**
+## ✨ Fonctionnalités
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+- 🔐 Authentification Outscale S3
+- 📁 Gestion des buckets et dossiers
+- 📤 Upload de fichiers avec progress
+- 📥 Téléchargement d'objets
+- 🗑️ Suppression d'objets et buckets
+- 💾 Cache intelligent
+- 🔄 Retry automatique
+- 🌐 Interface responsive
 
-## What technologies are used for this project?
+## 🛠️ Configuration
+
+### Identifiants Outscale
+
+Lors de la connexion, fournissez:
+- **Access Key**: Votre clé d'accès Outscale
+- **Secret Key**: Votre clé secrète
+- **Région**: Région de vos buckets (eu-west-2, cloudgouv-eu-west-1, etc.)
+
+### Endpoints supportés
+
+- `eu-west-2`: https://oos.eu-west-2.outscale.com
+- `cloudgouv-eu-west-1`: https://oos.cloudgouv-eu-west-1.outscale.com
+- `us-east-2`: https://oos.us-east-2.outscale.com
+- `us-west-1`: https://oos.us-west-1.outscale.com
+
+## 🔧 Architecture
+
+- **Frontend**: React + TypeScript + Vite + Tailwind CSS
+- **Proxy**: Node.js + Express pour contourner les limitations CORS
+- **SDK**: AWS S3 SDK v3 compatible Outscale
+
+---
+
+## Project info (Lovable)
+
+**URL**: https://lovable.dev/projects/0422b083-61f3-48c8-9ea7-98254615adb4
+
+## Technologies
 
 This project is built with:
-
 - Vite
-- TypeScript
+- TypeScript  
 - React
 - shadcn-ui
 - Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/0422b083-61f3-48c8-9ea7-98254615adb4) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
