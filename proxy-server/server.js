@@ -18,7 +18,7 @@ const PORT = process.env.PORT || 3001;
 
 // Configuration CORS permissive
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:3000', 'https://your-frontend-domain.com'],
+  origin: ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:8080', 'https://your-frontend-domain.com'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-access-key', 'x-secret-key', 'x-region']
@@ -27,7 +27,7 @@ app.use(cors({
 app.use(express.json({ limit: '50mb' }));
 
 // Configuration multer pour upload de fichiers
-const upload = multer({ 
+const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 50 * 1024 * 1024 } // 50MB max
 });
@@ -50,9 +50,9 @@ const extractCredentials = (req, res, next) => {
   const region = req.headers['x-region'] || 'eu-west-2';
 
   if (!accessKey || !secretKey) {
-    return res.status(400).json({ 
-      success: false, 
-      error: 'Credentials manquantes' 
+    return res.status(400).json({
+      success: false,
+      error: 'Credentials manquantes'
     });
   }
 
@@ -79,7 +79,7 @@ app.get('/api/buckets', extractCredentials, async (req, res) => {
   try {
     const command = new ListBucketsCommand({});
     const response = await req.s3Client.send(command);
-    
+
     const buckets = (response.Buckets || []).map(bucket => ({
       name: bucket.Name || '',
       creationDate: bucket.CreationDate || new Date(),
@@ -89,10 +89,10 @@ app.get('/api/buckets', extractCredentials, async (req, res) => {
     res.json({ success: true, data: buckets });
   } catch (error) {
     console.error('Erreur liste buckets:', error);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       error: 'Erreur lors de la récupération des buckets',
-      message: error.message 
+      message: error.message
     });
   }
 });
@@ -103,14 +103,14 @@ app.post('/api/buckets', extractCredentials, async (req, res) => {
     const { name } = req.body;
     const command = new CreateBucketCommand({ Bucket: name });
     await req.s3Client.send(command);
-    
+
     res.json({ success: true, message: `Bucket "${name}" créé` });
   } catch (error) {
     console.error('Erreur création bucket:', error);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       error: 'Erreur lors de la création',
-      message: error.message 
+      message: error.message
     });
   }
 });
@@ -121,14 +121,14 @@ app.delete('/api/buckets/:name', extractCredentials, async (req, res) => {
     const { name } = req.params;
     const command = new DeleteBucketCommand({ Bucket: name });
     await req.s3Client.send(command);
-    
+
     res.json({ success: true, message: `Bucket "${name}" supprimé` });
   } catch (error) {
     console.error('Erreur suppression bucket:', error);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       error: 'Erreur lors de la suppression',
-      message: error.message 
+      message: error.message
     });
   }
 });
@@ -138,16 +138,16 @@ app.get('/api/buckets/:bucket/objects', extractCredentials, async (req, res) => 
   try {
     const { bucket } = req.params;
     const { prefix = '', delimiter = '/' } = req.query;
-    
+
     const command = new ListObjectsV2Command({
       Bucket: bucket,
       Prefix: prefix,
       Delimiter: delimiter
     });
-    
+
     const response = await req.s3Client.send(command);
     const objects = [];
-    
+
     // Dossiers
     if (response.CommonPrefixes) {
       response.CommonPrefixes.forEach(prefix => {
@@ -163,7 +163,7 @@ app.get('/api/buckets/:bucket/objects', extractCredentials, async (req, res) => 
         }
       });
     }
-    
+
     // Fichiers
     if (response.Contents) {
       response.Contents.forEach(object => {
@@ -183,10 +183,10 @@ app.get('/api/buckets/:bucket/objects', extractCredentials, async (req, res) => 
     res.json({ success: true, data: objects });
   } catch (error) {
     console.error('Erreur liste objets:', error);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       error: 'Erreur lors de la récupération des objets',
-      message: error.message 
+      message: error.message
     });
   }
 });
@@ -197,14 +197,14 @@ app.get('/api/buckets/:bucket/objects/:key/download', extractCredentials, async 
     const { bucket, key } = req.params;
     const command = new GetObjectCommand({ Bucket: bucket, Key: key });
     const url = await getSignedUrl(req.s3Client, command, { expiresIn: 3600 });
-    
+
     res.json({ success: true, data: { url } });
   } catch (error) {
     console.error('Erreur URL téléchargement:', error);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       error: 'Erreur génération URL',
-      message: error.message 
+      message: error.message
     });
   }
 });
@@ -214,7 +214,7 @@ app.post('/api/buckets/:bucket/objects', extractCredentials, upload.single('file
   try {
     const { bucket } = req.params;
     const { path = '' } = req.body;
-    
+
     if (!req.file) {
       return res.status(400).json({
         success: false,
@@ -223,27 +223,27 @@ app.post('/api/buckets/:bucket/objects', extractCredentials, upload.single('file
     }
 
     const key = path ? `${path}/${req.file.originalname}` : req.file.originalname;
-    
+
     const command = new PutObjectCommand({
       Bucket: bucket,
       Key: key,
       Body: req.file.buffer,
       ContentType: req.file.mimetype
     });
-    
+
     await req.s3Client.send(command);
-    
-    res.json({ 
-      success: true, 
+
+    res.json({
+      success: true,
       message: `Fichier "${req.file.originalname}" uploadé`,
       data: { key }
     });
   } catch (error) {
     console.error('Erreur upload fichier:', error);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       error: 'Erreur lors de l\'upload',
-      message: error.message 
+      message: error.message
     });
   }
 });
@@ -254,14 +254,14 @@ app.delete('/api/buckets/:bucket/objects/:key(*)', extractCredentials, async (re
     const { bucket, key } = req.params;
     const command = new DeleteObjectCommand({ Bucket: bucket, Key: key });
     await req.s3Client.send(command);
-    
+
     res.json({ success: true, message: `Objet "${key}" supprimé` });
   } catch (error) {
     console.error('Erreur suppression objet:', error);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       error: 'Erreur lors de la suppression',
-      message: error.message 
+      message: error.message
     });
   }
 });
@@ -271,7 +271,7 @@ app.post('/api/buckets/:bucket/folders', extractCredentials, async (req, res) =>
   try {
     const { bucket } = req.params;
     const { path = '', folderName } = req.body;
-    
+
     if (!folderName) {
       return res.status(400).json({
         success: false,
@@ -280,27 +280,27 @@ app.post('/api/buckets/:bucket/folders', extractCredentials, async (req, res) =>
     }
 
     const key = path ? `${path}/${folderName}/` : `${folderName}/`;
-    
+
     const command = new PutObjectCommand({
       Bucket: bucket,
       Key: key,
       Body: '',
       ContentType: 'application/x-directory'
     });
-    
+
     await req.s3Client.send(command);
-    
-    res.json({ 
-      success: true, 
+
+    res.json({
+      success: true,
       message: `Dossier "${folderName}" créé`,
       data: { key }
     });
   } catch (error) {
     console.error('Erreur création dossier:', error);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       error: 'Erreur lors de la création du dossier',
-      message: error.message 
+      message: error.message
     });
   }
 });
@@ -308,9 +308,9 @@ app.post('/api/buckets/:bucket/folders', extractCredentials, async (req, res) =>
 // Gestion des erreurs
 app.use((error, req, res, next) => {
   console.error('Erreur serveur:', error);
-  res.status(500).json({ 
-    success: false, 
-    error: 'Erreur interne du serveur' 
+  res.status(500).json({
+    success: false,
+    error: 'Erreur interne du serveur'
   });
 });
 
