@@ -77,11 +77,24 @@ export const LoginForm = () => {
       }
     } catch (error) {
       console.error('Login error:', error);
-      toast({
-        title: "Erreur de connexion",
-        description: "Impossible de se connecter au service. Vérifiez vos identifiants et votre connexion internet.",
-        variant: "destructive"
-      });
+      
+      // Vérifier si c'est une erreur spécifique du proxy
+      const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue';
+      
+      if (errorMessage.includes('Serveur proxy non accessible')) {
+        toast({
+          title: "🚫 Serveur proxy requis",
+          description: "Exécutez './start.sh' (Linux/Mac) ou 'start.bat' (Windows) pour démarrer le frontend et le proxy ensemble.",
+          variant: "destructive",
+          duration: 8000
+        });
+      } else {
+        toast({
+          title: "Erreur de connexion",
+          description: "Impossible de se connecter au service. Vérifiez vos identifiants et votre connexion internet.",
+          variant: "destructive"
+        });
+      }
     } finally {
       setIsLoading(false);
     }

@@ -41,6 +41,16 @@ class ProxyS3Service {
       }
     } catch (error) {
       console.error('❌ Erreur initialisation proxy:', error);
+      
+      // Vérifier si c'est une erreur de connexion au proxy
+      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+        return {
+          success: false,
+          error: '🚫 Serveur proxy non accessible',
+          message: '⚠️ SOLUTION: Exécutez "./start.sh" (Linux/Mac) ou "start.bat" (Windows) pour démarrer les deux serveurs'
+        };
+      }
+      
       return {
         success: false,
         error: 'Impossible de se connecter au proxy',
@@ -85,6 +95,12 @@ class ProxyS3Service {
       return data;
     } catch (error) {
       console.error(`❌ Erreur requête ${endpoint}:`, error);
+      
+      // Si c'est une erreur de connexion, afficher un message plus clair
+      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+        console.error('🚫 PROXY SERVER NOT RUNNING! Run: npm run dev:all');
+      }
+      
       throw error;
     }
   }
