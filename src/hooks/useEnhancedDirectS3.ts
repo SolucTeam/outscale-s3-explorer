@@ -3,7 +3,7 @@
  * Version optimisée pour performance et fiabilité
  */
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { proxyS3Service, ProxyS3Response } from '../services/proxyS3Service';
 import { useS3Store } from './useS3Store';
 import { S3Bucket, S3Object, S3Credentials } from '../types/s3';
@@ -33,10 +33,17 @@ export const useEnhancedDirectS3 = () => {
   } = useS3Store();
   
   const { toast } = useToast();
-  const [initialized, setInitialized] = useState(false);
+  const [initialized, setInitialized] = useState<boolean>(() => proxyS3Service.isInitialized());
   const [uploadProgress, setUploadProgress] = useState<Record<string, UploadProgress>>({});
   const uploadQueueRef = useRef<File[]>([]);
   const activeUploadsRef = useRef<Set<string>>(new Set());
+  
+  // Sync initialized state with proxy service (important after navigation)
+  useEffect(() => {
+    if (proxyS3Service.isInitialized() !== initialized) {
+      setInitialized(proxyS3Service.isInitialized());
+    }
+  }, [initialized]);
   
   const retryConfig: RetryConfig = {
     maxRetries: 3,
