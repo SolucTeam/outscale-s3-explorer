@@ -74,16 +74,40 @@ app.get('/health', (req, res) => {
   res.json({ status: 'OK', message: 'Proxy CORS NumS3 opérationnel' });
 });
 
-// Liste des buckets
+// Liste des buckets avec statistiques
 app.get('/api/buckets', extractCredentials, async (req, res) => {
   try {
     const command = new ListBucketsCommand({});
     const response = await req.s3Client.send(command);
 
-    const buckets = (response.Buckets || []).map(bucket => ({
-      name: bucket.Name || '',
-      creationDate: bucket.CreationDate || new Date(),
-      region: req.headers['x-region'] || 'eu-west-2'
+    const buckets = await Promise.all((response.Buckets || []).map(async (bucket) => {
+      try {
+        // Récupérer les statistiques du bucket
+        const listCommand = new ListObjectsV2Command({
+          Bucket: bucket.Name
+        });
+        const objectsResponse = await req.s3Client.send(listCommand);
+        
+        const objectCount = objectsResponse.KeyCount || 0;
+        const size = (objectsResponse.Contents || []).reduce((total, obj) => total + (obj.Size || 0), 0);
+
+        return {
+          name: bucket.Name || '',
+          creationDate: bucket.CreationDate || new Date(),
+          region: req.headers['x-region'] || 'eu-west-2',
+          objectCount,
+          size
+        };
+      } catch (statsError) {
+        console.warn(`Impossible de récupérer les stats pour ${bucket.Name}:`, statsError.message);
+        return {
+          name: bucket.Name || '',
+          creationDate: bucket.CreationDate || new Date(),
+          region: req.headers['x-region'] || 'eu-west-2',
+          objectCount: 0,
+          size: 0
+        };
+      }
     }));
 
     res.json({ success: true, data: buckets });
@@ -150,16 +174,26 @@ app.get('/api/buckets/:bucket/objects', extractCredentials, async (req, res) => 
 
     // Dossiers
     if (response.CommonPrefixes) {
-      response.CommonPrefixes.forEach(prefix => {
-        if (prefix.Prefix) {
-          objects.push({
-            key: prefix.Prefix,
-            lastModified: new Date(),
-            size: 0,
-            etag: '',
-            storageClass: 'STANDARD',
-            isFolder: true
-          });
+      response.CommonPrefixes.forEach(prefixObj => {
+        if (prefixObj.Prefix) {
+          // Extraire le nom du dossier sans le préfixe parent
+          let folderName = prefixObj.Prefix;
+          if (prefix && folderName.startsWith(prefix)) {
+            folderName = folderName.substring(prefix.length);
+          }
+          // Retirer le slash final
+          folderName = folderName.replace(/\/$/, '');
+          
+          if (folderName) {
+            objects.push({
+              key: folderName,
+              lastModified: new Date(),
+              size: 0,
+              etag: '',
+              storageClass: 'STANDARD',
+              isFolder: true
+            });
+          }
         }
       });
     }
@@ -167,15 +201,24 @@ app.get('/api/buckets/:bucket/objects', extractCredentials, async (req, res) => 
     // Fichiers
     if (response.Contents) {
       response.Contents.forEach(object => {
-        if (object.Key && object.Key !== prefix) {
-          objects.push({
-            key: object.Key,
-            lastModified: object.LastModified || new Date(),
-            size: object.Size || 0,
-            etag: object.ETag || '',
-            storageClass: object.StorageClass || 'STANDARD',
-            isFolder: false
-          });
+        if (object.Key && object.Key !== prefix && !object.Key.endsWith('/')) {
+          // Extraire le nom du fichier sans le préfixe parent
+          let fileName = object.Key;
+          if (prefix && fileName.startsWith(prefix)) {
+            fileName = fileName.substring(prefix.length);
+          }
+          
+          // Ignorer les fichiers dans des sous-dossiers (contenant des slashes)
+          if (!fileName.includes('/')) {
+            objects.push({
+              key: fileName,
+              lastModified: object.LastModified || new Date(),
+              size: object.Size || 0,
+              etag: object.ETag || '',
+              storageClass: object.StorageClass || 'STANDARD',
+              isFolder: false
+            });
+          }
         }
       });
     }
