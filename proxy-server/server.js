@@ -235,7 +235,7 @@ app.get('/api/buckets/:bucket/objects', extractCredentials, async (req, res) => 
 });
 
 // URL de téléchargement
-app.get('/api/buckets/:bucket/objects/:key/download', extractCredentials, async (req, res) => {
+app.get('/api/buckets/:bucket/objects/:key(*)/download', extractCredentials, async (req, res) => {
   try {
     const { bucket, key } = req.params;
     const command = new GetObjectCommand({ Bucket: bucket, Key: key });

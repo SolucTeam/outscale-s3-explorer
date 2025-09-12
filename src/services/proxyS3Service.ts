@@ -120,7 +120,7 @@ class ProxyS3Service {
 
     try {
       console.log('🌐 Chargement buckets via proxy...');
-      const response = await this.makeRequest<S3Bucket[]>('/api/buckets');
+      const response = await this.makeRequest<S3Bucket[]>('/buckets');
       
       if (response.success && response.data) {
         // Mettre en cache
@@ -145,7 +145,7 @@ class ProxyS3Service {
 
     try {
       console.log(`🆕 Création bucket: ${name}`);
-      const response = await this.makeRequest<void>('/api/buckets', {
+      const response = await this.makeRequest<void>('/buckets', {
         method: 'POST',
         body: JSON.stringify({ name })
       });
@@ -174,7 +174,7 @@ class ProxyS3Service {
 
     try {
       console.log(`🗑️ Suppression bucket: ${name}`);
-      const response = await this.makeRequest<void>(`/api/buckets/${encodeURIComponent(name)}`, {
+      const response = await this.makeRequest<void>(`/buckets/${encodeURIComponent(name)}`, {
         method: 'DELETE'
       });
       
@@ -202,21 +202,24 @@ class ProxyS3Service {
       return { success: false, error: 'Service non initialisé' };
     }
 
+    // Normaliser le chemin (toujours un trailing slash pour un listing de dossier correct)
+    const normalizedPath = path ? path.replace(/^\/+|\/+$/g, '') + '/' : '';
+
     // Vérifier le cache
-    const cacheKey = `objects_${bucket}_${path}`;
+    const cacheKey = `objects_${bucket}_${normalizedPath}`;
     const cached = cacheService.get<S3Object[]>(cacheKey);
     if (cached) {
-      console.log(`📂 Objets depuis le cache: ${bucket}/${path}`);
+      console.log(`📂 Objets depuis le cache: ${bucket}/${normalizedPath}`);
       return { success: true, data: cached };
     }
 
     try {
-      console.log(`🌐 Chargement objets: ${bucket}/${path}`);
+      console.log(`🌐 Chargement objets: ${bucket}/${normalizedPath}`);
       const params = new URLSearchParams();
-      if (path) params.append('prefix', path);
+      if (normalizedPath) params.append('prefix', normalizedPath);
       params.append('delimiter', '/');
       
-      const endpoint = `/api/buckets/${encodeURIComponent(bucket)}/objects?${params.toString()}`;
+      const endpoint = `/buckets/${encodeURIComponent(bucket)}/objects?${params.toString()}`;
       const response = await this.makeRequest<S3Object[]>(endpoint);
       
       if (response.success && response.data) {
@@ -241,7 +244,7 @@ class ProxyS3Service {
     }
 
     try {
-      const endpoint = `/api/buckets/${encodeURIComponent(bucket)}/objects/${encodeURIComponent(objectKey)}/download`;
+      const endpoint = `/buckets/${encodeURIComponent(bucket)}/objects/${encodeURIComponent(objectKey)}/download`;
       const response = await this.makeRequest<{ url: string }>(endpoint);
       return response;
     } catch (error) {
@@ -260,7 +263,7 @@ class ProxyS3Service {
 
     try {
       console.log(`🗑️ Suppression objet: ${bucket}/${objectKey}`);
-      const response = await this.makeRequest<void>(`/api/buckets/${encodeURIComponent(bucket)}/objects/${encodeURIComponent(objectKey)}`, {
+      const response = await this.makeRequest<void>(`/buckets/${encodeURIComponent(bucket)}/objects/${encodeURIComponent(objectKey)}`, {
         method: 'DELETE'
       });
       
@@ -293,7 +296,7 @@ class ProxyS3Service {
       formData.append('file', file);
       formData.append('path', path);
 
-      const response = await this.makeRequest<{ key: string }>(`/api/buckets/${encodeURIComponent(bucket)}/objects`, {
+      const response = await this.makeRequest<{ key: string }>(`/buckets/${encodeURIComponent(bucket)}/objects`, {
         method: 'POST',
         body: formData,
         headers: {
@@ -327,7 +330,7 @@ class ProxyS3Service {
 
     try {
       console.log(`📁 Création dossier: ${folderName} dans ${bucket}/${path}`);
-      const response = await this.makeRequest<{ key: string }>(`/api/buckets/${encodeURIComponent(bucket)}/folders`, {
+      const response = await this.makeRequest<{ key: string }>(`/buckets/${encodeURIComponent(bucket)}/folders`, {
         method: 'POST',
         body: JSON.stringify({ path, folderName })
       });
