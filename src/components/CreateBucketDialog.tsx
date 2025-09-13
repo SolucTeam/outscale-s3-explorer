@@ -53,7 +53,6 @@ export const CreateBucketDialog = ({ open, onOpenChange }: CreateBucketDialogPro
     if (success) {
       setBucketName('');
       onOpenChange(false);
-      await fetchBuckets();
       toast({
         title: "Succès",
         description: `Bucket "${bucketName}" créé avec succès`

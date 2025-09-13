@@ -9,6 +9,7 @@ import { useS3Store } from './useS3Store';
 import { S3Bucket, S3Object, S3Credentials } from '../types/s3';
 import { useToast } from '@/hooks/use-toast';
 import { cacheService } from '../services/cacheService';
+import { s3LoggingService } from '../services/s3LoggingService';
 
 interface UploadProgress {
   file: string;
@@ -310,6 +311,14 @@ export const useEnhancedDirectS3 = () => {
     setLoading(true);
     setError(null);
 
+    // Log operation start
+    const logEntryId = s3LoggingService.logOperationStart(
+      'bucket_create',
+      name,
+      undefined,
+      `Région: ${region}`
+    );
+
     try {
       const response = await withRetry(
         () => proxyS3Service.createBucket(name),
@@ -317,28 +326,64 @@ export const useEnhancedDirectS3 = () => {
       );
       
       if (response.success) {
+        // Log success
+        s3LoggingService.logOperationSuccess(
+          logEntryId,
+          'bucket_create',
+          name,
+          undefined,
+          `Bucket créé dans la région ${region}`
+        );
+        
+        // Invalider le cache des buckets et forcer le refresh
+        cacheService.delete('buckets');
+        await fetchBuckets(true);
+        
         toast({
           title: "Succès",
           description: `Bucket "${name}" créé avec succès`
         });
         return true;
       } else {
+        // Log error
+        s3LoggingService.logOperationError(
+          logEntryId,
+          'bucket_create',
+          response.error || 'Erreur lors de la création',
+          name,
+          undefined,
+          'CREATE_FAILED'
+        );
         return handleError(response, 'Erreur lors de la création du bucket');
       }
     } catch (error) {
       console.error('❌ Create bucket error:', error);
+      s3LoggingService.logOperationError(
+        logEntryId,
+        'bucket_create',
+        error instanceof Error ? error : 'Erreur de connexion',
+        name,
+        undefined,
+        'NETWORK_ERROR'
+      );
       setError('Erreur de connexion');
       return false;
     } finally {
       setLoading(false);
     }
-  }, [initialized]);
+  }, [initialized, fetchBuckets]);
 
   const deleteBucket = useCallback(async (name: string): Promise<boolean> => {
     if (!initialized) return false;
     
     setLoading(true);
     setError(null);
+
+    // Log operation start
+    const logEntryId = s3LoggingService.logOperationStart(
+      'bucket_delete',
+      name
+    );
 
     try {
       const response = await withRetry(
@@ -347,6 +392,15 @@ export const useEnhancedDirectS3 = () => {
       );
       
       if (response.success) {
+        // Log success
+        s3LoggingService.logOperationSuccess(
+          logEntryId,
+          'bucket_delete',
+          name,
+          undefined,
+          'Bucket supprimé avec succès'
+        );
+        
         toast({
           title: "Succès",
           description: `Bucket "${name}" supprimé avec succès`
@@ -354,10 +408,27 @@ export const useEnhancedDirectS3 = () => {
         await fetchBuckets(true); // Force refresh
         return true;
       } else {
+        // Log error
+        s3LoggingService.logOperationError(
+          logEntryId,
+          'bucket_delete',
+          response.error || 'Erreur lors de la suppression',
+          name,
+          undefined,
+          'DELETE_FAILED'
+        );
         return handleError(response, 'Erreur lors de la suppression du bucket');
       }
     } catch (error) {
       console.error('❌ Delete bucket error:', error);
+      s3LoggingService.logOperationError(
+        logEntryId,
+        'bucket_delete',
+        error instanceof Error ? error : 'Erreur de connexion',
+        name,
+        undefined,
+        'NETWORK_ERROR'
+      );
       setError('Erreur de connexion');
       return false;
     } finally {
@@ -368,6 +439,13 @@ export const useEnhancedDirectS3 = () => {
   const deleteObject = useCallback(async (bucket: string, objectKey: string): Promise<boolean> => {
     if (!initialized) return false;
 
+    // Log operation start
+    const logEntryId = s3LoggingService.logOperationStart(
+      'object_delete',
+      bucket,
+      objectKey
+    );
+
     try {
       const response = await withRetry(
         () => proxyS3Service.deleteObject(bucket, objectKey),
@@ -375,16 +453,42 @@ export const useEnhancedDirectS3 = () => {
       );
       
       if (response.success) {
+        // Log success
+        s3LoggingService.logOperationSuccess(
+          logEntryId,
+          'object_delete',
+          bucket,
+          objectKey,
+          'Objet supprimé avec succès'
+        );
+        
         toast({
           title: "Succès",
           description: `"${objectKey}" supprimé avec succès`
         });
         return true;
       } else {
+        // Log error
+        s3LoggingService.logOperationError(
+          logEntryId,
+          'object_delete',
+          response.error || 'Erreur lors de la suppression',
+          bucket,
+          objectKey,
+          'DELETE_FAILED'
+        );
         return handleError(response, 'Erreur lors de la suppression');
       }
     } catch (error) {
       console.error('❌ Delete object error:', error);
+      s3LoggingService.logOperationError(
+        logEntryId,
+        'object_delete',
+        error instanceof Error ? error : 'Erreur de connexion',
+        bucket,
+        objectKey,
+        'NETWORK_ERROR'
+      );
       setError('Erreur de connexion');
       return false;
     }
@@ -413,6 +517,14 @@ export const useEnhancedDirectS3 = () => {
   const createFolder = useCallback(async (bucket: string, path: string, folderName: string): Promise<boolean> => {
     if (!initialized) return false;
 
+    // Log operation start
+    const logEntryId = s3LoggingService.logOperationStart(
+      'folder_create',
+      bucket,
+      `${path}${folderName}/`,
+      `Dossier dans ${path || 'racine'}`
+    );
+
     try {
       const response = await withRetry(
         () => proxyS3Service.createFolder(bucket, path, folderName),
@@ -420,16 +532,42 @@ export const useEnhancedDirectS3 = () => {
       );
       
       if (response.success) {
+        // Log success
+        s3LoggingService.logOperationSuccess(
+          logEntryId,
+          'folder_create',
+          bucket,
+          `${path}${folderName}/`,
+          `Dossier créé dans ${path || 'racine'}`
+        );
+        
         toast({
           title: "Succès",
           description: `Dossier "${folderName}" créé avec succès`
         });
         return true;
       } else {
+        // Log error
+        s3LoggingService.logOperationError(
+          logEntryId,
+          'folder_create',
+          response.error || 'Erreur lors de la création',
+          bucket,
+          `${path}${folderName}/`,
+          'CREATE_FAILED'
+        );
         return handleError(response, 'Erreur lors de la création du dossier');
       }
     } catch (error) {
       console.error('❌ Create folder error:', error);
+      s3LoggingService.logOperationError(
+        logEntryId,
+        'folder_create',
+        error instanceof Error ? error : 'Erreur de connexion',
+        bucket,
+        `${path}${folderName}/`,
+        'NETWORK_ERROR'
+      );
       setError('Erreur de connexion');
       return false;
     }
