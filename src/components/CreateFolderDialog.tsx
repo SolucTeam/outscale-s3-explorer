@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useDirectS3 } from '../hooks/useDirectS3';
+import { useEnhancedDirectS3 } from '../hooks/useEnhancedDirectS3'; 
 import { useToast } from '@/hooks/use-toast';
 
 interface CreateFolderDialogProps {
@@ -17,7 +17,7 @@ interface CreateFolderDialogProps {
 export const CreateFolderDialog = ({ open, onOpenChange, bucket, currentPath, onFolderCreated }: CreateFolderDialogProps) => {
   const [folderName, setFolderName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
-  const { createFolder } = useDirectS3();
+  const { createFolder } = useEnhancedDirectS3();
   const { toast } = useToast();
 
   const handleCreate = async () => {

@@ -31,9 +31,11 @@ export const Breadcrumb = () => {
 
   const handleBreadcrumbClick = (item: BreadcrumbItem) => {
     if (item.path === '') {
+      setCurrentPath('');
       // Retour à la liste des buckets
       navigate('/dashboard');
     } else if (item.path === currentBucket) {
+      setCurrentPath('');
       // Retour à la racine du bucket
       navigate(`/bucket/${encodeURIComponent(currentBucket)}`);
     } else {

@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent } from '@/components/ui/card';
-import { useDirectS3 } from '../hooks/useDirectS3';
+import { useEnhancedDirectS3 } from '../hooks/useEnhancedDirectS3';
 import { Upload, X, File, CheckCircle, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { s3LoggingService } from '../services/s3LoggingService';
@@ -33,7 +33,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({
   const [files, setFiles] = useState<UploadFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [bulkLogEntryId, setBulkLogEntryId] = useState<string>('');
-  const { uploadFile } = useDirectS3();
+  const { uploadFile } = useEnhancedDirectS3();
   const { toast } = useToast();
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
