@@ -78,21 +78,32 @@ export const LoginForm = () => {
     } catch (error) {
       console.error('Login error:', error);
       
-      // Vérifier si c'est une erreur spécifique du proxy
-      const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue';
+      const errorMessage = error instanceof Error ? error.message : '';
+      const isNetworkError = errorMessage.includes('Failed to fetch') || 
+                             errorMessage.includes('NetworkError') || 
+                             errorMessage.includes('Serveur proxy non accessible') ||
+                             errorMessage.includes('ECONNREFUSED');
       
-      if (errorMessage.includes('Serveur proxy non accessible')) {
+      if (isNetworkError) {
         toast({
-          title: "🚫 Serveur proxy requis",
-          description: "Exécutez './start.sh' (Linux/Mac) ou 'start.bat' (Windows) pour démarrer le frontend et le proxy ensemble.",
+          title: "❌ Serveur proxy non démarré",
+          description: "Le serveur proxy est requis pour se connecter à Outscale. Lancez './start.sh' (Linux/Mac) ou 'start.bat' (Windows) dans un terminal pour démarrer le proxy et l'application.",
           variant: "destructive",
-          duration: 8000
+          duration: 10000
+        });
+      } else if (errorMessage.includes('InvalidAccessKeyId') || errorMessage.includes('SignatureDoesNotMatch')) {
+        toast({
+          title: "❌ Identifiants invalides",
+          description: "Vérifiez votre Access Key et Secret Key Outscale.",
+          variant: "destructive",
+          duration: 6000
         });
       } else {
         toast({
-          title: "Erreur de connexion",
-          description: "Impossible de se connecter au service. Vérifiez vos identifiants et votre connexion internet.",
-          variant: "destructive"
+          title: "❌ Erreur de connexion",
+          description: errorMessage || "Impossible de se connecter au service. Vérifiez vos identifiants et votre connexion internet.",
+          variant: "destructive",
+          duration: 6000
         });
       }
     } finally {
@@ -195,14 +206,23 @@ export const LoginForm = () => {
             </Button>
           </form>
           
-          <div className="mt-6 p-4 bg-green-50 rounded-lg border border-green-200">
-            <p className="text-sm text-green-800">
-              <Shield className="w-4 h-4 inline mr-2" />
-              Connexion sécurisée via notre backend à votre infrastructure Outscale.
+          <div className="mt-6 p-4 bg-amber-50 rounded-lg border border-amber-300">
+            <p className="text-sm text-amber-900 font-medium flex items-start">
+              <Server className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
+              <span>
+                <strong>Prérequis:</strong> Démarrez le serveur proxy avec <code className="bg-amber-100 px-1.5 py-0.5 rounded text-xs">./start.sh</code> ou <code className="bg-amber-100 px-1.5 py-0.5 rounded text-xs">start.bat</code>
+              </span>
             </p>
           </div>
 
-          <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+          <div className="mt-4 p-4 bg-green-50 rounded-lg border border-green-200">
+            <p className="text-sm text-green-800">
+              <Shield className="w-4 h-4 inline mr-2" />
+              Connexion sécurisée via proxy local à votre infrastructure Outscale.
+            </p>
+          </div>
+
+          <div className="mt-3 p-4 bg-blue-50 rounded-lg border border-blue-200">
             <p className="text-sm text-blue-800 flex items-start">
               <AlertCircle className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
               Vos identifiants sont sécurisés et stockés uniquement durant votre session.
