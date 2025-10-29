@@ -105,6 +105,28 @@ export class EncryptionService {
   }
 
   /**
+   * Démarre un timer de refresh automatique à 25 minutes
+   */
+  static startAutoRefresh(onRefresh?: () => void): () => void {
+    const refreshTime = 25 * 60 * 1000; // 25 minutes
+    const checkInterval = 60 * 1000; // Vérifier chaque minute
+
+    const intervalId = setInterval(() => {
+      const timeRemaining = this.getTimeUntilExpiration();
+      
+      // Si moins de 5 minutes restantes, refresh
+      if (timeRemaining > 0 && timeRemaining <= 5 * 60 * 1000) {
+        this.refreshSession();
+        if (onRefresh) {
+          onRefresh();
+        }
+      }
+    }, checkInterval);
+
+    return () => clearInterval(intervalId);
+  }
+
+  /**
    * Démarre un timer d'avertissement d'expiration
    * Affiche un toast 5 minutes avant l'expiration
    */

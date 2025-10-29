@@ -501,7 +501,7 @@ export const useEnhancedDirectS3 = () => {
     }
   }, [initialized, toast]);
 
-  const downloadObject = useCallback(async (bucket: string, objectKey: string): Promise<void> => {
+  const downloadObject = useCallback(async (bucket: string, objectKey: string, fileName?: string): Promise<void> => {
     if (!initialized) return;
 
     try {
@@ -511,7 +511,17 @@ export const useEnhancedDirectS3 = () => {
       );
       
       if (response.success && response.data?.url) {
-        window.open(response.data.url, '_blank');
+        // Extraire le nom du fichier depuis la clé S3 si non fourni
+        const downloadName = fileName || objectKey.split('/').pop() || objectKey;
+        
+        // Créer un lien temporaire pour forcer le téléchargement avec le bon nom
+        const link = document.createElement('a');
+        link.href = response.data.url;
+        link.download = downloadName;
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
       } else {
         handleError(response, 'Erreur lors de la génération du lien de téléchargement');
       }

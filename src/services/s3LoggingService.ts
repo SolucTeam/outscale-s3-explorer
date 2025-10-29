@@ -1,7 +1,15 @@
 import { useActionHistoryStore, LogLevel, ActionHistoryEntry } from '../stores/actionHistoryStore';
 import { useS3Store } from '../hooks/useS3Store';
 
+type LogMode = 'production' | 'debug';
+
 class S3LoggingService {
+  private mode: LogMode = 'production';
+  
+  setMode(mode: LogMode) {
+    this.mode = mode;
+  }
+
   private getStore() {
     return useActionHistoryStore.getState();
   }
@@ -13,6 +21,13 @@ class S3LoggingService {
     if (!store.currentUserId && s3Store.credentials) {
       const userId = `${s3Store.credentials.accessKey.substring(0, 8)}_${s3Store.credentials.region}`;
       store.setCurrentUser(userId);
+    }
+  }
+
+  private log(level: 'info' | 'warn' | 'error', message: string, ...args: any[]) {
+    if (this.mode === 'debug' || level === 'error') {
+      const timestamp = new Date().toISOString();
+      console[level](`[${timestamp}] [S3] ${message}`, ...args);
     }
   }
 
@@ -30,6 +45,8 @@ class S3LoggingService {
     const currentUserHistory = store.userHistories[store.currentUserId];
     if (!currentUserHistory?.isLoggingEnabled) return '';
 
+    this.log('info', `Operation started: ${operationType}`, { bucketName, objectName });
+
     const userMessage = this.generateUserMessage(operationType, 'started', bucketName, objectName);
     
     store.addEntry({
@@ -42,7 +59,6 @@ class S3LoggingService {
       userFriendlyMessage: userMessage
     });
 
-    // Return the entry ID for future updates
     const entries = store.getCurrentUserEntries();
     return entries[0]?.id || '';
   }
@@ -123,6 +139,8 @@ class S3LoggingService {
     if (!currentUserHistory?.isLoggingEnabled) return;
 
     const errorMessage = error instanceof Error ? error.message : error;
+    this.log('error', `Operation error: ${operationType}`, { errorMessage, errorCode, bucketName, objectName });
+    
     const userMessage = this.generateUserMessage(operationType, 'error', bucketName, objectName, errorMessage);
 
     if (entryId) {

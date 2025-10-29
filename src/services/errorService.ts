@@ -80,6 +80,28 @@ export class ErrorService {
       userMessage: 'Quota dépassé.',
       canRetry: false,
       action: 'Contactez votre administrateur'
+    },
+
+    // Erreurs diverses
+    'ACCESS_DENIED': {
+      userMessage: 'Accès refusé. Vérifiez vos permissions.',
+      canRetry: false,
+      action: 'Vérifiez vos droits d\'accès'
+    },
+    'INVALID_REQUEST': {
+      userMessage: 'Requête invalide.',
+      canRetry: false,
+      action: 'Vérifiez les paramètres de votre requête'
+    },
+    'NO_SUCH_KEY': {
+      userMessage: 'Clé inexistante.',
+      canRetry: false,
+      action: 'Vérifiez que le fichier existe'
+    },
+    'PRECONDITION_FAILED': {
+      userMessage: 'Précondition échouée.',
+      canRetry: false,
+      action: 'Vérifiez les conditions de votre requête'
     }
   };
 

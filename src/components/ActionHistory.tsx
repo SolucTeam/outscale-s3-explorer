@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useActionHistoryStore } from '../stores/actionHistoryStore';
 import { useS3Store } from '../hooks/useS3Store';
-import { Activity, Clock, CheckCircle, XCircle, AlertCircle, Filter, Trash2, User, Settings } from 'lucide-react';
+import { Activity, Clock, CheckCircle, XCircle, AlertCircle, Filter, Trash2, User, Settings, ChevronLeft, ChevronRight } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
@@ -24,6 +24,8 @@ export const ActionHistory = () => {
   const [filter, setFilter] = useState<'all' | 'success' | 'error' | 'info'>('all');
   const [isExpanded, setIsExpanded] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   // Mettre à jour l'utilisateur courant quand les credentials changent
   useEffect(() => {
@@ -44,6 +46,15 @@ export const ActionHistory = () => {
     if (filter === 'info') return entry.status === 'started' || entry.status === 'progress';
     return true;
   });
+
+  const totalPages = Math.ceil(filteredActions.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedActions = filteredActions.slice(startIndex, endIndex);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filter]);
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -173,9 +184,10 @@ export const ActionHistory = () => {
             <p className="text-xs text-gray-500">Les actions S3 apparaîtront ici</p>
           </div>
         ) : (
-          <ScrollArea className="h-64 xl:h-96">
-            <div className="p-4 space-y-3">
-              {filteredActions.map((entry, index) => (
+          <>
+            <ScrollArea className="h-64 xl:h-96">
+              <div className="p-4 space-y-3">
+                {paginatedActions.map((entry, index) => (
                 <div
                   key={entry.id}
                   className={`group relative p-3 rounded-lg border transition-all duration-200 hover:shadow-sm ${
@@ -235,9 +247,36 @@ export const ActionHistory = () => {
                     )}
                   </div>
                 </div>
-              ))}
-            </div>
-          </ScrollArea>
+                ))}
+              </div>
+            </ScrollArea>
+            
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between px-4 py-3 border-t">
+                <div className="text-sm text-gray-600">
+                  Page {currentPage} sur {totalPages} ({filteredActions.length} actions)
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </CardContent>
     </Card>

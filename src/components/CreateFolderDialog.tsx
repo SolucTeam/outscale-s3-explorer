@@ -30,26 +30,39 @@ export const CreateFolderDialog = ({ open, onOpenChange, bucket, currentPath, on
       return;
     }
 
-    // Validation du nom de dossier
-    if (folderName.includes('/') || folderName.includes('\\')) {
+    // Validation regex: alphanumériques, tirets, underscores et espaces
+    const validNameRegex = /^[a-zA-Z0-9\s_-]+$/;
+    if (!validNameRegex.test(folderName)) {
       toast({
         title: "Nom invalide",
-        description: "Le nom ne peut pas contenir de caractères / ou \\",
+        description: "Le nom ne peut contenir que des lettres, chiffres, espaces, tirets et underscores",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Validation longueur
+    if (folderName.length > 255) {
+      toast({
+        title: "Nom trop long",
+        description: "Le nom du dossier ne peut pas dépasser 255 caractères",
         variant: "destructive"
       });
       return;
     }
 
     setIsCreating(true);
-    const success = await createFolder(bucket, currentPath, folderName);
-    
-    if (success) {
-      setFolderName('');
-      onOpenChange(false);
-      onFolderCreated();
+    try {
+      const success = await createFolder(bucket, currentPath, folderName);
+      
+      if (success) {
+        setFolderName('');
+        onOpenChange(false);
+        onFolderCreated();
+      }
+    } finally {
+      setIsCreating(false);
     }
-    
-    setIsCreating(false);
   };
 
   return (

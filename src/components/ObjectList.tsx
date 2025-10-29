@@ -11,6 +11,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { FileUpload } from './FileUpload';
 import { CreateFolderDialog } from './CreateFolderDialog';
+import { DeleteObjectDialog } from './DeleteObjectDialog';
 
 export const ObjectList = () => {
   const { currentBucket, currentPath, objects, loading, setCurrentPath } = useS3Store();
@@ -19,6 +20,12 @@ export const ObjectList = () => {
   const [showUpload, setShowUpload] = useState(false);
   const [showCreateFolder, setShowCreateFolder] = useState(false);
   const [isLoadingObjects, setIsLoadingObjects] = useState(false);
+  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; objectKey: string; isFolder: boolean }>({
+    open: false,
+    objectKey: '',
+    isFolder: false
+  });
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     if (currentBucket) {
@@ -70,39 +77,43 @@ export const ObjectList = () => {
     }
   };
 
-  const handleDelete = async (objectKey: string, isFolder: boolean = false) => {
-    const itemType = isFolder ? 'dossier' : 'fichier';
-    const confirmMessage = isFolder 
-      ? `Êtes-vous sûr de vouloir supprimer le dossier "${objectKey}" et tout son contenu ?`
-      : `Êtes-vous sûr de vouloir supprimer ce ${itemType} ?`;
+  const handleDeleteClick = (objectKey: string, isFolder: boolean = false) => {
+    setDeleteDialog({ open: true, objectKey, isFolder });
+  };
+
+  const handleDeleteConfirm = async () => {
+    const { objectKey, isFolder } = deleteDialog;
     
-    if (window.confirm(confirmMessage)) {
-      try {
-        // Pour les dossiers, construire le chemin complet avec le préfixe actuel
-        let keyToDelete = objectKey;
-        if (isFolder) {
-          keyToDelete = currentPath ? `${currentPath}/${objectKey}/` : `${objectKey}/`;
-        } else if (currentPath) {
-          keyToDelete = `${currentPath}/${objectKey}`;
-        }
-        
-        console.log('Deleting object:', { objectKey, isFolder, currentPath, keyToDelete });
-        
-        await deleteObject(currentBucket!, keyToDelete);
-        
-        // Rafraîchir la liste après suppression
-        loadObjects();
-      } catch (error) {
-        console.error('Error deleting object:', error);
+    setIsDeleting(true);
+    try {
+      let keyToDelete = objectKey;
+      if (isFolder) {
+        keyToDelete = currentPath ? `${currentPath}/${objectKey}/` : `${objectKey}/`;
+      } else if (currentPath) {
+        keyToDelete = `${currentPath}/${objectKey}`;
       }
+      
+      console.log('Deleting object:', { objectKey, isFolder, currentPath, keyToDelete });
+      
+      await deleteObject(currentBucket!, keyToDelete);
+      
+      setDeleteDialog({ open: false, objectKey: '', isFolder: false });
+      loadObjects();
+    } catch (error) {
+      console.error('Error deleting object:', error);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
   const handleDownload = async (objectKey: string) => {
     try {
-      // Construire le chemin complet pour le téléchargement
       const fullKey = currentPath ? `${currentPath}/${objectKey}` : objectKey;
-      await downloadObject(currentBucket!, fullKey);
+      
+      // Extraire le nom du fichier depuis la clé
+      const fileName = fullKey.split('/').pop() || objectKey;
+      
+      await downloadObject(currentBucket!, fullKey, fileName);
     } catch (error) {
       console.error('Error downloading object:', error);
     }
@@ -252,7 +263,7 @@ export const ObjectList = () => {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => handleDelete(object.key, object.isFolder)}
+                      onClick={() => handleDeleteClick(object.key, object.isFolder)}
                       className="text-red-600 hover:text-red-700 hover:bg-red-50"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -283,6 +294,15 @@ export const ObjectList = () => {
           onFolderCreated={handleFolderCreated}
         />
       )}
+
+      <DeleteObjectDialog
+        open={deleteDialog.open}
+        onOpenChange={(open) => setDeleteDialog({ ...deleteDialog, open })}
+        objectKey={deleteDialog.objectKey}
+        isFolder={deleteDialog.isFolder}
+        onConfirm={handleDeleteConfirm}
+        isDeleting={isDeleting}
+      />
     </div>
   );
 };
