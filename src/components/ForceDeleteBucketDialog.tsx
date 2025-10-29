@@ -37,25 +37,26 @@ export const ForceDeleteBucketDialog: React.FC<ForceDeleteBucketDialogProps> = (
     setIsDeleting(true);
     
     try {
-      const success = await deleteBucket(bucketName);
+      // Passer force=true pour vider automatiquement le bucket avant suppression
+      const success = await deleteBucket(bucketName, true);
       
       if (success) {
         toast({
-          title: "Suppression réussie",
-          description: `Bucket "${bucketName}" supprimé avec succès`
+          title: "✅ Suppression réussie",
+          description: `Bucket "${bucketName}" et tout son contenu ont été supprimés`
         });
         onDeleted();
         onOpenChange(false);
       } else {
         toast({
-          title: "Erreur de suppression",
-          description: "Impossible de supprimer le bucket",
+          title: "❌ Erreur de suppression",
+          description: "Impossible de supprimer le bucket. Vérifiez les permissions.",
           variant: "destructive"
         });
       }
     } catch (error) {
       toast({
-        title: "Erreur",
+        title: "❌ Erreur",
         description: "Une erreur inattendue s'est produite",
         variant: "destructive"
       });

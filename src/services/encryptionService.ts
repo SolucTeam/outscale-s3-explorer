@@ -80,6 +80,20 @@ export class EncryptionService {
   }
 
   /**
+   * Obtient le temps restant avant expiration (en ms)
+   */
+  static getTimeUntilExpiration(): number {
+    const data = this.loadFromSession();
+    if (!data || !data.timestamp) return 0;
+    
+    const now = Date.now();
+    const sessionAge = now - data.timestamp;
+    const maxAge = 30 * 60 * 1000; // 30 minutes
+    
+    return Math.max(0, maxAge - sessionAge);
+  }
+
+  /**
    * Auto-refresh de la session
    */
   static refreshSession(): void {
@@ -88,5 +102,46 @@ export class EncryptionService {
       data.timestamp = Date.now();
       this.saveToSession(data);
     }
+  }
+
+  /**
+   * Démarre un timer d'avertissement d'expiration
+   * Affiche un toast 5 minutes avant l'expiration
+   */
+  static startExpirationWarning(toastFn: (options: any) => void): () => void {
+    const checkInterval = 60 * 1000; // Vérifier chaque minute
+    const warningTime = 5 * 60 * 1000; // Avertir 5 minutes avant
+    let warningShown = false;
+
+    const intervalId = setInterval(() => {
+      const timeRemaining = this.getTimeUntilExpiration();
+      
+      if (timeRemaining === 0) {
+        clearInterval(intervalId);
+        toastFn({
+          title: "⏱️ Session expirée",
+          description: "Votre session a expiré. Veuillez vous reconnecter.",
+          variant: "destructive",
+          duration: 10000
+        });
+        // Déconnecter après un court délai
+        setTimeout(() => {
+          this.clearSession();
+          window.location.href = '/login';
+        }, 2000);
+      } else if (timeRemaining <= warningTime && !warningShown) {
+        warningShown = true;
+        const minutesLeft = Math.ceil(timeRemaining / 60000);
+        toastFn({
+          title: "⚠️ Session bientôt expirée",
+          description: `Votre session expirera dans ${minutesLeft} minute${minutesLeft > 1 ? 's' : ''}. Effectuez une action pour la renouveler.`,
+          variant: "default",
+          duration: 8000
+        });
+      }
+    }, checkInterval);
+
+    // Retourner une fonction de cleanup
+    return () => clearInterval(intervalId);
   }
 }

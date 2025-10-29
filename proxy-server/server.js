@@ -139,20 +139,79 @@ app.post('/api/buckets', extractCredentials, async (req, res) => {
   }
 });
 
-// Supprimer un bucket
+// Vider récursivement un bucket
+const emptyBucket = async (s3Client, bucketName) => {
+  let deletedCount = 0;
+  let isTruncated = true;
+  let continuationToken;
+
+  while (isTruncated) {
+    const listCommand = new ListObjectsV2Command({
+      Bucket: bucketName,
+      ContinuationToken: continuationToken
+    });
+
+    const listResponse = await s3Client.send(listCommand);
+    
+    if (listResponse.Contents && listResponse.Contents.length > 0) {
+      // Supprimer les objets par lot
+      for (const obj of listResponse.Contents) {
+        if (obj.Key) {
+          const deleteCommand = new DeleteObjectCommand({
+            Bucket: bucketName,
+            Key: obj.Key
+          });
+          await s3Client.send(deleteCommand);
+          deletedCount++;
+        }
+      }
+    }
+
+    isTruncated = listResponse.IsTruncated || false;
+    continuationToken = listResponse.NextContinuationToken;
+  }
+
+  return deletedCount;
+};
+
+// Supprimer un bucket (avec vidange automatique si nécessaire)
 app.delete('/api/buckets/:name', extractCredentials, async (req, res) => {
   try {
     const { name } = req.params;
-    const command = new DeleteBucketCommand({ Bucket: name });
-    await req.s3Client.send(command);
+    const { force } = req.query;
 
-    res.json({ success: true, message: `Bucket "${name}" supprimé` });
+    // Tenter la suppression directe
+    try {
+      const command = new DeleteBucketCommand({ Bucket: name });
+      await req.s3Client.send(command);
+      res.json({ success: true, message: `Bucket "${name}" supprimé` });
+      return;
+    } catch (deleteError) {
+      // Si le bucket n'est pas vide et force=true, vider puis supprimer
+      if (deleteError.name === 'BucketNotEmpty' && force === 'true') {
+        console.log(`🗑️ Vidage du bucket "${name}" avant suppression...`);
+        const deletedCount = await emptyBucket(req.s3Client, name);
+        console.log(`✅ ${deletedCount} objets supprimés du bucket "${name}"`);
+        
+        // Réessayer la suppression
+        const retryCommand = new DeleteBucketCommand({ Bucket: name });
+        await req.s3Client.send(retryCommand);
+        
+        res.json({ 
+          success: true, 
+          message: `Bucket "${name}" vidé (${deletedCount} objets) et supprimé` 
+        });
+      } else {
+        throw deleteError;
+      }
+    }
   } catch (error) {
     console.error('Erreur suppression bucket:', error);
     res.status(500).json({
       success: false,
-      error: 'Erreur lors de la suppression',
-      message: error.message
+      error: error.name === 'BucketNotEmpty' ? 'Le bucket contient des objets' : 'Erreur lors de la suppression',
+      message: error.message,
+      requiresForce: error.name === 'BucketNotEmpty'
     });
   }
 });

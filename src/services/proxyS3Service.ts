@@ -167,23 +167,23 @@ class ProxyS3Service {
     }
   }
 
-  async deleteBucket(name: string): Promise<ProxyS3Response<void>> {
+  async deleteBucket(name: string, force: boolean = false): Promise<ProxyS3Response<void>> {
     if (!this.credentials) {
       return { success: false, error: 'Service non initialisé' };
     }
 
     try {
-      console.log(`🗑️ Suppression bucket: ${name}`);
-      const response = await this.makeRequest<void>(`/buckets/${encodeURIComponent(name)}`, {
+      console.log(`🗑️ Suppression bucket: ${name}${force ? ' (forcée)' : ''}`);
+      const url = `/buckets/${encodeURIComponent(name)}${force ? '?force=true' : ''}`;
+      const response = await this.makeRequest<void>(url, {
         method: 'DELETE'
       });
       
       if (response.success) {
         // Invalider les caches
-        const bucketCacheKey = `buckets_${this.credentials.region}`;
-        const objectsCacheKey = `objects_${name}`;
-        cacheService.delete(bucketCacheKey);
-        cacheService.clearByPattern(objectsCacheKey);
+        cacheService.delete('buckets');
+        cacheService.clearByPattern(`buckets_`);
+        cacheService.clearByPattern(`objects_${name}`);
         console.log(`✅ Bucket "${name}" supprimé`);
       }
       

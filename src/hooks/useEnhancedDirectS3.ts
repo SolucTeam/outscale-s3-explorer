@@ -373,7 +373,7 @@ export const useEnhancedDirectS3 = () => {
     }
   }, [initialized, fetchBuckets]);
 
-  const deleteBucket = useCallback(async (name: string): Promise<boolean> => {
+  const deleteBucket = useCallback(async (name: string, force: boolean = false): Promise<boolean> => {
     if (!initialized) return false;
     
     setLoading(true);
@@ -382,12 +382,14 @@ export const useEnhancedDirectS3 = () => {
     // Log operation start
     const logEntryId = s3LoggingService.logOperationStart(
       'bucket_delete',
-      name
+      name,
+      undefined,
+      force ? 'Suppression forcée (avec vidange)' : undefined
     );
 
     try {
       const response = await withRetry(
-        () => proxyS3Service.deleteBucket(name),
+        () => proxyS3Service.deleteBucket(name, force),
         `suppression bucket ${name}`
       );
       
@@ -405,7 +407,12 @@ export const useEnhancedDirectS3 = () => {
           title: "Succès",
           description: `Bucket "${name}" supprimé avec succès`
         });
-        await fetchBuckets(true); // Force refresh
+        
+        // Invalider le cache et forcer le refresh
+        cacheService.delete('buckets');
+        cacheService.clearByPattern('buckets_');
+        await fetchBuckets(true);
+        
         return true;
       } else {
         // Log error

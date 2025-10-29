@@ -39,7 +39,8 @@ export const Breadcrumb = () => {
     } else {
       // Navigation vers un dossier spécifique
       const newPath = item.path.replace(`${currentBucket}/`, '');
-      const encodedPath = encodeURIComponent(newPath);
+      // Encoder chaque segment du chemin séparément pour gérer les caractères spéciaux
+      const encodedPath = newPath.split('/').map(segment => encodeURIComponent(segment)).join('/');
       navigate(`/bucket/${encodeURIComponent(currentBucket)}/folder/${encodedPath}`);
     }
   };
