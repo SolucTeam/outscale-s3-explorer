@@ -1,0 +1,70 @@
+🎉 NumS3 Console a été installé avec succès!
+
+{{- if .Values.ingress.enabled }}
+{{- range .Values.ingress.hosts }}
+🌐 Application accessible sur: https://{{ .host }}
+{{- end }}
+{{- else }}
+
+Pour accéder à votre application, suivez ces étapes:
+
+1. Récupérez l'URL du service:
+
+{{- if contains "NodePort" .Values.service.type }}
+  export NODE_PORT=$(kubectl get --namespace {{ .Release.Namespace }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ include "nums3-console.fullname" . }}-frontend)
+  export NODE_IP=$(kubectl get nodes --namespace {{ .Release.Namespace }} -o jsonpath="{.items[0].status.addresses[0].address}")
+  echo "🌐 Frontend: http://$NODE_IP:$NODE_PORT"
+  echo "🔌 Proxy API: http://$NODE_IP:30031"
+
+{{- else if contains "LoadBalancer" .Values.service.type }}
+  NOTE: Il peut prendre quelques minutes pour que le LoadBalancer soit disponible.
+  
+  export SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ include "nums3-console.fullname" . }}-frontend --template "{{"{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}"}}")
+  echo "🌐 Frontend: http://$SERVICE_IP:{{ .Values.service.frontend.port }}"
+  echo "🔌 Proxy API: http://$SERVICE_IP:{{ .Values.service.proxy.port }}"
+
+{{- else if contains "ClusterIP" .Values.service.type }}
+  kubectl port-forward --namespace {{ .Release.Namespace }} svc/{{ include "nums3-console.fullname" . }}-frontend 8080:{{ .Values.service.frontend.port }} &
+  kubectl port-forward --namespace {{ .Release.Namespace }} svc/{{ include "nums3-console.fullname" . }}-proxy 3001:{{ .Values.service.proxy.port }} &
+  echo "🌐 Frontend: http://localhost:8080"
+  echo "🔌 Proxy API: http://localhost:3001"
+{{- end }}
+{{- end }}
+
+📊 Vérifier le status de vos pods:
+  kubectl get pods --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "nums3-console.name" . }},app.kubernetes.io/instance={{ .Release.Name }}"
+
+📋 Voir les logs:
+  # Logs du frontend
+  kubectl logs -f --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "nums3-console.name" . }},app.kubernetes.io/component=frontend"
+  
+  # Logs du proxy
+  kubectl logs -f --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "nums3-console.name" . }},app.kubernetes.io/component=proxy"
+
+{{- if .Values.autoscaling.enabled }}
+
+⚡ Autoscaling activé:
+  - Min replicas: {{ .Values.autoscaling.minReplicas }}
+  - Max replicas: {{ .Values.autoscaling.maxReplicas }}
+  - Target CPU: {{ .Values.autoscaling.targetCPUUtilizationPercentage }}%
+{{- end }}
+
+{{- if .Values.persistence.enabled }}
+
+💾 Persistence activée:
+  - StorageClass: {{ .Values.persistence.storageClass }}
+  - Size: {{ .Values.persistence.size }}
+{{- end }}
+
+📚 Documentation complète disponible dans le README.md
+
+⚠️  IMPORTANT: 
+  - Les credentials Outscale sont fournis par les utilisateurs via l'interface web
+  - Assurez-vous que vos pods ont accès aux endpoints Outscale S3
+  - Configurez les Network Policies si nécessaire pour la sécurité
+
+🔍 Pour plus d'informations:
+  helm status {{ .Release.Name }} --namespace {{ .Release.Namespace }}
+  helm get all {{ .Release.Name }} --namespace {{ .Release.Namespace }}
+
+Merci d'utiliser NumS3 Console! 🚀

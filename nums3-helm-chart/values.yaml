@@ -1,0 +1,234 @@
+# Configuration par défaut pour NumS3 Console
+
+# Nombre de réplicas
+replicaCount: 2
+
+# Configuration de l'image Docker
+image:
+  # Repository de votre image (à personnaliser)
+  repository: your-registry/nums3-console
+  pullPolicy: IfNotPresent
+  # Tag de l'image (utilise .Chart.AppVersion par défaut)
+  tag: ""
+
+# Secrets pour pull d'images privées
+imagePullSecrets: []
+
+# Override du nom du chart
+nameOverride: ""
+fullnameOverride: ""
+
+# Configuration du service account
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# Annotations pour les pods
+podAnnotations: {}
+
+# Labels pour les pods
+podLabels: {}
+
+# Contexte de sécurité pour les pods
+podSecurityContext:
+  fsGroup: 1000
+
+# Contexte de sécurité pour les containers
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: false
+  allowPrivilegeEscalation: false
+
+# Configuration Frontend
+frontend:
+  enabled: true
+  name: frontend
+  port: 5173
+  containerPort: 5173
+  
+  # Variables d'environnement pour le frontend
+  env:
+    - name: VITE_API_URL
+      value: "http://nums3-proxy:3001"
+    - name: NODE_ENV
+      value: "production"
+  
+  # Ressources pour le frontend
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 250m
+      memory: 256Mi
+  
+  # Health checks
+  livenessProbe:
+    httpGet:
+      path: /
+      port: 5173
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  
+  readinessProbe:
+    httpGet:
+      path: /
+      port: 5173
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+# Configuration Proxy/Backend
+proxy:
+  enabled: true
+  name: proxy
+  port: 3001
+  containerPort: 3001
+  
+  # Variables d'environnement pour le proxy
+  env:
+    - name: PORT
+      value: "3001"
+    - name: NODE_ENV
+      value: "production"
+    - name: CORS_ORIGIN
+      value: "*"
+  
+  # Ressources pour le proxy
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 500m
+      memory: 512Mi
+  
+  # Health checks
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: 3001
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  
+  readinessProbe:
+    httpGet:
+      path: /health
+      port: 3001
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+# Configuration du Service Kubernetes
+service:
+  type: ClusterIP
+  frontend:
+    port: 80
+    targetPort: 5173
+  proxy:
+    port: 3001
+    targetPort: 3001
+
+# Configuration Ingress
+ingress:
+  enabled: false
+  className: "nginx"
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  hosts:
+    - host: nums3.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+          backend: frontend
+        - path: /api
+          pathType: Prefix
+          backend: proxy
+  tls:
+    - secretName: nums3-tls
+      hosts:
+        - nums3.example.com
+
+# Autoscaling (HPA)
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+
+# Node selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity rules
+affinity: {}
+
+# Volumes persistants (si nécessaire pour logs, etc.)
+persistence:
+  enabled: false
+  storageClass: ""
+  accessMode: ReadWriteOnce
+  size: 5Gi
+  mountPath: /app/logs
+
+# Configuration des secrets Outscale (optionnel)
+outscale:
+  # Si vous voulez stocker des credentials par défaut (non recommandé en production)
+  credentials:
+    enabled: false
+    accessKey: ""
+    secretKey: ""
+    region: "eu-west-2"
+
+# ConfigMap pour configuration additionnelle
+configMap:
+  enabled: true
+  data:
+    # Endpoints Outscale supportés
+    endpoints.json: |
+      {
+        "eu-west-2": "https://oos.eu-west-2.outscale.com",
+        "cloudgouv-eu-west-1": "https://oos.cloudgouv-eu-west-1.outscale.com",
+        "us-east-2": "https://oos.us-east-2.outscale.com",
+        "us-west-1": "https://oos.us-west-1.outscale.com"
+      }
+
+# Network Policies
+networkPolicy:
+  enabled: false
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            name: ingress-nginx
+  egress:
+    - to:
+      - namespaceSelector: {}
+      ports:
+      - protocol: TCP
+        port: 443
+      - protocol: TCP
+        port: 80
+
+# Pod Disruption Budget
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1

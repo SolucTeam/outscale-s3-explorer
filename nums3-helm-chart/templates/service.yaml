@@ -1,0 +1,35 @@
+{{- if .Values.frontend.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "nums3-console.fullname" . }}-frontend
+  labels:
+    {{- include "nums3-console.frontend.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.frontend.port }}
+      targetPort: {{ .Values.service.frontend.targetPort }}
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "nums3-console.frontend.selectorLabels" . | nindent 4 }}
+{{- end }}
+---
+{{- if .Values.proxy.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "nums3-console.fullname" . }}-proxy
+  labels:
+    {{- include "nums3-console.proxy.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.proxy.port }}
+      targetPort: {{ .Values.service.proxy.targetPort }}
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "nums3-console.proxy.selectorLabels" . | nindent 4 }}
+{{- end }}

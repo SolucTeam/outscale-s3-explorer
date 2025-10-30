@@ -1,0 +1,198 @@
+# values-production.yaml
+# Configuration pour environnement de production
+
+replicaCount: 3
+
+image:
+  repository: your-registry/nums3-console
+  pullPolicy: Always
+  tag: "1.0.0"
+
+imagePullSecrets:
+  - name: registry-secret
+
+serviceAccount:
+  create: true
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT:role/nums3-role
+
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "3001"
+  prometheus.io/path: "/metrics"
+
+podSecurityContext:
+  fsGroup: 1000
+  runAsNonRoot: true
+  runAsUser: 1000
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: false
+  allowPrivilegeEscalation: false
+
+frontend:
+  enabled: true
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 500m
+      memory: 512Mi
+  
+  livenessProbe:
+    httpGet:
+      path: /
+      port: 5173
+    initialDelaySeconds: 60
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  
+  readinessProbe:
+    httpGet:
+      path: /
+      port: 5173
+    initialDelaySeconds: 30
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+proxy:
+  enabled: true
+  resources:
+    limits:
+      cpu: 2000m
+      memory: 2Gi
+    requests:
+      cpu: 1000m
+      memory: 1Gi
+  
+  env:
+    - name: PORT
+      value: "3001"
+    - name: NODE_ENV
+      value: "production"
+    - name: CORS_ORIGIN
+      value: "https://nums3.example.com"
+    - name: LOG_LEVEL
+      value: "info"
+
+service:
+  type: ClusterIP
+  frontend:
+    port: 80
+    targetPort: 5173
+  proxy:
+    port: 3001
+    targetPort: 3001
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+  hosts:
+    - host: nums3.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+          backend: frontend
+        - path: /api
+          pathType: Prefix
+          backend: proxy
+  tls:
+    - secretName: nums3-tls-prod
+      hosts:
+        - nums3.example.com
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 15
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+persistence:
+  enabled: true
+  storageClass: "gp3"
+  accessMode: ReadWriteOnce
+  size: 10Gi
+  mountPath: /app/logs
+
+nodeSelector:
+  workload: web
+
+tolerations:
+  - key: "workload"
+    operator: "Equal"
+    value: "web"
+    effect: "NoSchedule"
+
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - nums3-console
+          topologyKey: kubernetes.io/hostname
+
+networkPolicy:
+  enabled: true
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            name: ingress-nginx
+      ports:
+      - protocol: TCP
+        port: 5173
+      - protocol: TCP
+        port: 3001
+  egress:
+    - to:
+      - namespaceSelector: {}
+      ports:
+      - protocol: TCP
+        port: 443
+      - protocol: TCP
+        port: 80
+    - to:
+      - namespaceSelector:
+          matchLabels:
+            name: kube-system
+      ports:
+      - protocol: UDP
+        port: 53
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2
+
+configMap:
+  enabled: true
+  data:
+    endpoints.json: |
+      {
+        "eu-west-2": "https://oos.eu-west-2.outscale.com",
+        "cloudgouv-eu-west-1": "https://oos.cloudgouv-eu-west-1.outscale.com",
+        "us-east-2": "https://oos.us-east-2.outscale.com",
+        "us-west-1": "https://oos.us-west-1.outscale.com"
+      }
