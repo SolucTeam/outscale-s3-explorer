@@ -11,6 +11,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { CreateBucketDialog } from './CreateBucketDialog';
 import { ForceDeleteBucketDialog } from './ForceDeleteBucketDialog';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 export const BucketList = () => {
   const { buckets, loading, setCurrentBucket, setCurrentPath, setObjects } = useS3Store();
@@ -161,9 +162,18 @@ export const BucketList = () => {
                       <Folder className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <CardTitle className="text-sm sm:text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors truncate">
-                        {bucket.name}
-                      </CardTitle>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <CardTitle className="text-sm sm:text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors truncate">
+                              {bucket.name}
+                            </CardTitle>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>{bucket.name}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                       <Badge variant="secondary" className="text-xs mt-1">
                         {bucket.region}
                       </Badge>
