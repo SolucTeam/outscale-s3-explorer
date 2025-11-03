@@ -136,6 +136,13 @@ export class EncryptionService {
     let warningShown = false;
 
     const intervalId = setInterval(() => {
+
+      if (!this.hasActiveSession()) {
+        console.log('⏭️ Pas de session active, arrêt de la vérification');
+        clearInterval(intervalId);
+        return;
+      }
+      
       const timeRemaining = this.getTimeUntilExpiration();
       
       if (timeRemaining === 0) {
