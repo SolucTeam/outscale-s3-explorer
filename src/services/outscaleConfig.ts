@@ -1,17 +1,13 @@
-
 import { OutscaleRegion } from '../types/s3';
+import { env } from '../config/environment';
 
 export class OutscaleConfig {
-  private static readonly ENDPOINTS = {
-    'eu-west-2': 'https://oos.eu-west-2.outscale.com',
-    'us-east-2': 'https://oos.us-east-2.outscale.com',
-    'us-west-1': 'https://oos.us-west-1.outscale.com',
-    'cloudgouv-eu-west-1': 'https://oos.cloudgouv-eu-west-1.outscale.com',
-    'ap-northeast-1': 'https://oos.ap-northeast-1.outscale.com'
-  };
+  private static get ENDPOINTS() {
+    return env.endpoints;
+  }
 
   static getEndpoint(region: string): string {
-    return this.ENDPOINTS[region as keyof typeof this.ENDPOINTS] || this.ENDPOINTS['eu-west-2'];
+    return env.getEndpoint(region);
   }
 
   static isValidRegion(region: string): boolean {

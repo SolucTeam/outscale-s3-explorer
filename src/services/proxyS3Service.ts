@@ -5,6 +5,7 @@
 
 import { S3Credentials, S3Bucket, S3Object } from '../types/s3';
 import { cacheService, CacheService } from './cacheService';
+import { env } from '../config/environment';
 
 export interface ProxyS3Response<T> {
   success: boolean;
@@ -14,7 +15,7 @@ export interface ProxyS3Response<T> {
 }
 
 class ProxyS3Service {
-  private baseUrl = 'http://localhost:3001/api';
+  private baseUrl = env.proxyUrl;
   private credentials: S3Credentials | null = null;
 
   async initialize(credentials: S3Credentials): Promise<ProxyS3Response<boolean>> {
