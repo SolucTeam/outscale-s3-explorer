@@ -286,3 +286,15 @@ npm run preview
 - Ne **jamais** mettre de secrets (API keys) dans les variables d'environnement frontend
 - Les secrets utilisateur sont chiffrés côté client avec AES-256-GCM
 - Utilisez Kubernetes Secrets pour les configurations sensibles du backend (proxy)
+
+### 🆕 Nouvelles fonctionnalités de sécurité
+
+NumS3 intègre maintenant des mesures de sécurité avancées :
+
+1. **Logging structuré** - Système de logs professionnel avec niveaux (debug/info/warn/error)
+2. **Cache paramétrable** - TTL configurables sans rebuild
+3. **Rate limiting** - Protection contre les abus d'API (100 req/15min par défaut)
+4. **Headers de sécurité** - CSP, HSTS, X-Frame-Options automatiques
+5. **Validation des credentials** - Contrôle du format avant utilisation
+
+📖 **Guide complet:** Voir [`SECURITE.md`](SECURITE.md) pour tous les détails et la configuration.

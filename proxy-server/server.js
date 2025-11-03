@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
+const rateLimit = require('express-rate-limit');
 const {
   S3Client,
   ListBucketsCommand,
@@ -16,15 +17,68 @@ const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// ============================================================
+// SÉCURITÉ: Headers de sécurité obligatoires
+// ============================================================
+app.use((req, res, next) => {
+  // Protection HTTPS (en production, utiliser un reverse proxy avec HTTPS)
+  if (process.env.NODE_ENV === 'production' && !req.secure && req.get('x-forwarded-proto') !== 'https') {
+    console.warn('⚠️  ATTENTION: Connexion non sécurisée détectée. Utilisez HTTPS en production!');
+  }
+
+  // Headers de sécurité
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  
+  // Content Security Policy
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://oos.*.outscale.com"
+  );
+  
+  next();
+});
+
+// ============================================================
+// RATE LIMITING: Protection contre les abus
+// ============================================================
+const limiter = rateLimit({
+  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes par défaut
+  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100, // 100 requêtes par fenêtre
+  message: {
+    success: false,
+    error: 'Trop de requêtes, veuillez réessayer plus tard',
+    retryAfter: '15 minutes'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Limiter plus strict pour les opérations d'écriture
+const strictLimiter = rateLimit({
+  windowMs: parseInt(process.env.RATE_LIMIT_STRICT_WINDOW_MS) || 5 * 60 * 1000, // 5 minutes
+  max: parseInt(process.env.RATE_LIMIT_STRICT_MAX_REQUESTS) || 20, // 20 requêtes
+  message: {
+    success: false,
+    error: 'Trop de requêtes d\'écriture, veuillez ralentir',
+    retryAfter: '5 minutes'
+  }
+});
+
+// Appliquer rate limiting
+app.use('/api/', limiter);
+
 // Configuration CORS permissive
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:8080', 'https://your-frontend-domain.com'],
+  origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:8080'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-access-key', 'x-secret-key', 'x-region']
 }));
 
-app.use(express.json({ limit: '50mb' }));
+app.use(express.json({ limit: process.env.MAX_JSON_SIZE || '50mb' }));
 
 // Configuration multer pour upload de fichiers
 const upload = multer({
@@ -43,16 +97,32 @@ const getOutscaleEndpoint = (region) => {
   return endpoints[region] || endpoints['eu-west-2'];
 };
 
-// Middleware pour extraire les credentials des headers
+// ============================================================
+// MIDDLEWARE: Extraction sécurisée des credentials
+// IMPORTANT: Les credentials transitent dans les headers
+// ⚠️  EN PRODUCTION: Toujours utiliser HTTPS pour chiffrer la connexion
+// ⚠️  Recommandé: Nginx/HAProxy en reverse proxy avec TLS
+// ============================================================
 const extractCredentials = (req, res, next) => {
   const accessKey = req.headers['x-access-key'];
   const secretKey = req.headers['x-secret-key'];
   const region = req.headers['x-region'] || 'eu-west-2';
 
+  // Validation des credentials
   if (!accessKey || !secretKey) {
+    console.warn('⚠️  Tentative de connexion sans credentials');
     return res.status(400).json({
       success: false,
       error: 'Credentials manquantes'
+    });
+  }
+
+  // Validation basique du format
+  if (accessKey.length < 10 || secretKey.length < 20) {
+    console.warn('⚠️  Credentials au format invalide');
+    return res.status(400).json({
+      success: false,
+      error: 'Format des credentials invalide'
     });
   }
 
@@ -121,8 +191,8 @@ app.get('/api/buckets', extractCredentials, async (req, res) => {
   }
 });
 
-// Créer un bucket
-app.post('/api/buckets', extractCredentials, async (req, res) => {
+// Créer un bucket (avec rate limiting strict)
+app.post('/api/buckets', strictLimiter, extractCredentials, async (req, res) => {
   try {
     const { name } = req.body;
     const command = new CreateBucketCommand({ Bucket: name });
@@ -174,8 +244,8 @@ const emptyBucket = async (s3Client, bucketName) => {
   return deletedCount;
 };
 
-// Supprimer un bucket (avec vidange automatique si nécessaire)
-app.delete('/api/buckets/:name', extractCredentials, async (req, res) => {
+// Supprimer un bucket (avec vidange automatique si nécessaire + rate limiting strict)
+app.delete('/api/buckets/:name', strictLimiter, extractCredentials, async (req, res) => {
   try {
     const { name } = req.params;
     const { force } = req.query;
@@ -311,8 +381,8 @@ app.get('/api/buckets/:bucket/objects/:key(*)/download', extractCredentials, asy
   }
 });
 
-// Upload de fichier
-app.post('/api/buckets/:bucket/objects', extractCredentials, upload.single('file'), async (req, res) => {
+// Upload de fichier (avec rate limiting strict)
+app.post('/api/buckets/:bucket/objects', strictLimiter, extractCredentials, upload.single('file'), async (req, res) => {
   try {
     const { bucket } = req.params;
     const { path = '' } = req.body;
@@ -350,8 +420,8 @@ app.post('/api/buckets/:bucket/objects', extractCredentials, upload.single('file
   }
 });
 
-// Supprimer un objet
-app.delete('/api/buckets/:bucket/objects/:key(*)', extractCredentials, async (req, res) => {
+// Supprimer un objet (avec rate limiting strict)
+app.delete('/api/buckets/:bucket/objects/:key(*)', strictLimiter, extractCredentials, async (req, res) => {
   try {
     const { bucket, key } = req.params;
     const command = new DeleteObjectCommand({ Bucket: bucket, Key: key });
@@ -368,8 +438,8 @@ app.delete('/api/buckets/:bucket/objects/:key(*)', extractCredentials, async (re
   }
 });
 
-// Créer un dossier
-app.post('/api/buckets/:bucket/folders', extractCredentials, async (req, res) => {
+// Créer un dossier (avec rate limiting strict)
+app.post('/api/buckets/:bucket/folders', strictLimiter, extractCredentials, async (req, res) => {
   try {
     const { bucket } = req.params;
     const { path = '', folderName } = req.body;
@@ -421,11 +491,23 @@ app.listen(PORT, () => {
   console.log(`📡 Endpoints disponibles:`);
   console.log(`   GET    /health`);
   console.log(`   GET    /api/buckets`);
-  console.log(`   POST   /api/buckets`);
-  console.log(`   DELETE /api/buckets/:name`);
+  console.log(`   POST   /api/buckets (rate limited)`);
+  console.log(`   DELETE /api/buckets/:name (rate limited)`);
   console.log(`   GET    /api/buckets/:bucket/objects`);
-  console.log(`   POST   /api/buckets/:bucket/objects (upload)`);
-  console.log(`   DELETE /api/buckets/:bucket/objects/:key`);
-  console.log(`   POST   /api/buckets/:bucket/folders`);
+  console.log(`   POST   /api/buckets/:bucket/objects (upload, rate limited)`);
+  console.log(`   DELETE /api/buckets/:bucket/objects/:key (rate limited)`);
+  console.log(`   POST   /api/buckets/:bucket/folders (rate limited)`);
   console.log(`   GET    /api/buckets/:bucket/objects/:key/download`);
+  console.log('');
+  console.log('🔒 Sécurité:');
+  console.log(`   ✓ Rate limiting activé (${process.env.RATE_LIMIT_MAX_REQUESTS || 100} req/15min)`);
+  console.log(`   ✓ Rate limiting strict (${process.env.RATE_LIMIT_STRICT_MAX_REQUESTS || 20} req/5min pour écriture)`);
+  console.log('   ✓ Headers de sécurité (CSP, HSTS, X-Frame-Options)');
+  console.log('   ✓ Validation des credentials');
+  console.log('');
+  if (process.env.NODE_ENV === 'production') {
+    console.log('⚠️  PRODUCTION: Assurez-vous d\'utiliser HTTPS (reverse proxy Nginx/HAProxy)');
+  } else {
+    console.log('💡 DEV MODE: N\'oubliez pas d\'activer HTTPS en production!');
+  }
 });

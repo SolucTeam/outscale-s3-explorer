@@ -1,7 +1,10 @@
 /**
  * Service de cache intelligent multi-niveaux
  * Cache Map avec invalidation TTL pour performance optimale
+ * TTL configurables via variables d'environnement
  */
+
+import { env } from '@/config/environment';
 
 export interface CacheEntry<T> {
   data: T;
@@ -13,13 +16,15 @@ export class CacheService {
   private static instance: CacheService;
   private cache = new Map<string, CacheEntry<any>>();
   
-  // TTL par type de données
-  static readonly TTL = {
-    BUCKETS: 5 * 60 * 1000,      // 5 minutes
-    OBJECTS: 2 * 60 * 1000,      // 2 minutes
-    CREDENTIALS: 30 * 60 * 1000,  // 30 minutes
-    METADATA: 10 * 60 * 1000     // 10 minutes
-  };
+  // TTL par type de données (configurables via environnement)
+  static get TTL() {
+    return {
+      BUCKETS: env.cacheTTL.buckets,
+      OBJECTS: env.cacheTTL.objects,
+      CREDENTIALS: env.cacheTTL.credentials,
+      METADATA: 10 * 60 * 1000  // 10 minutes (fallback)
+    };
+  }
 
   static getInstance(): CacheService {
     if (!this.instance) {
