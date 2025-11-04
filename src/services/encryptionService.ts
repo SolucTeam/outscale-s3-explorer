@@ -37,14 +37,15 @@ export class EncryptionService {
    */
   static saveToSession(data: any): void {
     const encrypted = this.encrypt(data);
-    sessionStorage.setItem(this.STORAGE_KEY, encrypted);
+    localStorage.setItem(this.STORAGE_KEY, encrypted);
+    console.log('💾 Session sauvegardée dans localStorage');
   }
 
   /**
    * Récupération depuis sessionStorage
    */
   static loadFromSession(): any {
-    const encrypted = sessionStorage.getItem(this.STORAGE_KEY);
+    const encrypted = localStorage.getItem(this.STORAGE_KEY);
     if (!encrypted) return null;
     return this.decrypt(encrypted);
   }
@@ -53,16 +54,17 @@ export class EncryptionService {
    * Supprime les données chiffrées
    */
   static clearSession(): void {
-    sessionStorage.removeItem(this.STORAGE_KEY);
-    // Nettoyer aussi localStorage au cas où
+    localStorage.removeItem(this.STORAGE_KEY);
+    sessionStorage.removeItem(this.STORAGE_KEY); // Nettoyer legacy
     localStorage.removeItem('s3-storage');
+    console.log('🗑️ Session nettoyée');
   }
 
   /**
    * Vérifie si une session existe
    */
   static hasActiveSession(): boolean {
-    return !!sessionStorage.getItem(this.STORAGE_KEY);
+    return !!localStorage.getItem(this.STORAGE_KEY);
   }
 
   /**

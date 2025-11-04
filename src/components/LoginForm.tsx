@@ -9,10 +9,12 @@ import { useS3Store } from '../hooks/useS3Store';
 import { useEnhancedDirectS3 } from '../hooks/useEnhancedDirectS3';
 import { OUTSCALE_REGIONS } from '../data/regions';
 import { useToast } from '@/hooks/use-toast';
-import { Cloud, Shield, AlertCircle, Globe, Server } from 'lucide-react';
+import { Cloud, Shield, AlertCircle, Globe, Server, Eye, EyeOff } from 'lucide-react';
+
 export const LoginForm = () => {
   const [accessKey, setAccessKey] = useState('');
   const [secretKey, setSecretKey] = useState('');
+  const [showSecretKey, setShowSecretKey] = useState(false);
   const [region, setRegion] = useState('eu-west-2');
   const [isLoading, setIsLoading] = useState(false);
   const {
@@ -39,6 +41,7 @@ export const LoginForm = () => {
 
   // Get the selected region details
   const selectedRegion = OUTSCALE_REGIONS.find(r => r.id === region);
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!accessKey || !secretKey) {
@@ -109,7 +112,9 @@ export const LoginForm = () => {
       setIsLoading(false);
     }
   };
-  return <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-blue-100 p-4">
+  
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-blue-100 p-4">
       <Card className="w-full max-w-lg shadow-2xl border-0 bg-white/80 backdrop-blur-sm">
         <CardHeader className="text-center space-y-4 pb-8">
           <div className="mx-auto w-16 h-16 bg-gradient-to-br from-blue-600 to-blue-800 rounded-2xl flex items-center justify-center shadow-lg">
@@ -136,17 +141,20 @@ export const LoginForm = () => {
                   <SelectValue placeholder="Sélectionnez une région" />
                 </SelectTrigger>
                 <SelectContent>
-                  {OUTSCALE_REGIONS.map(r => <SelectItem key={r.id} value={r.id}>
+                  {OUTSCALE_REGIONS.map(r => (
+                    <SelectItem key={r.id} value={r.id}>
                       <div className="flex items-center space-x-2">
                         <Globe className="w-4 h-4" />
                         <span>{r.name}</span>
                       </div>
-                    </SelectItem>)}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               
               {/* Display endpoint for selected region */}
-              {selectedRegion && <div className="mt-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
+              {selectedRegion && (
+                <div className="mt-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
                   <div className="flex items-center space-x-2 text-sm text-blue-800">
                     <Server className="w-4 h-4" />
                     <span className="font-medium">Endpoint:</span>
@@ -154,31 +162,67 @@ export const LoginForm = () => {
                       {selectedRegion.endpoint}
                     </code>
                   </div>
-                </div>}
+                </div>
+              )}
             </div>
             
             <div className="space-y-2">
               <Label htmlFor="accessKey" className="text-sm font-medium text-gray-700">
                 Access Key
               </Label>
-              <Input id="accessKey" type="text" value={accessKey} onChange={e => setAccessKey(e.target.value)} placeholder="Votre Access Key Outscale" required disabled={isLoading} className="w-full" />
+              <Input 
+                id="accessKey" 
+                type="text" 
+                value={accessKey} 
+                onChange={e => setAccessKey(e.target.value)} 
+                placeholder="Votre Access Key Outscale" 
+                required 
+                disabled={isLoading} 
+                className="w-full" 
+              />
             </div>
             
             <div className="space-y-2">
               <Label htmlFor="secretKey" className="text-sm font-medium text-gray-700">
                 Secret Key
               </Label>
-              <Input id="secretKey" type="password" value={secretKey} onChange={e => setSecretKey(e.target.value)} placeholder="Votre Secret Key" required disabled={isLoading} className="w-full" />
+              <div className="relative">
+                <Input 
+                  id="secretKey" 
+                  type={showSecretKey ? "text" : "password"}
+                  value={secretKey} 
+                  onChange={e => setSecretKey(e.target.value)} 
+                  placeholder="Votre Secret Key" 
+                  required 
+                  disabled={isLoading} 
+                  className="w-full pr-12" 
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowSecretKey(!showSecretKey)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none transition-colors p-1"
+                  disabled={isLoading}
+                  aria-label={showSecretKey ? "Masquer le secret" : "Afficher le secret"}
+                >
+                  {showSecretKey ? (
+                    <EyeOff className="w-5 h-5" />
+                  ) : (
+                    <Eye className="w-5 h-5" />
+                  )}
+                </button>
+              </div>
             </div>
             
-            <Button type="submit" className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white py-3 rounded-lg font-medium transition-all duration-200 shadow-lg hover:shadow-xl" disabled={!accessKey || !secretKey || isLoading}>
+            <Button 
+              type="submit" 
+              className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white py-3 rounded-lg font-medium transition-all duration-200 shadow-lg hover:shadow-xl" 
+              disabled={!accessKey || !secretKey || isLoading}
+            >
               <Shield className="w-4 h-4 mr-2" />
               {isLoading ? 'Connexion...' : 'Se connecter'}
             </Button>
           </form>
           
-          
-
           <div className="mt-4 p-4 bg-green-50 rounded-lg border border-green-200">
             <p className="text-sm text-green-800">
               <Shield className="w-4 h-4 inline mr-2" />
@@ -194,5 +238,6 @@ export const LoginForm = () => {
           </div>
         </CardContent>
       </Card>
-    </div>;
+    </div>
+  );
 };
