@@ -30,7 +30,9 @@ export const useEnhancedDirectS3 = () => {
     setObjects, 
     setLoading, 
     setError,
-    logout: storeLogout 
+    logout: storeLogout,
+    credentials,
+    isAuthenticated
   } = useS3Store();
   
   const { toast } = useToast();
@@ -38,6 +40,31 @@ export const useEnhancedDirectS3 = () => {
   const [uploadProgress, setUploadProgress] = useState<Record<string, UploadProgress>>({});
   const uploadQueueRef = useRef<File[]>([]);
   const activeUploadsRef = useRef<Set<string>>(new Set());
+  const initAttemptedRef = useRef<boolean>(false);
+  
+  // Auto-réinitialiser le service si une session valide existe mais le service n'est pas initialisé
+  useEffect(() => {
+    const autoRestore = async () => {
+      if (isAuthenticated && credentials && !proxyS3Service.isInitialized() && !initAttemptedRef.current) {
+        console.log('🔄 Auto-restauration de la session S3 après rechargement');
+        initAttemptedRef.current = true;
+        
+        try {
+          const response = await proxyS3Service.initialize(credentials);
+          if (response.success) {
+            setInitialized(true);
+            console.log('✅ Service S3 réinitialisé avec succès');
+          } else {
+            console.error('❌ Échec de la réinitialisation:', response.error);
+          }
+        } catch (error) {
+          console.error('❌ Erreur lors de la réinitialisation:', error);
+        }
+      }
+    };
+    
+    autoRestore();
+  }, [isAuthenticated, credentials]);
   
   // Sync initialized state with proxy service (important after navigation)
   useEffect(() => {
