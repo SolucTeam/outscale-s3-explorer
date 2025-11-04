@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import { S3Credentials, S3Bucket, S3Object } from '../types/s3';
 import { EncryptionService } from '../services/encryptionService';
 import { cacheService, CacheService } from '../services/cacheService';
+import { useActionHistoryStore } from '../stores/actionHistoryStore';
 
 interface S3Store {
   isAuthenticated: boolean;
@@ -30,28 +31,46 @@ interface S3Store {
   checkSessionValidity: () => boolean;
 }
 
+// Fonction pour obtenir l'état initial depuis la session
+const getInitialState = () => {
+  if (EncryptionService.hasActiveSession() && EncryptionService.isSessionValid()) {
+    const sessionData = EncryptionService.loadFromSession();
+    if (sessionData?.credentials) {
+      console.log('🔐 Session valide trouvée, restauration automatique');
+      
+      // Restaurer le userId pour l'historique
+      if (sessionData.credentials.accessKey && sessionData.credentials.region) {
+        const userId = `${sessionData.credentials.accessKey.substring(0, 8)}_${sessionData.credentials.region}`;
+        useActionHistoryStore.getState().setCurrentUser(userId);
+      }
+      
+      return {
+        isAuthenticated: true,
+        credentials: sessionData.credentials,
+        currentBucket: sessionData.currentBucket || null,
+        currentPath: sessionData.currentPath || '',
+        buckets: sessionData.buckets || []
+      };
+    }
+  }
+  return {
+    isAuthenticated: false,
+    credentials: null,
+    currentBucket: null,
+    currentPath: '',
+    buckets: []
+  };
+};
+
 export const useS3Store = create<S3Store>()((set, get) => {
   // Initialiser le cache auto-cleanup
   cacheService.startAutoCleanup();
   
-  // Vérifier session au démarrage
-  const initializeFromSession = () => {
-    if (EncryptionService.hasActiveSession() && EncryptionService.isSessionValid()) {
-      const sessionData = EncryptionService.loadFromSession();
-      if (sessionData?.credentials) {
-        console.log('🔐 Session valide trouvée, restauration automatique');
-        set({
-          isAuthenticated: true,
-          credentials: sessionData.credentials
-        });
-      }
-    }
-  };
+  // Obtenir l'état initial de manière synchrone
+  const initialState = getInitialState();
 
   // Auto-refresh session toutes les 5 minutes
   if (typeof window !== 'undefined') {
-    initializeFromSession();
-    
     setInterval(() => {
       if (EncryptionService.hasActiveSession()) {
         if (EncryptionService.isSessionValid()) {
@@ -65,11 +84,7 @@ export const useS3Store = create<S3Store>()((set, get) => {
   }
 
   return {
-        isAuthenticated: false,
-        credentials: null,
-        currentBucket: null,
-        currentPath: '',
-        buckets: [],
+        ...initialState,
         objects: [],
         loading: false,
         error: null,
@@ -77,10 +92,14 @@ export const useS3Store = create<S3Store>()((set, get) => {
         login: (credentials) => {
           console.log('🔐 Connexion sécurisée, chiffrement des credentials');
           
-          // Sauvegarder en session chiffrée
+          const state = get();
+          // Sauvegarder en session chiffrée avec toutes les données
           EncryptionService.saveToSession({
             credentials,
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            buckets: state.buckets,
+            currentBucket: state.currentBucket,
+            currentPath: state.currentPath
           });
           
           set({ 
@@ -127,7 +146,21 @@ export const useS3Store = create<S3Store>()((set, get) => {
         
         setCurrentPath: (path) => set({ currentPath: path }),
         
-        setBuckets: (buckets) => set({ buckets }),
+        setBuckets: (buckets) => {
+          set({ buckets });
+          // Persister les buckets dans la session
+          const state = get();
+          if (state.credentials) {
+            const sessionData = EncryptionService.loadFromSession();
+            if (sessionData) {
+              EncryptionService.saveToSession({
+                ...sessionData,
+                buckets,
+                timestamp: Date.now()
+              });
+            }
+          }
+        },
         
         setObjects: (objects) => set({ objects }),
         
@@ -137,16 +170,52 @@ export const useS3Store = create<S3Store>()((set, get) => {
         
         navigateToBucket: (bucketName: string) => {
           set({ currentBucket: bucketName, currentPath: '' });
+          
+          // Persister la navigation
+          const sessionData = EncryptionService.loadFromSession();
+          if (sessionData) {
+            EncryptionService.saveToSession({
+              ...sessionData,
+              currentBucket: bucketName,
+              currentPath: '',
+              timestamp: Date.now()
+            });
+          }
+          
           window.history.pushState({}, '', `/bucket/${encodeURIComponent(bucketName)}`);
         },
         
         navigateToFolder: (bucketName: string, folderPath: string) => {
           set({ currentBucket: bucketName, currentPath: folderPath });
+          
+          // Persister la navigation
+          const sessionData = EncryptionService.loadFromSession();
+          if (sessionData) {
+            EncryptionService.saveToSession({
+              ...sessionData,
+              currentBucket: bucketName,
+              currentPath: folderPath,
+              timestamp: Date.now()
+            });
+          }
+          
           window.history.pushState({}, '', `/bucket/${encodeURIComponent(bucketName)}/folder/${encodeURIComponent(folderPath)}`);
         },
         
         navigateToDashboard: () => {
           set({ currentBucket: null, currentPath: '' });
+          
+          // Persister la navigation
+          const sessionData = EncryptionService.loadFromSession();
+          if (sessionData) {
+            EncryptionService.saveToSession({
+              ...sessionData,
+              currentBucket: null,
+              currentPath: '',
+              timestamp: Date.now()
+            });
+          }
+          
           window.history.pushState({}, '', '/dashboard');
         },
 

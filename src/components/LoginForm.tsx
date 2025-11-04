@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useS3Store } from '../hooks/useS3Store';
 import { useEnhancedDirectS3 } from '../hooks/useEnhancedDirectS3';
+import { useActionHistoryStore } from '../stores/actionHistoryStore';
 import { OUTSCALE_REGIONS } from '../data/regions';
 import { useToast } from '@/hooks/use-toast';
 import { Cloud, Shield, AlertCircle, Globe, Server, Eye, EyeOff } from 'lucide-react';
@@ -67,6 +68,11 @@ export const LoginForm = () => {
       if (success) {
         // D'abord connecter l'utilisateur
         login(credentials);
+        
+        // Initialiser le userId pour l'historique des actions
+        const userId = `${accessKey.substring(0, 8)}_${region}`;
+        useActionHistoryStore.getState().setCurrentUser(userId);
+        
         console.log('Login successful, will redirect to dashboard');
         toast({
           title: "Connexion réussie",
