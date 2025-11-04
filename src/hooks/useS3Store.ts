@@ -42,13 +42,19 @@ export const useS3Store = create<S3Store>()((set, get) => {
         console.log('🔐 Session valide trouvée, restauration automatique');
         return {
           isAuthenticated: true,
-          credentials: sessionData.credentials
+          credentials: sessionData.credentials,
+          buckets: sessionData.buckets || [],
+          currentBucket: sessionData.currentBucket || null,
+          currentPath: sessionData.currentPath || ''
         };
       }
     }
     return {
       isAuthenticated: false,
-      credentials: null
+      credentials: null,
+      buckets: [],
+      currentBucket: null,
+      currentPath: ''
     };
   };
 
@@ -71,9 +77,9 @@ export const useS3Store = create<S3Store>()((set, get) => {
   return {
         isAuthenticated: initialState.isAuthenticated,
         credentials: initialState.credentials,
-        currentBucket: null,
-        currentPath: '',
-        buckets: [],
+        currentBucket: initialState.currentBucket,
+        currentPath: initialState.currentPath,
+        buckets: initialState.buckets,
         objects: [],
         loading: false,
         error: null,
@@ -81,9 +87,13 @@ export const useS3Store = create<S3Store>()((set, get) => {
         login: (credentials) => {
           console.log('🔐 Connexion sécurisée, chiffrement des credentials');
           
-          // Sauvegarder en session chiffrée
+          const state = get();
+          // Sauvegarder en session chiffrée avec les buckets
           EncryptionService.saveToSession({
             credentials,
+            buckets: state.buckets,
+            currentBucket: state.currentBucket,
+            currentPath: state.currentPath,
             timestamp: Date.now()
           });
           
@@ -131,7 +141,20 @@ export const useS3Store = create<S3Store>()((set, get) => {
         
         setCurrentPath: (path) => set({ currentPath: path }),
         
-        setBuckets: (buckets) => set({ buckets }),
+        setBuckets: (buckets) => {
+          set({ buckets });
+          // Persister les buckets dans la session
+          const state = get();
+          if (state.credentials) {
+            EncryptionService.saveToSession({
+              credentials: state.credentials,
+              buckets,
+              currentBucket: state.currentBucket,
+              currentPath: state.currentPath,
+              timestamp: Date.now()
+            });
+          }
+        },
         
         setObjects: (objects) => set({ objects }),
         
@@ -142,16 +165,52 @@ export const useS3Store = create<S3Store>()((set, get) => {
         navigateToBucket: (bucketName: string) => {
           set({ currentBucket: bucketName, currentPath: '' });
           window.history.pushState({}, '', `/bucket/${encodeURIComponent(bucketName)}`);
+          
+          // Persister la navigation
+          const state = get();
+          if (state.credentials) {
+            EncryptionService.saveToSession({
+              credentials: state.credentials,
+              buckets: state.buckets,
+              currentBucket: bucketName,
+              currentPath: '',
+              timestamp: Date.now()
+            });
+          }
         },
         
         navigateToFolder: (bucketName: string, folderPath: string) => {
           set({ currentBucket: bucketName, currentPath: folderPath });
           window.history.pushState({}, '', `/bucket/${encodeURIComponent(bucketName)}/folder/${encodeURIComponent(folderPath)}`);
+          
+          // Persister la navigation
+          const state = get();
+          if (state.credentials) {
+            EncryptionService.saveToSession({
+              credentials: state.credentials,
+              buckets: state.buckets,
+              currentBucket: bucketName,
+              currentPath: folderPath,
+              timestamp: Date.now()
+            });
+          }
         },
         
         navigateToDashboard: () => {
           set({ currentBucket: null, currentPath: '' });
           window.history.pushState({}, '', '/dashboard');
+          
+          // Persister la navigation
+          const state = get();
+          if (state.credentials) {
+            EncryptionService.saveToSession({
+              credentials: state.credentials,
+              buckets: state.buckets,
+              currentBucket: null,
+              currentPath: '',
+              timestamp: Date.now()
+            });
+          }
         },
 
         checkSessionValidity: () => {
