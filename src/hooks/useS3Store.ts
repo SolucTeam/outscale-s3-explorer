@@ -34,24 +34,28 @@ export const useS3Store = create<S3Store>()((set, get) => {
   // Initialiser le cache auto-cleanup
   cacheService.startAutoCleanup();
   
-  // Vérifier session au démarrage
-  const initializeFromSession = () => {
+  // Vérifier session au démarrage de manière SYNCHRONE
+  const getInitialState = () => {
     if (EncryptionService.hasActiveSession() && EncryptionService.isSessionValid()) {
       const sessionData = EncryptionService.loadFromSession();
       if (sessionData?.credentials) {
         console.log('🔐 Session valide trouvée, restauration automatique');
-        set({
+        return {
           isAuthenticated: true,
           credentials: sessionData.credentials
-        });
+        };
       }
     }
+    return {
+      isAuthenticated: false,
+      credentials: null
+    };
   };
+
+  const initialState = getInitialState();
 
   // Auto-refresh session toutes les 5 minutes
   if (typeof window !== 'undefined') {
-    initializeFromSession();
-    
     setInterval(() => {
       if (EncryptionService.hasActiveSession()) {
         if (EncryptionService.isSessionValid()) {
@@ -65,8 +69,8 @@ export const useS3Store = create<S3Store>()((set, get) => {
   }
 
   return {
-        isAuthenticated: false,
-        credentials: null,
+        isAuthenticated: initialState.isAuthenticated,
+        credentials: initialState.credentials,
         currentBucket: null,
         currentPath: '',
         buckets: [],
