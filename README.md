@@ -69,10 +69,6 @@ Lors de la connexion, fournissez:
 
 ---
 
-## Project info (Lovable)
-
-**URL**: https://lovable.dev/projects/0422b083-61f3-48c8-9ea7-98254615adb4
-
 ## Technologies
 
 This project is built with:
