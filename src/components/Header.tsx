@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useS3Store } from '../hooks/useS3Store';
 import { useEnhancedDirectS3 } from '../hooks/useEnhancedDirectS3';
-import { LogOut, ArrowLeft } from 'lucide-react';
+import { Cloud, LogOut, ArrowLeft } from 'lucide-react';
 
 export const Header = () => {
   const { credentials, currentBucket } = useS3Store();
@@ -25,11 +25,9 @@ export const Header = () => {
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-3">
-              <img 
-                src="/favicon.png" 
-                alt="NumS3 Logo" 
-                className="w-10 h-10 rounded-lg"
-              />
+              <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-blue-800 rounded-lg flex items-center justify-center">
+                <Cloud className="w-5 h-5 text-white" />
+              </div>
               <div>
                 <h1 className="text-xl font-bold text-gray-900">NumS3 Console</h1>
                 <p className="text-sm text-gray-600">
