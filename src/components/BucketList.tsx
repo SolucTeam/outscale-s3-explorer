@@ -174,18 +174,18 @@ export const BucketList = () => {
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
-                      <div className="flex gap-1 mt-1">
+                      <div className="flex flex-wrap gap-1 mt-1">
                         <Badge variant="secondary" className="text-xs">
                           {bucket.region}
                         </Badge>
                         {bucket.versioningEnabled && (
-                          <Badge variant="outline" className="text-xs flex items-center gap-1">
+                          <Badge variant="versioning" className="text-xs flex items-center gap-1">
                             <GitBranch className="w-3 h-3" />
                             Versioning
                           </Badge>
                         )}
                         {bucket.objectLockEnabled && (
-                          <Badge variant="outline" className="text-xs flex items-center gap-1">
+                          <Badge variant="lock" className="text-xs flex items-center gap-1">
                             <Lock className="w-3 h-3" />
                             Lock
                           </Badge>
