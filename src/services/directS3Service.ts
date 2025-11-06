@@ -7,7 +7,13 @@ import {
   PutObjectCommand,
   DeleteObjectCommand,
   GetObjectCommand,
-  HeadObjectCommand
+  HeadObjectCommand,
+  GetBucketVersioningCommand,
+  PutBucketVersioningCommand,
+  GetObjectLockConfigurationCommand,
+  GetObjectTaggingCommand,
+  PutObjectTaggingCommand,
+  DeleteObjectTaggingCommand
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { S3Credentials, S3Bucket, S3Object } from '../types/s3';
@@ -119,13 +125,41 @@ class DirectS3Service {
       const command = new ListBucketsCommand({});
       const response = await this.client.send(command);
 
-      const buckets: S3Bucket[] = (response.Buckets || []).map(bucket => ({
-        name: bucket.Name || '',
-        creationDate: bucket.CreationDate || new Date(),
-        region: this.credentials?.region || '',
-        objectCount: 0,
-        size: 0
-      }));
+      const buckets: S3Bucket[] = await Promise.all(
+        (response.Buckets || []).map(async bucket => {
+          const bucketName = bucket.Name || '';
+          
+          // Récupérer le statut du versioning
+          let versioningEnabled = false;
+          try {
+            const versioningCmd = new GetBucketVersioningCommand({ Bucket: bucketName });
+            const versioningResponse = await this.client!.send(versioningCmd);
+            versioningEnabled = versioningResponse.Status === 'Enabled';
+          } catch (error) {
+            console.log(`Versioning status not available for ${bucketName}`);
+          }
+          
+          // Récupérer le statut de l'object lock
+          let objectLockEnabled = false;
+          try {
+            const lockCmd = new GetObjectLockConfigurationCommand({ Bucket: bucketName });
+            await this.client!.send(lockCmd);
+            objectLockEnabled = true;
+          } catch (error) {
+            // Object lock n'est pas configuré
+          }
+          
+          return {
+            name: bucketName,
+            creationDate: bucket.CreationDate || new Date(),
+            region: this.credentials?.region || '',
+            objectCount: 0,
+            size: 0,
+            versioningEnabled,
+            objectLockEnabled
+          };
+        })
+      );
 
       // Mettre en cache
       cacheService.set(cacheKey, buckets, CacheService.TTL.BUCKETS);
@@ -237,20 +271,42 @@ class DirectS3Service {
         });
       }
       
-      // Ajouter les fichiers
+      // Ajouter les fichiers avec leurs tags
       if (response.Contents) {
-        response.Contents.forEach(object => {
+        for (const object of response.Contents) {
           if (object.Key && object.Key !== path) {
+            let tags: Record<string, string> = {};
+            
+            // Récupérer les tags de l'objet
+            try {
+              const tagsCmd = new GetObjectTaggingCommand({
+                Bucket: bucket,
+                Key: object.Key
+              });
+              const tagsResponse = await this.client!.send(tagsCmd);
+              if (tagsResponse.TagSet) {
+                tags = tagsResponse.TagSet.reduce((acc, tag) => {
+                  if (tag.Key) {
+                    acc[tag.Key] = tag.Value || '';
+                  }
+                  return acc;
+                }, {} as Record<string, string>);
+              }
+            } catch (error) {
+              // Les tags ne sont pas disponibles
+            }
+            
             objects.push({
               key: object.Key,
               lastModified: object.LastModified || new Date(),
               size: object.Size || 0,
               etag: object.ETag || '',
               storageClass: object.StorageClass || 'STANDARD',
-              isFolder: false
+              isFolder: false,
+              tags
             });
           }
-        });
+        }
       }
 
       // Mettre en cache
@@ -364,6 +420,97 @@ class DirectS3Service {
       return {
         success: false,
         error: 'Erreur lors de la création du dossier',
+        message: error instanceof Error ? error.message : 'Erreur inconnue'
+      };
+    }
+  }
+
+  async setBucketVersioning(bucket: string, enabled: boolean): Promise<DirectS3Response<void>> {
+    if (!this.client) {
+      return { success: false, error: 'Client S3 non initialisé' };
+    }
+
+    try {
+      const command = new PutBucketVersioningCommand({
+        Bucket: bucket,
+        VersioningConfiguration: {
+          Status: enabled ? 'Enabled' : 'Suspended'
+        }
+      });
+
+      await this.client.send(command);
+      
+      // Invalider le cache des buckets
+      const cacheKey = `buckets_${this.credentials?.region}`;
+      cacheService.delete(cacheKey);
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Erreur setBucketVersioning:', error);
+      return {
+        success: false,
+        error: 'Erreur lors de la configuration du versioning',
+        message: error instanceof Error ? error.message : 'Erreur inconnue'
+      };
+    }
+  }
+
+  async setObjectTags(bucket: string, objectKey: string, tags: Record<string, string>): Promise<DirectS3Response<void>> {
+    if (!this.client) {
+      return { success: false, error: 'Client S3 non initialisé' };
+    }
+
+    try {
+      const tagSet = Object.entries(tags).map(([Key, Value]) => ({ Key, Value }));
+      
+      const command = new PutObjectTaggingCommand({
+        Bucket: bucket,
+        Key: objectKey,
+        Tagging: {
+          TagSet: tagSet
+        }
+      });
+
+      await this.client.send(command);
+      
+      // Invalider le cache des objets
+      const cacheKey = `objects_${bucket}`;
+      cacheService.clearByPattern(cacheKey);
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Erreur setObjectTags:', error);
+      return {
+        success: false,
+        error: 'Erreur lors de la définition des tags',
+        message: error instanceof Error ? error.message : 'Erreur inconnue'
+      };
+    }
+  }
+
+  async deleteObjectTags(bucket: string, objectKey: string): Promise<DirectS3Response<void>> {
+    if (!this.client) {
+      return { success: false, error: 'Client S3 non initialisé' };
+    }
+
+    try {
+      const command = new DeleteObjectTaggingCommand({
+        Bucket: bucket,
+        Key: objectKey
+      });
+
+      await this.client.send(command);
+      
+      // Invalider le cache des objets
+      const cacheKey = `objects_${bucket}`;
+      cacheService.clearByPattern(cacheKey);
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Erreur deleteObjectTags:', error);
+      return {
+        success: false,
+        error: 'Erreur lors de la suppression des tags',
         message: error instanceof Error ? error.message : 'Erreur inconnue'
       };
     }

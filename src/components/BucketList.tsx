@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useS3Store } from '../hooks/useS3Store';
 import { useEnhancedDirectS3 } from '../hooks/useEnhancedDirectS3';
-import { Folder, Calendar, HardDrive, ChevronRight, RefreshCw, Plus, Trash2, Cloud } from 'lucide-react';
+import { Folder, Calendar, HardDrive, ChevronRight, RefreshCw, Plus, Trash2, Cloud, GitBranch, Lock } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { CreateBucketDialog } from './CreateBucketDialog';
@@ -174,9 +174,23 @@ export const BucketList = () => {
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
-                      <Badge variant="secondary" className="text-xs mt-1">
-                        {bucket.region}
-                      </Badge>
+                      <div className="flex gap-1 mt-1">
+                        <Badge variant="secondary" className="text-xs">
+                          {bucket.region}
+                        </Badge>
+                        {bucket.versioningEnabled && (
+                          <Badge variant="outline" className="text-xs flex items-center gap-1">
+                            <GitBranch className="w-3 h-3" />
+                            Versioning
+                          </Badge>
+                        )}
+                        {bucket.objectLockEnabled && (
+                          <Badge variant="outline" className="text-xs flex items-center gap-1">
+                            <Lock className="w-3 h-3" />
+                            Lock
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                   </div>
                   <div className="flex items-center space-x-1 flex-shrink-0">

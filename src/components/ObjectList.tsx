@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useS3Store } from '../hooks/useS3Store';
 import { useEnhancedDirectS3 } from '../hooks/useEnhancedDirectS3';
-import { Upload, Download, Trash2, FolderOpen, File, RefreshCw, Plus, FolderPlus } from 'lucide-react';
+import { Upload, Download, Trash2, FolderOpen, File, RefreshCw, Plus, FolderPlus, Tag } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { FileUpload } from './FileUpload';
@@ -247,6 +247,16 @@ export const ObjectList = () => {
                           })}
                         </span>
                       </div>
+                      {object.tags && Object.keys(object.tags).length > 0 && (
+                        <div className="flex items-center gap-2 mt-2 flex-wrap">
+                          <Tag className="w-3 h-3 text-gray-500" />
+                          {Object.entries(object.tags).map(([key, value]) => (
+                            <Badge key={key} variant="outline" className="text-xs">
+                              {key}: {value}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                   

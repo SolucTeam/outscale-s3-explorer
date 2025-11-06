@@ -10,7 +10,13 @@ const {
   ListObjectsV2Command,
   PutObjectCommand,
   DeleteObjectCommand,
-  GetObjectCommand
+  GetObjectCommand,
+  GetBucketVersioningCommand,
+  PutBucketVersioningCommand,
+  GetObjectLockConfigurationCommand,
+  GetObjectTaggingCommand,
+  PutObjectTaggingCommand,
+  DeleteObjectTaggingCommand
 } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 
@@ -161,12 +167,34 @@ app.get('/api/buckets', extractCredentials, async (req, res) => {
         const objectCount = objectsResponse.KeyCount || 0;
         const size = (objectsResponse.Contents || []).reduce((total, obj) => total + (obj.Size || 0), 0);
 
+        // Récupérer le statut du versioning
+        let versioningEnabled = false;
+        try {
+          const versioningCmd = new GetBucketVersioningCommand({ Bucket: bucket.Name });
+          const versioningResponse = await req.s3Client.send(versioningCmd);
+          versioningEnabled = versioningResponse.Status === 'Enabled';
+        } catch (error) {
+          // Versioning not configured
+        }
+
+        // Récupérer le statut de l'object lock
+        let objectLockEnabled = false;
+        try {
+          const lockCmd = new GetObjectLockConfigurationCommand({ Bucket: bucket.Name });
+          await req.s3Client.send(lockCmd);
+          objectLockEnabled = true;
+        } catch (error) {
+          // Object lock not configured
+        }
+
         return {
           name: bucket.Name || '',
           creationDate: bucket.CreationDate || new Date(),
           region: req.headers['x-region'] || 'eu-west-2',
           objectCount,
-          size
+          size,
+          versioningEnabled,
+          objectLockEnabled
         };
       } catch (statsError) {
         console.warn(`Impossible de récupérer les stats pour ${bucket.Name}:`, statsError.message);
@@ -175,7 +203,9 @@ app.get('/api/buckets', extractCredentials, async (req, res) => {
           creationDate: bucket.CreationDate || new Date(),
           region: req.headers['x-region'] || 'eu-west-2',
           objectCount: 0,
-          size: 0
+          size: 0,
+          versioningEnabled: false,
+          objectLockEnabled: false
         };
       }
     }));
@@ -327,9 +357,9 @@ app.get('/api/buckets/:bucket/objects', extractCredentials, async (req, res) => 
       });
     }
 
-    // Fichiers
+    // Fichiers avec tags
     if (response.Contents) {
-      response.Contents.forEach(object => {
+      for (const object of response.Contents) {
         if (object.Key && object.Key !== prefix && !object.Key.endsWith('/')) {
           // Extraire le nom du fichier sans le préfixe parent
           let fileName = object.Key;
@@ -339,17 +369,39 @@ app.get('/api/buckets/:bucket/objects', extractCredentials, async (req, res) => 
           
           // Ignorer les fichiers dans des sous-dossiers (contenant des slashes)
           if (!fileName.includes('/')) {
+            let tags = {};
+            
+            // Récupérer les tags de l'objet
+            try {
+              const tagsCmd = new GetObjectTaggingCommand({
+                Bucket: bucket,
+                Key: object.Key
+              });
+              const tagsResponse = await req.s3Client.send(tagsCmd);
+              if (tagsResponse.TagSet) {
+                tags = tagsResponse.TagSet.reduce((acc, tag) => {
+                  if (tag.Key) {
+                    acc[tag.Key] = tag.Value || '';
+                  }
+                  return acc;
+                }, {});
+              }
+            } catch (error) {
+              // Tags not available
+            }
+            
             objects.push({
               key: fileName,
               lastModified: object.LastModified || new Date(),
               size: object.Size || 0,
               etag: object.ETag || '',
               storageClass: object.StorageClass || 'STANDARD',
-              isFolder: false
+              isFolder: false,
+              tags
             });
           }
         }
-      });
+      }
     }
 
     res.json({ success: true, data: objects });
@@ -472,6 +524,100 @@ app.post('/api/buckets/:bucket/folders', strictLimiter, extractCredentials, asyn
     res.status(500).json({
       success: false,
       error: 'Erreur lors de la création du dossier',
+      message: error.message
+    });
+  }
+});
+
+// Configurer le versioning d'un bucket (avec rate limiting strict)
+app.put('/api/buckets/:bucket/versioning', strictLimiter, extractCredentials, async (req, res) => {
+  try {
+    const { bucket } = req.params;
+    const { enabled } = req.body;
+
+    const command = new PutBucketVersioningCommand({
+      Bucket: bucket,
+      VersioningConfiguration: {
+        Status: enabled ? 'Enabled' : 'Suspended'
+      }
+    });
+
+    await req.s3Client.send(command);
+
+    res.json({
+      success: true,
+      message: `Versioning ${enabled ? 'activé' : 'désactivé'} pour le bucket "${bucket}"`
+    });
+  } catch (error) {
+    console.error('Erreur configuration versioning:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur lors de la configuration du versioning',
+      message: error.message
+    });
+  }
+});
+
+// Ajouter/Modifier les tags d'un objet (avec rate limiting strict)
+app.put('/api/buckets/:bucket/objects/:key(*)/tags', strictLimiter, extractCredentials, async (req, res) => {
+  try {
+    const { bucket, key } = req.params;
+    const { tags } = req.body;
+
+    if (!tags || typeof tags !== 'object') {
+      return res.status(400).json({
+        success: false,
+        error: 'Tags requis au format objet'
+      });
+    }
+
+    const tagSet = Object.entries(tags).map(([Key, Value]) => ({ Key, Value }));
+
+    const command = new PutObjectTaggingCommand({
+      Bucket: bucket,
+      Key: key,
+      Tagging: {
+        TagSet: tagSet
+      }
+    });
+
+    await req.s3Client.send(command);
+
+    res.json({
+      success: true,
+      message: `Tags mis à jour pour "${key}"`
+    });
+  } catch (error) {
+    console.error('Erreur mise à jour tags:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur lors de la mise à jour des tags',
+      message: error.message
+    });
+  }
+});
+
+// Supprimer les tags d'un objet (avec rate limiting strict)
+app.delete('/api/buckets/:bucket/objects/:key(*)/tags', strictLimiter, extractCredentials, async (req, res) => {
+  try {
+    const { bucket, key } = req.params;
+
+    const command = new DeleteObjectTaggingCommand({
+      Bucket: bucket,
+      Key: key
+    });
+
+    await req.s3Client.send(command);
+
+    res.json({
+      success: true,
+      message: `Tags supprimés pour "${key}"`
+    });
+  } catch (error) {
+    console.error('Erreur suppression tags:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur lors de la suppression des tags',
       message: error.message
     });
   }

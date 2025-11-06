@@ -17,6 +17,8 @@ export interface S3Bucket {
   region: string;
   objectCount?: number;
   size?: number;
+  versioningEnabled?: boolean;
+  objectLockEnabled?: boolean;
 }
 
 export interface S3Object {
@@ -26,6 +28,12 @@ export interface S3Object {
   etag: string;
   storageClass: string;
   isFolder: boolean;
+  tags?: Record<string, string>;
+}
+
+export interface ObjectTag {
+  Key: string;
+  Value: string;
 }
 
 export interface BreadcrumbItem {

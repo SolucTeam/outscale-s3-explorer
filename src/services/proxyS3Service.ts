@@ -353,6 +353,92 @@ class ProxyS3Service {
     }
   }
 
+  async setBucketVersioning(bucket: string, enabled: boolean): Promise<ProxyS3Response<void>> {
+    if (!this.credentials) {
+      return { success: false, error: 'Service non initialisé' };
+    }
+
+    try {
+      console.log(`⚙️ Configuration versioning: ${bucket} -> ${enabled}`);
+      const response = await this.makeRequest<void>(`/buckets/${encodeURIComponent(bucket)}/versioning`, {
+        method: 'PUT',
+        body: JSON.stringify({ enabled })
+      });
+      
+      if (response.success) {
+        // Invalider le cache des buckets
+        const cacheKey = `buckets_${this.credentials.region}`;
+        cacheService.delete(cacheKey);
+        console.log(`✅ Versioning ${enabled ? 'activé' : 'désactivé'} pour "${bucket}"`);
+      }
+      
+      return response;
+    } catch (error) {
+      return {
+        success: false,
+        error: 'Erreur lors de la configuration du versioning',
+        message: error instanceof Error ? error.message : 'Erreur inconnue'
+      };
+    }
+  }
+
+  async setObjectTags(bucket: string, objectKey: string, tags: Record<string, string>): Promise<ProxyS3Response<void>> {
+    if (!this.credentials) {
+      return { success: false, error: 'Service non initialisé' };
+    }
+
+    try {
+      console.log(`🏷️ Mise à jour tags: ${bucket}/${objectKey}`);
+      const response = await this.makeRequest<void>(`/buckets/${encodeURIComponent(bucket)}/objects/${encodeURIComponent(objectKey)}/tags`, {
+        method: 'PUT',
+        body: JSON.stringify({ tags })
+      });
+      
+      if (response.success) {
+        // Invalider le cache des objets
+        const cacheKey = `objects_${bucket}`;
+        cacheService.clearByPattern(cacheKey);
+        console.log(`✅ Tags mis à jour pour "${objectKey}"`);
+      }
+      
+      return response;
+    } catch (error) {
+      return {
+        success: false,
+        error: 'Erreur lors de la mise à jour des tags',
+        message: error instanceof Error ? error.message : 'Erreur inconnue'
+      };
+    }
+  }
+
+  async deleteObjectTags(bucket: string, objectKey: string): Promise<ProxyS3Response<void>> {
+    if (!this.credentials) {
+      return { success: false, error: 'Service non initialisé' };
+    }
+
+    try {
+      console.log(`🗑️ Suppression tags: ${bucket}/${objectKey}`);
+      const response = await this.makeRequest<void>(`/buckets/${encodeURIComponent(bucket)}/objects/${encodeURIComponent(objectKey)}/tags`, {
+        method: 'DELETE'
+      });
+      
+      if (response.success) {
+        // Invalider le cache des objets
+        const cacheKey = `objects_${bucket}`;
+        cacheService.clearByPattern(cacheKey);
+        console.log(`✅ Tags supprimés pour "${objectKey}"`);
+      }
+      
+      return response;
+    } catch (error) {
+      return {
+        success: false,
+        error: 'Erreur lors de la suppression des tags',
+        message: error instanceof Error ? error.message : 'Erreur inconnue'
+      };
+    }
+  }
+
   isInitialized(): boolean {
     return !!this.credentials;
   }
