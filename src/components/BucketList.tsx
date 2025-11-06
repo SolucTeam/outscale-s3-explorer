@@ -157,7 +157,7 @@ export const BucketList = () => {
             <Card key={bucket.name} className="hover:shadow-lg transition-all duration-200 cursor-pointer group" onClick={() => handleBucketClick(bucket.name)}>
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center space-x-3 min-w-0 flex-1">
+                  <div className="flex items-start space-x-3 min-w-0 flex-1">
                     <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-200 transition-colors flex-shrink-0">
                       <Folder className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
                     </div>
@@ -174,20 +174,21 @@ export const BucketList = () => {
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        <Badge variant="secondary" className="text-xs">
+                      <div className="flex flex-wrap gap-1 mt-1 max-w-full">
+                        <Badge variant="secondary" className="text-xs whitespace-nowrap">
                           {bucket.region}
                         </Badge>
                         {bucket.versioningEnabled && (
-                          <Badge variant="versioning" className="text-xs flex items-center gap-1">
+                          <Badge variant="versioning" className="text-xs flex items-center gap-1 whitespace-nowrap">
                             <GitBranch className="w-3 h-3" />
-                            Versioning
+                            <span className="hidden sm:inline">Versioning</span>
+                            <span className="sm:hidden">Ver</span>
                           </Badge>
                         )}
                         {bucket.objectLockEnabled && (
-                          <Badge variant="lock" className="text-xs flex items-center gap-1">
+                          <Badge variant="lock" className="text-xs flex items-center gap-1 whitespace-nowrap">
                             <Lock className="w-3 h-3" />
-                            Lock
+                            <span>Lock</span>
                           </Badge>
                         )}
                       </div>
