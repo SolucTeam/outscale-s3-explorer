@@ -176,7 +176,7 @@ export const BucketList = () => {
                       </TooltipProvider>
                       <div className="flex flex-wrap gap-1 mt-1 max-w-full">
                         <Badge variant="secondary" className="text-xs whitespace-nowrap">
-                          {bucket.region}
+                          {bucket.location || bucket.region}
                         </Badge>
                         {bucket.versioningEnabled && (
                           <Badge variant="versioning" className="text-xs flex items-center gap-1 whitespace-nowrap">
@@ -189,6 +189,13 @@ export const BucketList = () => {
                           <Badge variant="lock" className="text-xs flex items-center gap-1 whitespace-nowrap">
                             <Lock className="w-3 h-3" />
                             <span>Lock</span>
+                          </Badge>
+                        )}
+                        {bucket.encryptionEnabled && (
+                          <Badge variant="encryption" className="text-xs flex items-center gap-1 whitespace-nowrap">
+                            <Lock className="w-3 h-3" />
+                            <span className="hidden sm:inline">Encryption</span>
+                            <span className="sm:hidden">Enc</span>
                           </Badge>
                         )}
                       </div>

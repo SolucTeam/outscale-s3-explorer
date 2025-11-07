@@ -16,7 +16,11 @@ const {
   GetObjectLockConfigurationCommand,
   GetObjectTaggingCommand,
   PutObjectTaggingCommand,
-  DeleteObjectTaggingCommand
+  DeleteObjectTaggingCommand,
+  GetBucketLocationCommand,
+  GetBucketEncryptionCommand,
+  PutBucketEncryptionCommand,
+  DeleteBucketEncryptionCommand
 } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 
@@ -187,14 +191,36 @@ app.get('/api/buckets', extractCredentials, async (req, res) => {
           // Object lock not configured
         }
 
+        // Récupérer la location du bucket
+        let location = req.headers['x-region'] || 'eu-west-2';
+        try {
+          const locationCmd = new GetBucketLocationCommand({ Bucket: bucket.Name });
+          const locationResponse = await req.s3Client.send(locationCmd);
+          location = locationResponse.LocationConstraint || req.headers['x-region'] || 'eu-west-2';
+        } catch (error) {
+          // Location not available
+        }
+
+        // Récupérer le statut de l'encryption
+        let encryptionEnabled = false;
+        try {
+          const encryptionCmd = new GetBucketEncryptionCommand({ Bucket: bucket.Name });
+          await req.s3Client.send(encryptionCmd);
+          encryptionEnabled = true;
+        } catch (error) {
+          // Encryption not configured
+        }
+
         return {
           name: bucket.Name || '',
           creationDate: bucket.CreationDate || new Date(),
           region: req.headers['x-region'] || 'eu-west-2',
+          location,
           objectCount,
           size,
           versioningEnabled,
-          objectLockEnabled
+          objectLockEnabled,
+          encryptionEnabled
         };
       } catch (statsError) {
         console.warn(`Impossible de récupérer les stats pour ${bucket.Name}:`, statsError.message);
@@ -202,10 +228,12 @@ app.get('/api/buckets', extractCredentials, async (req, res) => {
           name: bucket.Name || '',
           creationDate: bucket.CreationDate || new Date(),
           region: req.headers['x-region'] || 'eu-west-2',
+          location: req.headers['x-region'] || 'eu-west-2',
           objectCount: 0,
           size: 0,
           versioningEnabled: false,
-          objectLockEnabled: false
+          objectLockEnabled: false,
+          encryptionEnabled: false
         };
       }
     }));
@@ -224,9 +252,43 @@ app.get('/api/buckets', extractCredentials, async (req, res) => {
 // Créer un bucket (avec rate limiting strict)
 app.post('/api/buckets', strictLimiter, extractCredentials, async (req, res) => {
   try {
-    const { name } = req.body;
-    const command = new CreateBucketCommand({ Bucket: name });
+    const { name, objectLockEnabled, versioningEnabled, encryptionEnabled } = req.body;
+    
+    // Créer le bucket avec object lock si demandé
+    const command = new CreateBucketCommand({ 
+      Bucket: name,
+      ObjectLockEnabledForBucket: objectLockEnabled
+    });
     await req.s3Client.send(command);
+
+    // Activer le versioning si demandé (requis pour object lock)
+    if (versioningEnabled || objectLockEnabled) {
+      const versioningCmd = new PutBucketVersioningCommand({
+        Bucket: name,
+        VersioningConfiguration: {
+          Status: 'Enabled'
+        }
+      });
+      await req.s3Client.send(versioningCmd);
+    }
+
+    // Activer l'encryption si demandé
+    if (encryptionEnabled) {
+      const encryptionCmd = new PutBucketEncryptionCommand({
+        Bucket: name,
+        ServerSideEncryptionConfiguration: {
+          Rules: [
+            {
+              ApplyServerSideEncryptionByDefault: {
+                SSEAlgorithm: 'AES256'
+              },
+              BucketKeyEnabled: true
+            }
+          ]
+        }
+      });
+      await req.s3Client.send(encryptionCmd);
+    }
 
     res.json({ success: true, message: `Bucket "${name}" créé` });
   } catch (error) {
@@ -553,6 +615,66 @@ app.put('/api/buckets/:bucket/versioning', strictLimiter, extractCredentials, as
     res.status(500).json({
       success: false,
       error: 'Erreur lors de la configuration du versioning',
+      message: error.message
+    });
+  }
+});
+
+// Configurer l'encryption d'un bucket (avec rate limiting strict)
+app.put('/api/buckets/:bucket/encryption', strictLimiter, extractCredentials, async (req, res) => {
+  try {
+    const { bucket } = req.params;
+
+    const command = new PutBucketEncryptionCommand({
+      Bucket: bucket,
+      ServerSideEncryptionConfiguration: {
+        Rules: [
+          {
+            ApplyServerSideEncryptionByDefault: {
+              SSEAlgorithm: 'AES256'
+            },
+            BucketKeyEnabled: true
+          }
+        ]
+      }
+    });
+
+    await req.s3Client.send(command);
+
+    res.json({
+      success: true,
+      message: `Encryption activée pour le bucket "${bucket}"`
+    });
+  } catch (error) {
+    console.error('Erreur activation encryption:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur lors de l\'activation de l\'encryption',
+      message: error.message
+    });
+  }
+});
+
+// Désactiver l'encryption d'un bucket (avec rate limiting strict)
+app.delete('/api/buckets/:bucket/encryption', strictLimiter, extractCredentials, async (req, res) => {
+  try {
+    const { bucket } = req.params;
+
+    const command = new DeleteBucketEncryptionCommand({
+      Bucket: bucket
+    });
+
+    await req.s3Client.send(command);
+
+    res.json({
+      success: true,
+      message: `Encryption désactivée pour le bucket "${bucket}"`
+    });
+  } catch (error) {
+    console.error('Erreur désactivation encryption:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur lors de la désactivation de l\'encryption',
       message: error.message
     });
   }

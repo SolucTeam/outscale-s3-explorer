@@ -332,7 +332,15 @@ export const useEnhancedDirectS3 = () => {
     }
   }, [initialized, toast]);
 
-  const createBucket = useCallback(async (name: string, region: string): Promise<boolean> => {
+  const createBucket = useCallback(async (
+    name: string, 
+    region: string,
+    options?: {
+      objectLockEnabled?: boolean;
+      versioningEnabled?: boolean;
+      encryptionEnabled?: boolean;
+    }
+  ): Promise<boolean> => {
     if (!initialized) return false;
     
     setLoading(true);
@@ -343,12 +351,12 @@ export const useEnhancedDirectS3 = () => {
       'bucket_create',
       name,
       undefined,
-      `Région: ${region}`
+      `Région: ${region}, Options: ${JSON.stringify(options)}`
     );
 
     try {
       const response = await withRetry(
-        () => proxyS3Service.createBucket(name),
+        () => proxyS3Service.createBucket(name, options),
         `création bucket ${name}`
       );
       
@@ -631,6 +639,84 @@ export const useEnhancedDirectS3 = () => {
     return cacheService.getStats();
   }, []);
 
+  const setBucketVersioning = useCallback(async (bucket: string, enabled: boolean): Promise<boolean> => {
+    if (!initialized) return false;
+
+    try {
+      const response = await withRetry(
+        () => proxyS3Service.setBucketVersioning(bucket, enabled),
+        `configuration versioning ${bucket}`
+      );
+
+      if (response.success) {
+        toast({
+          title: "Succès",
+          description: `Versioning ${enabled ? 'activé' : 'désactivé'} pour "${bucket}"`
+        });
+        await fetchBuckets(true);
+        return true;
+      } else {
+        return handleError(response, 'Erreur lors de la configuration du versioning');
+      }
+    } catch (error) {
+      console.error('❌ Set bucket versioning error:', error);
+      setError('Erreur de connexion');
+      return false;
+    }
+  }, [initialized, fetchBuckets, toast]);
+
+  const setBucketEncryption = useCallback(async (bucket: string): Promise<boolean> => {
+    if (!initialized) return false;
+
+    try {
+      const response = await withRetry(
+        () => proxyS3Service.setBucketEncryption(bucket),
+        `activation encryption ${bucket}`
+      );
+
+      if (response.success) {
+        toast({
+          title: "Succès",
+          description: `Encryption activée pour "${bucket}"`
+        });
+        await fetchBuckets(true);
+        return true;
+      } else {
+        return handleError(response, 'Erreur lors de l\'activation de l\'encryption');
+      }
+    } catch (error) {
+      console.error('❌ Set bucket encryption error:', error);
+      setError('Erreur de connexion');
+      return false;
+    }
+  }, [initialized, fetchBuckets, toast]);
+
+  const deleteBucketEncryption = useCallback(async (bucket: string): Promise<boolean> => {
+    if (!initialized) return false;
+
+    try {
+      const response = await withRetry(
+        () => proxyS3Service.deleteBucketEncryption(bucket),
+        `désactivation encryption ${bucket}`
+      );
+
+      if (response.success) {
+        toast({
+          title: "Succès",
+          description: `Encryption désactivée pour "${bucket}"`
+        });
+        await fetchBuckets(true);
+        return true;
+      } else {
+        return handleError(response, 'Erreur lors de la désactivation de l\'encryption');
+      }
+    } catch (error) {
+      console.error('❌ Delete bucket encryption error:', error);
+      setError('Erreur de connexion');
+      return false;
+    }
+  }, [initialized, fetchBuckets, toast]);
+
   return {
     initialized,
     uploadProgress,
@@ -644,6 +730,9 @@ export const useEnhancedDirectS3 = () => {
     downloadObject,
     createFolder,
     logout,
-    getCacheStats
+    getCacheStats,
+    setBucketVersioning,
+    setBucketEncryption,
+    deleteBucketEncryption
   };
 };

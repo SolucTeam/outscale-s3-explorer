@@ -13,7 +13,11 @@ import {
   GetObjectLockConfigurationCommand,
   GetObjectTaggingCommand,
   PutObjectTaggingCommand,
-  DeleteObjectTaggingCommand
+  DeleteObjectTaggingCommand,
+  GetBucketLocationCommand,
+  GetBucketEncryptionCommand,
+  PutBucketEncryptionCommand,
+  DeleteBucketEncryptionCommand
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { S3Credentials, S3Bucket, S3Object } from '../types/s3';
@@ -149,14 +153,36 @@ class DirectS3Service {
             // Object lock n'est pas configuré
           }
           
+          // Récupérer la location du bucket
+          let location = this.credentials?.region;
+          try {
+            const locationCmd = new GetBucketLocationCommand({ Bucket: bucketName });
+            const locationResponse = await this.client!.send(locationCmd);
+            location = locationResponse.LocationConstraint || this.credentials?.region || '';
+          } catch (error) {
+            console.log(`Location not available for ${bucketName}`);
+          }
+          
+          // Récupérer le statut de l'encryption
+          let encryptionEnabled = false;
+          try {
+            const encryptionCmd = new GetBucketEncryptionCommand({ Bucket: bucketName });
+            await this.client!.send(encryptionCmd);
+            encryptionEnabled = true;
+          } catch (error) {
+            // Encryption n'est pas configurée
+          }
+          
           return {
             name: bucketName,
             creationDate: bucket.CreationDate || new Date(),
             region: this.credentials?.region || '',
+            location,
             objectCount: 0,
             size: 0,
             versioningEnabled,
-            objectLockEnabled
+            objectLockEnabled,
+            encryptionEnabled
           };
         })
       );
@@ -176,15 +202,37 @@ class DirectS3Service {
     }
   }
 
-  async createBucket(name: string): Promise<DirectS3Response<void>> {
+  async createBucket(
+    name: string, 
+    options?: { 
+      objectLockEnabled?: boolean;
+      versioningEnabled?: boolean;
+      encryptionEnabled?: boolean;
+    }
+  ): Promise<DirectS3Response<void>> {
     if (!this.client) {
       return { success: false, error: 'Client S3 non initialisé' };
     }
 
     try {
-      console.log(`🆕 Création du bucket: ${name}`);
-      const command = new CreateBucketCommand({ Bucket: name });
+      console.log(`🆕 Création du bucket: ${name}`, options);
+      
+      // Créer le bucket avec object lock si demandé
+      const command = new CreateBucketCommand({ 
+        Bucket: name,
+        ObjectLockEnabledForBucket: options?.objectLockEnabled
+      });
       await this.client.send(command);
+      
+      // Activer le versioning si demandé (requis pour object lock)
+      if (options?.versioningEnabled || options?.objectLockEnabled) {
+        await this.setBucketVersioning(name, true);
+      }
+      
+      // Activer l'encryption si demandé
+      if (options?.encryptionEnabled) {
+        await this.setBucketEncryption(name);
+      }
       
       // Invalider le cache des buckets
       const cacheKey = `buckets_${this.credentials?.region}`;
@@ -511,6 +559,70 @@ class DirectS3Service {
       return {
         success: false,
         error: 'Erreur lors de la suppression des tags',
+        message: error instanceof Error ? error.message : 'Erreur inconnue'
+      };
+    }
+  }
+
+  async setBucketEncryption(bucket: string): Promise<DirectS3Response<void>> {
+    if (!this.client) {
+      return { success: false, error: 'Client S3 non initialisé' };
+    }
+
+    try {
+      const command = new PutBucketEncryptionCommand({
+        Bucket: bucket,
+        ServerSideEncryptionConfiguration: {
+          Rules: [
+            {
+              ApplyServerSideEncryptionByDefault: {
+                SSEAlgorithm: 'AES256'
+              },
+              BucketKeyEnabled: true
+            }
+          ]
+        }
+      });
+
+      await this.client.send(command);
+      
+      // Invalider le cache des buckets
+      const cacheKey = `buckets_${this.credentials?.region}`;
+      cacheService.delete(cacheKey);
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Erreur setBucketEncryption:', error);
+      return {
+        success: false,
+        error: 'Erreur lors de l\'activation du chiffrement',
+        message: error instanceof Error ? error.message : 'Erreur inconnue'
+      };
+    }
+  }
+
+  async deleteBucketEncryption(bucket: string): Promise<DirectS3Response<void>> {
+    if (!this.client) {
+      return { success: false, error: 'Client S3 non initialisé' };
+    }
+
+    try {
+      const command = new DeleteBucketEncryptionCommand({
+        Bucket: bucket
+      });
+
+      await this.client.send(command);
+      
+      // Invalider le cache des buckets
+      const cacheKey = `buckets_${this.credentials?.region}`;
+      cacheService.delete(cacheKey);
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Erreur deleteBucketEncryption:', error);
+      return {
+        success: false,
+        error: 'Erreur lors de la désactivation du chiffrement',
         message: error instanceof Error ? error.message : 'Erreur inconnue'
       };
     }

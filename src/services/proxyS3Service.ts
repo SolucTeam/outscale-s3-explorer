@@ -139,16 +139,28 @@ class ProxyS3Service {
     }
   }
 
-  async createBucket(name: string): Promise<ProxyS3Response<void>> {
+  async createBucket(
+    name: string, 
+    options?: { 
+      objectLockEnabled?: boolean;
+      versioningEnabled?: boolean;
+      encryptionEnabled?: boolean;
+    }
+  ): Promise<ProxyS3Response<void>> {
     if (!this.credentials) {
       return { success: false, error: 'Service non initialisé' };
     }
 
     try {
-      console.log(`🆕 Création bucket: ${name}`);
+      console.log(`🆕 Création bucket: ${name}`, options);
       const response = await this.makeRequest<void>('/buckets', {
         method: 'POST',
-        body: JSON.stringify({ name })
+        body: JSON.stringify({ 
+          name,
+          objectLockEnabled: options?.objectLockEnabled,
+          versioningEnabled: options?.versioningEnabled,
+          encryptionEnabled: options?.encryptionEnabled
+        })
       });
       
       if (response.success) {
@@ -434,6 +446,62 @@ class ProxyS3Service {
       return {
         success: false,
         error: 'Erreur lors de la suppression des tags',
+        message: error instanceof Error ? error.message : 'Erreur inconnue'
+      };
+    }
+  }
+
+  async setBucketEncryption(bucket: string): Promise<ProxyS3Response<void>> {
+    if (!this.credentials) {
+      return { success: false, error: 'Service non initialisé' };
+    }
+
+    try {
+      console.log(`🔒 Activation encryption: ${bucket}`);
+      const response = await this.makeRequest<void>(`/buckets/${encodeURIComponent(bucket)}/encryption`, {
+        method: 'PUT'
+      });
+      
+      if (response.success) {
+        // Invalider le cache des buckets
+        const cacheKey = `buckets_${this.credentials.region}`;
+        cacheService.delete(cacheKey);
+        console.log(`✅ Encryption activée pour "${bucket}"`);
+      }
+      
+      return response;
+    } catch (error) {
+      return {
+        success: false,
+        error: 'Erreur lors de l\'activation de l\'encryption',
+        message: error instanceof Error ? error.message : 'Erreur inconnue'
+      };
+    }
+  }
+
+  async deleteBucketEncryption(bucket: string): Promise<ProxyS3Response<void>> {
+    if (!this.credentials) {
+      return { success: false, error: 'Service non initialisé' };
+    }
+
+    try {
+      console.log(`🔓 Désactivation encryption: ${bucket}`);
+      const response = await this.makeRequest<void>(`/buckets/${encodeURIComponent(bucket)}/encryption`, {
+        method: 'DELETE'
+      });
+      
+      if (response.success) {
+        // Invalider le cache des buckets
+        const cacheKey = `buckets_${this.credentials.region}`;
+        cacheService.delete(cacheKey);
+        console.log(`✅ Encryption désactivée pour "${bucket}"`);
+      }
+      
+      return response;
+    } catch (error) {
+      return {
+        success: false,
+        error: 'Erreur lors de la désactivation de l\'encryption',
         message: error instanceof Error ? error.message : 'Erreur inconnue'
       };
     }

@@ -15,10 +15,12 @@ export interface S3Bucket {
   name: string;
   creationDate: Date;
   region: string;
+  location?: string;
   objectCount?: number;
   size?: number;
   versioningEnabled?: boolean;
   objectLockEnabled?: boolean;
+  encryptionEnabled?: boolean;
 }
 
 export interface S3Object {
