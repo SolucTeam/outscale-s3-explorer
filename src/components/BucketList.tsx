@@ -6,12 +6,14 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useS3Store } from '../hooks/useS3Store';
 import { useEnhancedDirectS3 } from '../hooks/useEnhancedDirectS3';
-import { Folder, Calendar, HardDrive, ChevronRight, RefreshCw, Plus, Trash2, Cloud, GitBranch, Lock } from 'lucide-react';
+import { Folder, Calendar, HardDrive, ChevronRight, RefreshCw, Plus, Trash2, Cloud, GitBranch, Lock, Settings } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { CreateBucketDialog } from './CreateBucketDialog';
 import { ForceDeleteBucketDialog } from './ForceDeleteBucketDialog';
+import { BucketSettingsDialog } from './BucketSettingsDialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { S3Bucket } from '../types/s3';
 
 export const BucketList = () => {
   const { buckets, loading, setCurrentBucket, setCurrentPath, setObjects } = useS3Store();
@@ -19,7 +21,9 @@ export const BucketList = () => {
   const navigate = useNavigate();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showSettingsDialog, setShowSettingsDialog] = useState(false);
   const [bucketToDelete, setBucketToDelete] = useState<string>('');
+  const [bucketToEdit, setBucketToEdit] = useState<S3Bucket | null>(null);
   const [hasInitiallyLoaded, setHasInitiallyLoaded] = useState(false);
 
   useEffect(() => {
@@ -56,6 +60,16 @@ export const BucketList = () => {
   const handleDeleteCompleted = () => {
     fetchBuckets();
     setBucketToDelete('');
+  };
+
+  const handleSettingsBucket = (bucket: S3Bucket, event: React.MouseEvent) => {
+    event.stopPropagation();
+    setBucketToEdit(bucket);
+    setShowSettingsDialog(true);
+  };
+
+  const handleSettingsUpdated = () => {
+    fetchBuckets(true);
   };
 
   const handleRefresh = async () => {
@@ -205,6 +219,15 @@ export const BucketList = () => {
                     <Button
                       size="sm"
                       variant="ghost"
+                      onClick={(e) => handleSettingsBucket(bucket, e)}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-600 hover:text-gray-700 hover:bg-gray-100 h-8 w-8 p-0"
+                      title="Paramètres du bucket"
+                    >
+                      <Settings className="w-3 h-3 sm:w-4 sm:h-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
                       onClick={(e) => handleDeleteBucket(bucket.name, e)}
                       className="opacity-0 group-hover:opacity-100 transition-opacity text-red-600 hover:text-red-700 hover:bg-red-50 h-8 w-8 p-0"
                       title="Supprimer le bucket et son contenu"
@@ -270,6 +293,15 @@ export const BucketList = () => {
         bucketName={bucketToDelete}
         onDeleted={handleDeleteCompleted}
       />
+
+      {bucketToEdit && (
+        <BucketSettingsDialog
+          open={showSettingsDialog}
+          onOpenChange={setShowSettingsDialog}
+          bucket={bucketToEdit}
+          onSettingsUpdated={handleSettingsUpdated}
+        />
+      )}
     </div>
   );
 };
