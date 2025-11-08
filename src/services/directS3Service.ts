@@ -17,10 +17,13 @@ import {
   GetBucketLocationCommand,
   GetBucketEncryptionCommand,
   PutBucketEncryptionCommand,
-  DeleteBucketEncryptionCommand
+  DeleteBucketEncryptionCommand,
+  ListObjectVersionsCommand,
+  GetObjectRetentionCommand,
+  PutObjectRetentionCommand
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { S3Credentials, S3Bucket, S3Object } from '../types/s3';
+import { S3Credentials, S3Bucket, S3Object, ObjectVersion, ObjectRetention, ObjectLockConfiguration } from '../types/s3';
 import { OutscaleConfig } from './outscaleConfig';
 import { cacheService, CacheService } from './cacheService';
 
@@ -623,6 +626,144 @@ class DirectS3Service {
       return {
         success: false,
         error: 'Erreur lors de la désactivation du chiffrement',
+        message: error instanceof Error ? error.message : 'Erreur inconnue'
+      };
+    }
+  }
+
+  async listObjectVersions(bucket: string, objectKey?: string): Promise<DirectS3Response<ObjectVersion[]>> {
+    if (!this.client) {
+      return { success: false, error: 'Client S3 non initialisé' };
+    }
+
+    try {
+      const command = new ListObjectVersionsCommand({
+        Bucket: bucket,
+        Prefix: objectKey
+      });
+
+      const response = await this.client.send(command);
+      const versions: ObjectVersion[] = [];
+
+      if (response.Versions) {
+        response.Versions.forEach(version => {
+          if (version.Key) {
+            versions.push({
+              versionId: version.VersionId || '',
+              key: version.Key,
+              lastModified: version.LastModified || new Date(),
+              size: version.Size || 0,
+              etag: version.ETag || '',
+              isLatest: version.IsLatest || false,
+              storageClass: version.StorageClass || 'STANDARD'
+            });
+          }
+        });
+      }
+
+      return { success: true, data: versions };
+    } catch (error) {
+      console.error('Erreur listObjectVersions:', error);
+      return {
+        success: false,
+        error: 'Erreur lors de la récupération des versions',
+        message: error instanceof Error ? error.message : 'Erreur inconnue'
+      };
+    }
+  }
+
+  async getObjectRetention(bucket: string, objectKey: string, versionId?: string): Promise<DirectS3Response<ObjectRetention>> {
+    if (!this.client) {
+      return { success: false, error: 'Client S3 non initialisé' };
+    }
+
+    try {
+      const command = new GetObjectRetentionCommand({
+        Bucket: bucket,
+        Key: objectKey,
+        VersionId: versionId
+      });
+
+      const response = await this.client.send(command);
+      
+      const retention: ObjectRetention = {
+        mode: response.Retention?.Mode as 'GOVERNANCE' | 'COMPLIANCE' | undefined,
+        retainUntilDate: response.Retention?.RetainUntilDate
+      };
+
+      return { success: true, data: retention };
+    } catch (error) {
+      console.error('Erreur getObjectRetention:', error);
+      return {
+        success: false,
+        error: 'Erreur lors de la récupération de la rétention',
+        message: error instanceof Error ? error.message : 'Erreur inconnue'
+      };
+    }
+  }
+
+  async setObjectRetention(
+    bucket: string, 
+    objectKey: string, 
+    retention: ObjectRetention,
+    versionId?: string
+  ): Promise<DirectS3Response<void>> {
+    if (!this.client) {
+      return { success: false, error: 'Client S3 non initialisé' };
+    }
+
+    try {
+      const command = new PutObjectRetentionCommand({
+        Bucket: bucket,
+        Key: objectKey,
+        VersionId: versionId,
+        Retention: {
+          Mode: retention.mode,
+          RetainUntilDate: retention.retainUntilDate
+        }
+      });
+
+      await this.client.send(command);
+      return { success: true };
+    } catch (error) {
+      console.error('Erreur setObjectRetention:', error);
+      return {
+        success: false,
+        error: 'Erreur lors de la configuration de la rétention',
+        message: error instanceof Error ? error.message : 'Erreur inconnue'
+      };
+    }
+  }
+
+  async getObjectLockConfiguration(bucket: string): Promise<DirectS3Response<ObjectLockConfiguration>> {
+    if (!this.client) {
+      return { success: false, error: 'Client S3 non initialisé' };
+    }
+
+    try {
+      const command = new GetObjectLockConfigurationCommand({
+        Bucket: bucket
+      });
+
+      const response = await this.client.send(command);
+      
+      const config: ObjectLockConfiguration = {
+        enabled: response.ObjectLockConfiguration?.ObjectLockEnabled === 'Enabled',
+        rule: response.ObjectLockConfiguration?.Rule ? {
+          defaultRetention: {
+            mode: response.ObjectLockConfiguration.Rule.DefaultRetention?.Mode as 'GOVERNANCE' | 'COMPLIANCE' | undefined,
+            days: response.ObjectLockConfiguration.Rule.DefaultRetention?.Days,
+            years: response.ObjectLockConfiguration.Rule.DefaultRetention?.Years
+          }
+        } : undefined
+      };
+
+      return { success: true, data: config };
+    } catch (error) {
+      console.error('Erreur getObjectLockConfiguration:', error);
+      return {
+        success: false,
+        error: 'Erreur lors de la récupération de la configuration Object Lock',
         message: error instanceof Error ? error.message : 'Erreur inconnue'
       };
     }

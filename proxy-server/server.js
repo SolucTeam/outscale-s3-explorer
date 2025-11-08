@@ -20,7 +20,10 @@ const {
   GetBucketLocationCommand,
   GetBucketEncryptionCommand,
   PutBucketEncryptionCommand,
-  DeleteBucketEncryptionCommand
+  DeleteBucketEncryptionCommand,
+  ListObjectVersionsCommand,
+  GetObjectRetentionCommand,
+  PutObjectRetentionCommand
 } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 
@@ -740,6 +743,152 @@ app.delete('/api/buckets/:bucket/objects/:key(*)/tags', strictLimiter, extractCr
     res.status(500).json({
       success: false,
       error: 'Erreur lors de la suppression des tags',
+      message: error.message
+    });
+  }
+});
+
+// Lister les versions d'un objet
+app.get('/api/buckets/:bucket/versions', extractCredentials, async (req, res) => {
+  try {
+    const { bucket } = req.params;
+    const { prefix } = req.query;
+
+    const command = new ListObjectVersionsCommand({
+      Bucket: bucket,
+      Prefix: prefix
+    });
+
+    const response = await req.s3Client.send(command);
+    const versions = [];
+
+    if (response.Versions) {
+      response.Versions.forEach(version => {
+        if (version.Key) {
+          versions.push({
+            versionId: version.VersionId || '',
+            key: version.Key,
+            lastModified: version.LastModified || new Date(),
+            size: version.Size || 0,
+            etag: version.ETag || '',
+            isLatest: version.IsLatest || false,
+            storageClass: version.StorageClass || 'STANDARD'
+          });
+        }
+      });
+    }
+
+    res.json({ success: true, data: versions });
+  } catch (error) {
+    console.error('Erreur liste versions:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur lors de la récupération des versions',
+      message: error.message
+    });
+  }
+});
+
+// Récupérer la rétention d'un objet
+app.get('/api/buckets/:bucket/objects/:key(*)/retention', extractCredentials, async (req, res) => {
+  try {
+    const { bucket, key } = req.params;
+    const { versionId } = req.query;
+
+    const command = new GetObjectRetentionCommand({
+      Bucket: bucket,
+      Key: key,
+      VersionId: versionId
+    });
+
+    const response = await req.s3Client.send(command);
+
+    res.json({
+      success: true,
+      data: {
+        mode: response.Retention?.Mode,
+        retainUntilDate: response.Retention?.RetainUntilDate
+      }
+    });
+  } catch (error) {
+    console.error('Erreur récupération rétention:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur lors de la récupération de la rétention',
+      message: error.message
+    });
+  }
+});
+
+// Configurer la rétention d'un objet (avec rate limiting strict)
+app.put('/api/buckets/:bucket/objects/:key(*)/retention', strictLimiter, extractCredentials, async (req, res) => {
+  try {
+    const { bucket, key } = req.params;
+    const { versionId } = req.query;
+    const { retention } = req.body;
+
+    if (!retention || !retention.mode || !retention.retainUntilDate) {
+      return res.status(400).json({
+        success: false,
+        error: 'Mode et date de rétention requis'
+      });
+    }
+
+    const command = new PutObjectRetentionCommand({
+      Bucket: bucket,
+      Key: key,
+      VersionId: versionId,
+      Retention: {
+        Mode: retention.mode,
+        RetainUntilDate: new Date(retention.retainUntilDate)
+      }
+    });
+
+    await req.s3Client.send(command);
+
+    res.json({
+      success: true,
+      message: `Rétention configurée pour "${key}"`
+    });
+  } catch (error) {
+    console.error('Erreur configuration rétention:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur lors de la configuration de la rétention',
+      message: error.message
+    });
+  }
+});
+
+// Récupérer la configuration Object Lock d'un bucket
+app.get('/api/buckets/:bucket/object-lock', extractCredentials, async (req, res) => {
+  try {
+    const { bucket } = req.params;
+
+    const command = new GetObjectLockConfigurationCommand({
+      Bucket: bucket
+    });
+
+    const response = await req.s3Client.send(command);
+
+    res.json({
+      success: true,
+      data: {
+        enabled: response.ObjectLockConfiguration?.ObjectLockEnabled === 'Enabled',
+        rule: response.ObjectLockConfiguration?.Rule ? {
+          defaultRetention: {
+            mode: response.ObjectLockConfiguration.Rule.DefaultRetention?.Mode,
+            days: response.ObjectLockConfiguration.Rule.DefaultRetention?.Days,
+            years: response.ObjectLockConfiguration.Rule.DefaultRetention?.Years
+          }
+        } : undefined
+      }
+    });
+  } catch (error) {
+    console.error('Erreur récupération Object Lock config:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur lors de la récupération de la configuration Object Lock',
       message: error.message
     });
   }

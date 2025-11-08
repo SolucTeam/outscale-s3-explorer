@@ -717,6 +717,102 @@ export const useEnhancedDirectS3 = () => {
     }
   }, [initialized, fetchBuckets, toast]);
 
+  const listObjectVersions = useCallback(async (bucket: string, objectKey?: string) => {
+    if (!initialized) return null;
+
+    try {
+      const response = await withRetry(
+        () => proxyS3Service.listObjectVersions(bucket, objectKey),
+        `liste versions ${objectKey || 'all'}`
+      );
+
+      if (response.success && response.data) {
+        return response.data;
+      } else {
+        handleError(response, 'Erreur lors de la récupération des versions');
+        return null;
+      }
+    } catch (error) {
+      console.error('❌ List versions error:', error);
+      setError('Erreur de connexion');
+      return null;
+    }
+  }, [initialized]);
+
+  const getObjectRetention = useCallback(async (bucket: string, objectKey: string, versionId?: string) => {
+    if (!initialized) return null;
+
+    try {
+      const response = await withRetry(
+        () => proxyS3Service.getObjectRetention(bucket, objectKey, versionId),
+        `récupération rétention ${objectKey}`
+      );
+
+      if (response.success && response.data) {
+        return response.data;
+      } else {
+        handleError(response, 'Erreur lors de la récupération de la rétention');
+        return null;
+      }
+    } catch (error) {
+      console.error('❌ Get retention error:', error);
+      setError('Erreur de connexion');
+      return null;
+    }
+  }, [initialized]);
+
+  const setObjectRetention = useCallback(async (
+    bucket: string, 
+    objectKey: string, 
+    retention: any,
+    versionId?: string
+  ): Promise<boolean> => {
+    if (!initialized) return false;
+
+    try {
+      const response = await withRetry(
+        () => proxyS3Service.setObjectRetention(bucket, objectKey, retention, versionId),
+        `configuration rétention ${objectKey}`
+      );
+
+      if (response.success) {
+        toast({
+          title: "Succès",
+          description: `Rétention configurée pour "${objectKey}"`
+        });
+        return true;
+      } else {
+        return handleError(response, 'Erreur lors de la configuration de la rétention');
+      }
+    } catch (error) {
+      console.error('❌ Set retention error:', error);
+      setError('Erreur de connexion');
+      return false;
+    }
+  }, [initialized, toast]);
+
+  const getObjectLockConfiguration = useCallback(async (bucket: string) => {
+    if (!initialized) return null;
+
+    try {
+      const response = await withRetry(
+        () => proxyS3Service.getObjectLockConfiguration(bucket),
+        `récupération Object Lock config ${bucket}`
+      );
+
+      if (response.success && response.data) {
+        return response.data;
+      } else {
+        handleError(response, 'Erreur lors de la récupération de la configuration Object Lock');
+        return null;
+      }
+    } catch (error) {
+      console.error('❌ Get Object Lock config error:', error);
+      setError('Erreur de connexion');
+      return null;
+    }
+  }, [initialized]);
+
   return {
     initialized,
     uploadProgress,
@@ -733,6 +829,10 @@ export const useEnhancedDirectS3 = () => {
     getCacheStats,
     setBucketVersioning,
     setBucketEncryption,
-    deleteBucketEncryption
+    deleteBucketEncryption,
+    listObjectVersions,
+    getObjectRetention,
+    setObjectRetention,
+    getObjectLockConfiguration
   };
 };

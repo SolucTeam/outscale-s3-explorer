@@ -3,7 +3,7 @@
  * Contourne les limitations CORS en utilisant un serveur proxy
  */
 
-import { S3Credentials, S3Bucket, S3Object } from '../types/s3';
+import { S3Credentials, S3Bucket, S3Object, ObjectVersion, ObjectRetention, ObjectLockConfiguration } from '../types/s3';
 import { cacheService, CacheService } from './cacheService';
 import { env } from '../config/environment';
 
@@ -502,6 +502,95 @@ class ProxyS3Service {
       return {
         success: false,
         error: 'Erreur lors de la désactivation de l\'encryption',
+        message: error instanceof Error ? error.message : 'Erreur inconnue'
+      };
+    }
+  }
+
+  async listObjectVersions(bucket: string, objectKey?: string): Promise<ProxyS3Response<ObjectVersion[]>> {
+    if (!this.credentials) {
+      return { success: false, error: 'Service non initialisé' };
+    }
+
+    try {
+      const params = new URLSearchParams();
+      if (objectKey) params.append('prefix', objectKey);
+      
+      const endpoint = `/buckets/${encodeURIComponent(bucket)}/versions?${params.toString()}`;
+      const response = await this.makeRequest<ObjectVersion[]>(endpoint);
+      return response;
+    } catch (error) {
+      return {
+        success: false,
+        error: 'Erreur lors de la récupération des versions',
+        message: error instanceof Error ? error.message : 'Erreur inconnue'
+      };
+    }
+  }
+
+  async getObjectRetention(bucket: string, objectKey: string, versionId?: string): Promise<ProxyS3Response<ObjectRetention>> {
+    if (!this.credentials) {
+      return { success: false, error: 'Service non initialisé' };
+    }
+
+    try {
+      const params = new URLSearchParams();
+      if (versionId) params.append('versionId', versionId);
+      
+      const endpoint = `/buckets/${encodeURIComponent(bucket)}/objects/${encodeURIComponent(objectKey)}/retention?${params.toString()}`;
+      const response = await this.makeRequest<ObjectRetention>(endpoint);
+      return response;
+    } catch (error) {
+      return {
+        success: false,
+        error: 'Erreur lors de la récupération de la rétention',
+        message: error instanceof Error ? error.message : 'Erreur inconnue'
+      };
+    }
+  }
+
+  async setObjectRetention(
+    bucket: string,
+    objectKey: string,
+    retention: ObjectRetention,
+    versionId?: string
+  ): Promise<ProxyS3Response<void>> {
+    if (!this.credentials) {
+      return { success: false, error: 'Service non initialisé' };
+    }
+
+    try {
+      const params = new URLSearchParams();
+      if (versionId) params.append('versionId', versionId);
+      
+      const endpoint = `/buckets/${encodeURIComponent(bucket)}/objects/${encodeURIComponent(objectKey)}/retention?${params.toString()}`;
+      const response = await this.makeRequest<void>(endpoint, {
+        method: 'PUT',
+        body: JSON.stringify({ retention })
+      });
+      return response;
+    } catch (error) {
+      return {
+        success: false,
+        error: 'Erreur lors de la configuration de la rétention',
+        message: error instanceof Error ? error.message : 'Erreur inconnue'
+      };
+    }
+  }
+
+  async getObjectLockConfiguration(bucket: string): Promise<ProxyS3Response<ObjectLockConfiguration>> {
+    if (!this.credentials) {
+      return { success: false, error: 'Service non initialisé' };
+    }
+
+    try {
+      const endpoint = `/buckets/${encodeURIComponent(bucket)}/object-lock`;
+      const response = await this.makeRequest<ObjectLockConfiguration>(endpoint);
+      return response;
+    } catch (error) {
+      return {
+        success: false,
+        error: 'Erreur lors de la récupération de la configuration Object Lock',
         message: error instanceof Error ? error.message : 'Erreur inconnue'
       };
     }

@@ -6,12 +6,13 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useS3Store } from '../hooks/useS3Store';
 import { useEnhancedDirectS3 } from '../hooks/useEnhancedDirectS3';
-import { Upload, Download, Trash2, FolderOpen, File, RefreshCw, Plus, FolderPlus, Tag } from 'lucide-react';
+import { Upload, Download, Trash2, FolderOpen, File, RefreshCw, Plus, FolderPlus, Tag, Info } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { FileUpload } from './FileUpload';
 import { CreateFolderDialog } from './CreateFolderDialog';
 import { DeleteObjectDialog } from './DeleteObjectDialog';
+import { ObjectDetailsDialog } from './ObjectDetailsDialog';
 
 export const ObjectList = () => {
   const { currentBucket, currentPath, objects, loading, setCurrentPath } = useS3Store();
@@ -26,6 +27,11 @@ export const ObjectList = () => {
     isFolder: false
   });
   const [isDeleting, setIsDeleting] = useState(false);
+  const [detailsDialog, setDetailsDialog] = useState<{ open: boolean; objectKey: string; object: any | null }>({
+    open: false,
+    objectKey: '',
+    object: null
+  });
 
   useEffect(() => {
     if (currentBucket) {
@@ -126,6 +132,11 @@ export const ObjectList = () => {
   const handleUploadComplete = () => {
     setShowUpload(false);
     loadObjects();
+  };
+
+  const handleShowDetails = (object: any) => {
+    const fullKey = currentPath ? `${currentPath}/${object.key}` : object.key;
+    setDetailsDialog({ open: true, objectKey: fullKey, object });
   };
 
   if (!currentBucket) return null;
@@ -262,13 +273,23 @@ export const ObjectList = () => {
                   
                   <div className="flex items-center space-x-2">
                     {!object.isFolder && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleDownload(object.key)}
-                      >
-                        <Download className="w-4 h-4" />
-                      </Button>
+                      <>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleShowDetails(object)}
+                          title="Détails de l'objet"
+                        >
+                          <Info className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleDownload(object.key)}
+                        >
+                          <Download className="w-4 h-4" />
+                        </Button>
+                      </>
                     )}
                     <Button
                       size="sm"
@@ -313,6 +334,16 @@ export const ObjectList = () => {
         onConfirm={handleDeleteConfirm}
         isDeleting={isDeleting}
       />
+
+      {detailsDialog.object && (
+        <ObjectDetailsDialog
+          open={detailsDialog.open}
+          onOpenChange={(open) => setDetailsDialog({ ...detailsDialog, open })}
+          bucket={currentBucket!}
+          objectKey={detailsDialog.objectKey}
+          object={detailsDialog.object}
+        />
+      )}
     </div>
   );
 };

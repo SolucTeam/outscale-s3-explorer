@@ -31,6 +31,34 @@ export interface S3Object {
   storageClass: string;
   isFolder: boolean;
   tags?: Record<string, string>;
+  versionId?: string;
+  isLatest?: boolean;
+}
+
+export interface ObjectVersion {
+  versionId: string;
+  key: string;
+  lastModified: Date;
+  size: number;
+  etag: string;
+  isLatest: boolean;
+  storageClass: string;
+}
+
+export interface ObjectRetention {
+  mode?: 'GOVERNANCE' | 'COMPLIANCE';
+  retainUntilDate?: Date;
+}
+
+export interface ObjectLockConfiguration {
+  enabled: boolean;
+  rule?: {
+    defaultRetention?: {
+      mode?: 'GOVERNANCE' | 'COMPLIANCE';
+      days?: number;
+      years?: number;
+    };
+  };
 }
 
 export interface ObjectTag {
