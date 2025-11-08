@@ -45,13 +45,13 @@ app.use((req, res, next) => {
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-XSS-Protection', '1; mode=block');
   res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
-  
+
   // Content Security Policy
   res.setHeader(
     'Content-Security-Policy',
     "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://oos.*.outscale.com"
   );
-  
+
   next();
 });
 
@@ -171,7 +171,7 @@ app.get('/api/buckets', extractCredentials, async (req, res) => {
           Bucket: bucket.Name
         });
         const objectsResponse = await req.s3Client.send(listCommand);
-        
+
         const objectCount = objectsResponse.KeyCount || 0;
         const size = (objectsResponse.Contents || []).reduce((total, obj) => total + (obj.Size || 0), 0);
 
@@ -257,9 +257,9 @@ app.get('/api/buckets', extractCredentials, async (req, res) => {
 app.post('/api/buckets', strictLimiter, extractCredentials, async (req, res) => {
   try {
     const { name, objectLockEnabled, versioningEnabled, encryptionEnabled } = req.body;
-    
+
     // Créer le bucket avec object lock si demandé
-    const command = new CreateBucketCommand({ 
+    const command = new CreateBucketCommand({
       Bucket: name,
       ObjectLockEnabledForBucket: objectLockEnabled
     });
@@ -318,7 +318,7 @@ const emptyBucket = async (s3Client, bucketName) => {
     });
 
     const listResponse = await s3Client.send(listCommand);
-    
+
     if (listResponse.Contents && listResponse.Contents.length > 0) {
       // Supprimer les objets par lot
       for (const obj of listResponse.Contents) {
@@ -358,14 +358,14 @@ app.delete('/api/buckets/:name', strictLimiter, extractCredentials, async (req, 
         console.log(`🗑️ Vidage du bucket "${name}" avant suppression...`);
         const deletedCount = await emptyBucket(req.s3Client, name);
         console.log(`✅ ${deletedCount} objets supprimés du bucket "${name}"`);
-        
+
         // Réessayer la suppression
         const retryCommand = new DeleteBucketCommand({ Bucket: name });
         await req.s3Client.send(retryCommand);
-        
-        res.json({ 
-          success: true, 
-          message: `Bucket "${name}" vidé (${deletedCount} objets) et supprimé` 
+
+        res.json({
+          success: true,
+          message: `Bucket "${name}" vidé (${deletedCount} objets) et supprimé`
         });
       } else {
         throw deleteError;
@@ -408,7 +408,7 @@ app.get('/api/buckets/:bucket/objects', extractCredentials, async (req, res) => 
           }
           // Retirer le slash final
           folderName = folderName.replace(/\/$/, '');
-          
+
           if (folderName) {
             objects.push({
               key: folderName,
@@ -432,11 +432,11 @@ app.get('/api/buckets/:bucket/objects', extractCredentials, async (req, res) => 
           if (prefix && fileName.startsWith(prefix)) {
             fileName = fileName.substring(prefix.length);
           }
-          
+
           // Ignorer les fichiers dans des sous-dossiers (contenant des slashes)
           if (!fileName.includes('/')) {
             let tags = {};
-            
+
             // Récupérer les tags de l'objet
             try {
               const tagsCmd = new GetObjectTaggingCommand({
@@ -455,7 +455,7 @@ app.get('/api/buckets/:bucket/objects', extractCredentials, async (req, res) => 
             } catch (error) {
               // Tags not available
             }
-            
+
             objects.push({
               key: fileName,
               lastModified: object.LastModified || new Date(),
@@ -812,6 +812,18 @@ app.get('/api/buckets/:bucket/objects/:key(*)/retention', extractCredentials, as
       }
     });
   } catch (error) {
+    // Si Object Lock n'est pas configuré sur le bucket ou pas de rétention définie
+    if ((error.Code === 'InvalidRequest' && error.message?.includes('Object Lock Configuration')) ||
+      error.Code === 'NoSuchObjectLockConfiguration') {
+      return res.json({
+        success: true,
+        data: {
+          mode: null,
+          retainUntilDate: null
+        }
+      });
+    }
+
     console.error('Erreur récupération rétention:', error);
     res.status(500).json({
       success: false,
@@ -886,6 +898,18 @@ app.get('/api/buckets/:bucket/object-lock', extractCredentials, async (req, res)
       }
     });
   } catch (error) {
+    // Si Object Lock n'est pas configuré, retourner une réponse valide au lieu d'une erreur
+    if (error.Code === 'ObjectLockConfigurationNotFoundError' ||
+      error.name === 'ObjectLockConfigurationNotFoundError') {
+      return res.json({
+        success: true,
+        data: {
+          enabled: false,
+          rule: undefined
+        }
+      });
+    }
+
     console.error('Erreur récupération Object Lock config:', error);
     res.status(500).json({
       success: false,
