@@ -813,6 +813,28 @@ export const useEnhancedDirectS3 = () => {
     }
   }, [initialized]);
 
+  const getObjectAcl = useCallback(async (bucket: string, objectKey: string) => {
+    if (!initialized) return null;
+
+    try {
+      const response = await withRetry(
+        () => proxyS3Service.getObjectAcl(bucket, objectKey),
+        `récupération ACL ${objectKey}`
+      );
+
+      if (response.success && response.data) {
+        return response.data;
+      } else {
+        handleError(response, 'Erreur lors de la récupération des ACL');
+        return null;
+      }
+    } catch (error) {
+      console.error('❌ Get ACL error:', error);
+      setError('Erreur de connexion');
+      return null;
+    }
+  }, [initialized]);
+
   return {
     initialized,
     uploadProgress,
@@ -833,6 +855,7 @@ export const useEnhancedDirectS3 = () => {
     listObjectVersions,
     getObjectRetention,
     setObjectRetention,
-    getObjectLockConfiguration
+    getObjectLockConfiguration,
+    getObjectAcl
   };
 };

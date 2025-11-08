@@ -20,7 +20,8 @@ import {
   DeleteBucketEncryptionCommand,
   ListObjectVersionsCommand,
   GetObjectRetentionCommand,
-  PutObjectRetentionCommand
+  PutObjectRetentionCommand,
+  GetObjectAclCommand
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { S3Credentials, S3Bucket, S3Object, ObjectVersion, ObjectRetention, ObjectLockConfiguration } from '../types/s3';
@@ -764,6 +765,46 @@ class DirectS3Service {
       return {
         success: false,
         error: 'Erreur lors de la récupération de la configuration Object Lock',
+        message: error instanceof Error ? error.message : 'Erreur inconnue'
+      };
+    }
+  }
+
+  async getObjectAcl(bucket: string, objectKey: string): Promise<DirectS3Response<any>> {
+    if (!this.client) {
+      return { success: false, error: 'Client S3 non initialisé' };
+    }
+
+    try {
+      const command = new GetObjectAclCommand({
+        Bucket: bucket,
+        Key: objectKey
+      });
+
+      const response = await this.client.send(command);
+      
+      const acl = {
+        owner: response.Owner ? {
+          displayName: response.Owner.DisplayName,
+          id: response.Owner.ID
+        } : null,
+        grants: response.Grants?.map(grant => ({
+          grantee: {
+            type: grant.Grantee?.Type,
+            displayName: grant.Grantee?.DisplayName,
+            id: grant.Grantee?.ID,
+            uri: grant.Grantee?.URI
+          },
+          permission: grant.Permission
+        })) || []
+      };
+
+      return { success: true, data: acl };
+    } catch (error) {
+      console.error('Erreur getObjectAcl:', error);
+      return {
+        success: false,
+        error: 'Erreur lors de la récupération des ACL',
         message: error instanceof Error ? error.message : 'Erreur inconnue'
       };
     }

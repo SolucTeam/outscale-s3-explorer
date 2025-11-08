@@ -596,6 +596,24 @@ class ProxyS3Service {
     }
   }
 
+  async getObjectAcl(bucket: string, objectKey: string): Promise<ProxyS3Response<any>> {
+    if (!this.credentials) {
+      return { success: false, error: 'Service non initialisé' };
+    }
+
+    try {
+      const endpoint = `/buckets/${encodeURIComponent(bucket)}/objects/${encodeURIComponent(objectKey)}/acl`;
+      const response = await this.makeRequest<any>(endpoint);
+      return response;
+    } catch (error) {
+      return {
+        success: false,
+        error: 'Erreur lors de la récupération des ACL',
+        message: error instanceof Error ? error.message : 'Erreur inconnue'
+      };
+    }
+  }
+
   isInitialized(): boolean {
     return !!this.credentials;
   }

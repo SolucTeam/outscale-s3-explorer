@@ -23,7 +23,8 @@ const {
   DeleteBucketEncryptionCommand,
   ListObjectVersionsCommand,
   GetObjectRetentionCommand,
-  PutObjectRetentionCommand
+  PutObjectRetentionCommand,
+  GetObjectAclCommand
 } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 
@@ -889,6 +890,46 @@ app.get('/api/buckets/:bucket/object-lock', extractCredentials, async (req, res)
     res.status(500).json({
       success: false,
       error: 'Erreur lors de la récupération de la configuration Object Lock',
+      message: error.message
+    });
+  }
+});
+
+// Récupérer les ACL d'un objet
+app.get('/api/buckets/:bucket/objects/:key(*)/acl', extractCredentials, async (req, res) => {
+  try {
+    const { bucket, key } = req.params;
+
+    const command = new GetObjectAclCommand({
+      Bucket: bucket,
+      Key: key
+    });
+
+    const response = await req.s3Client.send(command);
+
+    res.json({
+      success: true,
+      data: {
+        owner: response.Owner ? {
+          displayName: response.Owner.DisplayName,
+          id: response.Owner.ID
+        } : null,
+        grants: response.Grants?.map(grant => ({
+          grantee: {
+            type: grant.Grantee?.Type,
+            displayName: grant.Grantee?.DisplayName,
+            id: grant.Grantee?.ID,
+            uri: grant.Grantee?.URI
+          },
+          permission: grant.Permission
+        })) || []
+      }
+    });
+  } catch (error) {
+    console.error('Erreur récupération ACL:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur lors de la récupération des ACL',
       message: error.message
     });
   }
