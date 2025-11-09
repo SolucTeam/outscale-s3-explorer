@@ -70,3 +70,47 @@ export interface BreadcrumbItem {
   name: string;
   path: string;
 }
+
+export interface LifecycleRule {
+  id: string;
+  status: 'Enabled' | 'Disabled';
+  prefix?: string;
+  expiration?: {
+    days?: number;
+    date?: Date;
+    expiredObjectDeleteMarker?: boolean;
+  };
+  noncurrentVersionExpiration?: {
+    noncurrentDays?: number;
+  };
+  abortIncompleteMultipartUpload?: {
+    daysAfterInitiation?: number;
+  };
+  transitions?: Array<{
+    days?: number;
+    date?: Date;
+    storageClass: string;
+  }>;
+}
+
+export interface BucketLifecycleConfiguration {
+  rules: LifecycleRule[];
+}
+
+export interface BucketMetadata {
+  region?: string;
+  creationDate?: Date;
+}
+
+export interface ObjectMetadata {
+  contentLength?: number;
+  contentType?: string;
+  lastModified?: Date;
+  etag?: string;
+  versionId?: string;
+  metadata?: Record<string, string>;
+}
+
+export interface PresignedUrlOptions {
+  expiresIn?: number; // en secondes, max 604800 (1 semaine)
+}

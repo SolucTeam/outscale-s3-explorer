@@ -614,6 +614,137 @@ class ProxyS3Service {
     }
   }
 
+  // Lifecycle Configuration
+  async getBucketLifecycleConfiguration(bucket: string): Promise<ProxyS3Response<any>> {
+    if (!this.credentials) {
+      return { success: false, error: 'Service non initialisé' };
+    }
+
+    try {
+      const endpoint = `/buckets/${encodeURIComponent(bucket)}/lifecycle`;
+      const response = await this.makeRequest<any>(endpoint);
+      return response;
+    } catch (error) {
+      return {
+        success: false,
+        error: 'Erreur lors de la récupération de la configuration lifecycle',
+        message: error instanceof Error ? error.message : 'Erreur inconnue'
+      };
+    }
+  }
+
+  async putBucketLifecycleConfiguration(bucket: string, configuration: any): Promise<ProxyS3Response<void>> {
+    if (!this.credentials) {
+      return { success: false, error: 'Service non initialisé' };
+    }
+
+    try {
+      console.log(`⚙️ Configuration lifecycle: ${bucket}`);
+      const response = await this.makeRequest<void>(`/buckets/${encodeURIComponent(bucket)}/lifecycle`, {
+        method: 'PUT',
+        body: JSON.stringify({ configuration })
+      });
+      
+      if (response.success) {
+        cacheService.delete(`buckets_${this.credentials.region}`);
+        console.log(`✅ Lifecycle configuré pour "${bucket}"`);
+      }
+      
+      return response;
+    } catch (error) {
+      return {
+        success: false,
+        error: 'Erreur lors de la configuration lifecycle',
+        message: error instanceof Error ? error.message : 'Erreur inconnue'
+      };
+    }
+  }
+
+  async deleteBucketLifecycle(bucket: string): Promise<ProxyS3Response<void>> {
+    if (!this.credentials) {
+      return { success: false, error: 'Service non initialisé' };
+    }
+
+    try {
+      console.log(`🗑️ Suppression lifecycle: ${bucket}`);
+      const response = await this.makeRequest<void>(`/buckets/${encodeURIComponent(bucket)}/lifecycle`, {
+        method: 'DELETE'
+      });
+      
+      if (response.success) {
+        cacheService.delete(`buckets_${this.credentials.region}`);
+        console.log(`✅ Lifecycle supprimé pour "${bucket}"`);
+      }
+      
+      return response;
+    } catch (error) {
+      return {
+        success: false,
+        error: 'Erreur lors de la suppression de la configuration lifecycle',
+        message: error instanceof Error ? error.message : 'Erreur inconnue'
+      };
+    }
+  }
+
+  // Head Operations
+  async headBucket(bucket: string): Promise<ProxyS3Response<any>> {
+    if (!this.credentials) {
+      return { success: false, error: 'Service non initialisé' };
+    }
+
+    try {
+      const endpoint = `/buckets/${encodeURIComponent(bucket)}/head`;
+      const response = await this.makeRequest<any>(endpoint);
+      return response;
+    } catch (error) {
+      return {
+        success: false,
+        error: 'Erreur lors de la vérification du bucket',
+        message: error instanceof Error ? error.message : 'Erreur inconnue'
+      };
+    }
+  }
+
+  async headObject(bucket: string, objectKey: string): Promise<ProxyS3Response<any>> {
+    if (!this.credentials) {
+      return { success: false, error: 'Service non initialisé' };
+    }
+
+    try {
+      const endpoint = `/buckets/${encodeURIComponent(bucket)}/objects/${encodeURIComponent(objectKey)}/head`;
+      const response = await this.makeRequest<any>(endpoint);
+      return response;
+    } catch (error) {
+      return {
+        success: false,
+        error: 'Erreur lors de la vérification de l\'objet',
+        message: error instanceof Error ? error.message : 'Erreur inconnue'
+      };
+    }
+  }
+
+  // Presigned URLs
+  async getPresignedUrl(bucket: string, objectKey: string, expiresIn?: number): Promise<ProxyS3Response<{ url: string }>> {
+    if (!this.credentials) {
+      return { success: false, error: 'Service non initialisé' };
+    }
+
+    try {
+      const params = new URLSearchParams();
+      if (expiresIn) params.append('expiresIn', expiresIn.toString());
+      
+      const endpoint = `/buckets/${encodeURIComponent(bucket)}/objects/${encodeURIComponent(objectKey)}/presigned?${params.toString()}`;
+      const response = await this.makeRequest<{ url: string }>(endpoint);
+      return response;
+    } catch (error) {
+      return {
+        success: false,
+        error: 'Erreur lors de la génération de l\'URL pré-signée',
+        message: error instanceof Error ? error.message : 'Erreur inconnue'
+      };
+    }
+  }
+
   isInitialized(): boolean {
     return !!this.credentials;
   }

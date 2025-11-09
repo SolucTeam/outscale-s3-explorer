@@ -4,11 +4,14 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { useEnhancedDirectS3 } from '@/hooks/useEnhancedDirectS3';
-import { Clock, Lock, Tag, History, RefreshCw, Shield } from 'lucide-react';
+import { Clock, Lock, Tag, History, RefreshCw, Shield, Link as LinkIcon, Copy, Check } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useToast } from '@/hooks/use-toast';
 
 interface ObjectDetailsDialogProps {
   open: boolean;
@@ -25,12 +28,17 @@ export const ObjectDetailsDialog: React.FC<ObjectDetailsDialogProps> = ({
   objectKey,
   object
 }) => {
-  const { listObjectVersions, getObjectRetention, getObjectLockConfiguration, getObjectAcl } = useEnhancedDirectS3();
+  const { listObjectVersions, getObjectRetention, getObjectLockConfiguration, getObjectAcl, getPresignedUrl } = useEnhancedDirectS3();
+  const { toast } = useToast();
   const [versions, setVersions] = useState<any[]>([]);
   const [retention, setRetention] = useState<any>(null);
   const [objectLockConfig, setObjectLockConfig] = useState<any>(null);
   const [acl, setAcl] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [presignedUrl, setPresignedUrl] = useState<string>('');
+  const [expiresIn, setExpiresIn] = useState<number>(3600);
+  const [generatingUrl, setGeneratingUrl] = useState(false);
+  const [urlCopied, setUrlCopied] = useState(false);
 
   const loadDetails = async () => {
     setLoading(true);
@@ -77,6 +85,49 @@ export const ObjectDetailsDialog: React.FC<ObjectDetailsDialogProps> = ({
     const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const generatePresignedUrl = async () => {
+    setGeneratingUrl(true);
+    try {
+      const url = await getPresignedUrl(bucket, objectKey, expiresIn);
+      if (url) {
+        setPresignedUrl(url);
+        toast({
+          title: "Succès",
+          description: "URL pré-signée générée avec succès"
+        });
+      }
+    } catch (error) {
+      console.error('Error generating presigned URL:', error);
+    } finally {
+      setGeneratingUrl(false);
+    }
+  };
+
+  const copyUrlToClipboard = () => {
+    if (presignedUrl) {
+      navigator.clipboard.writeText(presignedUrl);
+      setUrlCopied(true);
+      toast({
+        title: "Copié",
+        description: "URL copiée dans le presse-papier"
+      });
+      setTimeout(() => setUrlCopied(false), 2000);
+    }
+  };
+
+  const formatExpiresIn = (seconds: number) => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    
+    const parts = [];
+    if (hours > 0) parts.push(`${hours}h`);
+    if (minutes > 0) parts.push(`${minutes}m`);
+    if (secs > 0) parts.push(`${secs}s`);
+    
+    return parts.join(' ') || '0s';
   };
 
   return (
@@ -128,7 +179,7 @@ export const ObjectDetailsDialog: React.FC<ObjectDetailsDialogProps> = ({
           </Card>
 
           <Tabs defaultValue="versions" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="versions">
                 <History className="w-4 h-4 mr-2" />
                 Versions
@@ -144,6 +195,10 @@ export const ObjectDetailsDialog: React.FC<ObjectDetailsDialogProps> = ({
               <TabsTrigger value="acl">
                 <Shield className="w-4 h-4 mr-2" />
                 ACL
+              </TabsTrigger>
+              <TabsTrigger value="presigned">
+                <LinkIcon className="w-4 h-4 mr-2" />
+                URL
               </TabsTrigger>
             </TabsList>
 
@@ -349,6 +404,84 @@ export const ObjectDetailsDialog: React.FC<ObjectDetailsDialogProps> = ({
                     <p className="text-sm text-muted-foreground text-center py-4">
                       Impossible de charger les ACL.
                     </p>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="presigned" className="space-y-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <LinkIcon className="w-4 h-4" />
+                    Générer une URL pré-signée
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="expiresIn">Durée de validité</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="expiresIn"
+                        type="number"
+                        min="60"
+                        max="604800"
+                        value={expiresIn}
+                        onChange={(e) => setExpiresIn(parseInt(e.target.value) || 3600)}
+                        className="flex-1"
+                      />
+                      <Badge variant="secondary" className="px-3 py-2">
+                        {formatExpiresIn(expiresIn)}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Entre 60 secondes et 604800 secondes (1 semaine)
+                    </p>
+                  </div>
+
+                  <Button
+                    onClick={generatePresignedUrl}
+                    disabled={generatingUrl || expiresIn < 60 || expiresIn > 604800}
+                    className="w-full"
+                  >
+                    {generatingUrl ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                        Génération...
+                      </>
+                    ) : (
+                      <>
+                        <LinkIcon className="w-4 h-4 mr-2" />
+                        Générer l'URL
+                      </>
+                    )}
+                  </Button>
+
+                  {presignedUrl && (
+                    <div className="space-y-2">
+                      <Label>URL générée</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          value={presignedUrl}
+                          readOnly
+                          className="font-mono text-xs"
+                        />
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={copyUrlToClipboard}
+                        >
+                          {urlCopied ? (
+                            <Check className="w-4 h-4 text-green-500" />
+                          ) : (
+                            <Copy className="w-4 h-4" />
+                          )}
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Cette URL expirera dans {formatExpiresIn(expiresIn)}
+                      </p>
+                    </div>
                   )}
                 </CardContent>
               </Card>

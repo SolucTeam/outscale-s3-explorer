@@ -835,6 +835,140 @@ export const useEnhancedDirectS3 = () => {
     }
   }, [initialized]);
 
+  const getBucketLifecycleConfiguration = useCallback(async (bucket: string) => {
+    if (!initialized) return null;
+
+    try {
+      const response = await withRetry(
+        () => proxyS3Service.getBucketLifecycleConfiguration(bucket),
+        `récupération lifecycle config ${bucket}`
+      );
+
+      if (response.success && response.data) {
+        return response.data;
+      } else {
+        handleError(response, 'Erreur lors de la récupération de la configuration lifecycle');
+        return null;
+      }
+    } catch (error) {
+      console.error('❌ Get lifecycle config error:', error);
+      setError('Erreur de connexion');
+      return null;
+    }
+  }, [initialized]);
+
+  const putBucketLifecycleConfiguration = useCallback(async (bucket: string, configuration: any): Promise<boolean> => {
+    if (!initialized) return false;
+
+    try {
+      const response = await withRetry(
+        () => proxyS3Service.putBucketLifecycleConfiguration(bucket, configuration),
+        `configuration lifecycle ${bucket}`
+      );
+
+      if (response.success) {
+        toast({
+          title: "Succès",
+          description: `Configuration lifecycle mise à jour pour "${bucket}"`
+        });
+        return true;
+      } else {
+        handleError(response, 'Erreur lors de la configuration lifecycle');
+        return false;
+      }
+    } catch (error) {
+      console.error('❌ Put lifecycle config error:', error);
+      setError('Erreur de connexion');
+      return false;
+    }
+  }, [initialized, toast]);
+
+  const deleteBucketLifecycle = useCallback(async (bucket: string): Promise<boolean> => {
+    if (!initialized) return false;
+
+    try {
+      const response = await withRetry(
+        () => proxyS3Service.deleteBucketLifecycle(bucket),
+        `suppression lifecycle ${bucket}`
+      );
+
+      if (response.success) {
+        toast({
+          title: "Succès",
+          description: `Configuration lifecycle supprimée pour "${bucket}"`
+        });
+        return true;
+      } else {
+        handleError(response, 'Erreur lors de la suppression de la configuration lifecycle');
+        return false;
+      }
+    } catch (error) {
+      console.error('❌ Delete lifecycle error:', error);
+      setError('Erreur de connexion');
+      return false;
+    }
+  }, [initialized, toast]);
+
+  const headBucket = useCallback(async (bucket: string) => {
+    if (!initialized) return null;
+
+    try {
+      const response = await withRetry(
+        () => proxyS3Service.headBucket(bucket),
+        `vérification bucket ${bucket}`
+      );
+
+      if (response.success && response.data) {
+        return response.data;
+      }
+      return null;
+    } catch (error) {
+      console.error('❌ Head bucket error:', error);
+      return null;
+    }
+  }, [initialized]);
+
+  const headObject = useCallback(async (bucket: string, objectKey: string) => {
+    if (!initialized) return null;
+
+    try {
+      const response = await withRetry(
+        () => proxyS3Service.headObject(bucket, objectKey),
+        `vérification object ${objectKey}`
+      );
+
+      if (response.success && response.data) {
+        return response.data;
+      }
+      return null;
+    } catch (error) {
+      console.error('❌ Head object error:', error);
+      return null;
+    }
+  }, [initialized]);
+
+  const getPresignedUrl = useCallback(async (bucket: string, objectKey: string, expiresIn?: number) => {
+    if (!initialized) return null;
+
+    try {
+      const response = await withRetry(
+        () => proxyS3Service.getPresignedUrl(bucket, objectKey, expiresIn),
+        `génération URL pré-signée ${objectKey}`
+      );
+
+      if (response.success && response.data) {
+        return response.data.url;
+      } else {
+        handleError(response, 'Erreur lors de la génération de l\'URL pré-signée');
+        return null;
+      }
+    } catch (error) {
+      console.error('❌ Get presigned URL error:', error);
+      setError('Erreur de connexion');
+      return null;
+    }
+  }, [initialized]);
+
   return {
     initialized,
     uploadProgress,
@@ -856,6 +990,12 @@ export const useEnhancedDirectS3 = () => {
     getObjectRetention,
     setObjectRetention,
     getObjectLockConfiguration,
-    getObjectAcl
+    getObjectAcl,
+    getBucketLifecycleConfiguration,
+    putBucketLifecycleConfiguration,
+    deleteBucketLifecycle,
+    headBucket,
+    headObject,
+    getPresignedUrl
   };
 };

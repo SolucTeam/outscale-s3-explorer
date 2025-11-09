@@ -11,6 +11,8 @@ const {
   PutObjectCommand,
   DeleteObjectCommand,
   GetObjectCommand,
+  HeadBucketCommand,
+  HeadObjectCommand,
   GetBucketVersioningCommand,
   PutBucketVersioningCommand,
   GetObjectLockConfigurationCommand,
@@ -24,7 +26,10 @@ const {
   ListObjectVersionsCommand,
   GetObjectRetentionCommand,
   PutObjectRetentionCommand,
-  GetObjectAclCommand
+  GetObjectAclCommand,
+  GetBucketLifecycleConfigurationCommand,
+  PutBucketLifecycleConfigurationCommand,
+  DeleteBucketLifecycleCommand
 } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 
@@ -955,6 +960,204 @@ app.get('/api/buckets/:bucket/objects/:key(*)/acl', extractCredentials, async (r
       success: false,
       error: 'Erreur lors de la récupération des ACL',
       message: error.message
+    });
+  }
+});
+
+// ============================================================
+// LIFECYCLE CONFIGURATION
+// ============================================================
+
+// GET /api/buckets/:bucket/lifecycle - Récupérer configuration lifecycle
+app.get('/api/buckets/:bucket/lifecycle', extractCredentials, async (req, res) => {
+  try {
+    const { bucket } = req.params;
+    
+    const command = new GetBucketLifecycleConfigurationCommand({
+      Bucket: bucket
+    });
+
+    const response = await req.s3Client.send(command);
+    
+    res.json({
+      success: true,
+      data: {
+        rules: response.Rules || []
+      }
+    });
+  } catch (error) {
+    if (error.name === 'NoSuchLifecycleConfiguration') {
+      return res.json({
+        success: true,
+        data: { rules: [] }
+      });
+    }
+    console.error('Erreur récupération lifecycle:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur lors de la récupération de la configuration lifecycle'
+    });
+  }
+});
+
+// PUT /api/buckets/:bucket/lifecycle - Configurer lifecycle
+app.put('/api/buckets/:bucket/lifecycle', strictLimiter, extractCredentials, async (req, res) => {
+  try {
+    const { bucket } = req.params;
+    const { configuration } = req.body;
+    
+    const command = new PutBucketLifecycleConfigurationCommand({
+      Bucket: bucket,
+      LifecycleConfiguration: configuration
+    });
+
+    await req.s3Client.send(command);
+    
+    res.json({
+      success: true,
+      message: 'Configuration lifecycle mise à jour'
+    });
+  } catch (error) {
+    console.error('Erreur configuration lifecycle:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur lors de la configuration lifecycle'
+    });
+  }
+});
+
+// DELETE /api/buckets/:bucket/lifecycle - Supprimer configuration lifecycle
+app.delete('/api/buckets/:bucket/lifecycle', strictLimiter, extractCredentials, async (req, res) => {
+  try {
+    const { bucket } = req.params;
+    
+    const command = new DeleteBucketLifecycleCommand({
+      Bucket: bucket
+    });
+
+    await req.s3Client.send(command);
+    
+    res.json({
+      success: true,
+      message: 'Configuration lifecycle supprimée'
+    });
+  } catch (error) {
+    console.error('Erreur suppression lifecycle:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur lors de la suppression de la configuration lifecycle'
+    });
+  }
+});
+
+// ============================================================
+// HEAD OPERATIONS
+// ============================================================
+
+// GET /api/buckets/:bucket/head - Vérifier bucket
+app.get('/api/buckets/:bucket/head', extractCredentials, async (req, res) => {
+  try {
+    const { bucket } = req.params;
+    
+    const command = new HeadBucketCommand({
+      Bucket: bucket
+    });
+
+    await req.s3Client.send(command);
+    
+    res.json({
+      success: true,
+      data: {
+        exists: true
+      }
+    });
+  } catch (error) {
+    if (error.name === 'NotFound') {
+      return res.json({
+        success: true,
+        data: { exists: false }
+      });
+    }
+    console.error('Erreur head bucket:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur lors de la vérification du bucket'
+    });
+  }
+});
+
+// GET /api/buckets/:bucket/objects/:key(*)/head - Vérifier objet
+app.get('/api/buckets/:bucket/objects/:key(*)/head', extractCredentials, async (req, res) => {
+  try {
+    const { bucket, key } = req.params;
+    
+    const command = new HeadObjectCommand({
+      Bucket: bucket,
+      Key: key
+    });
+
+    const response = await req.s3Client.send(command);
+    
+    res.json({
+      success: true,
+      data: {
+        contentLength: response.ContentLength,
+        contentType: response.ContentType,
+        lastModified: response.LastModified,
+        etag: response.ETag,
+        versionId: response.VersionId,
+        metadata: response.Metadata
+      }
+    });
+  } catch (error) {
+    if (error.name === 'NotFound') {
+      return res.json({
+        success: true,
+        data: { exists: false }
+      });
+    }
+    console.error('Erreur head object:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur lors de la vérification de l\'objet'
+    });
+  }
+});
+
+// ============================================================
+// PRESIGNED URLS
+// ============================================================
+
+// GET /api/buckets/:bucket/objects/:key(*)/presigned - Générer URL pré-signée
+app.get('/api/buckets/:bucket/objects/:key(*)/presigned', extractCredentials, async (req, res) => {
+  try {
+    const { bucket, key } = req.params;
+    const expiresIn = parseInt(req.query.expiresIn) || 3600;
+    
+    // Limiter à 1 semaine max
+    if (expiresIn > 604800) {
+      return res.status(400).json({
+        success: false,
+        error: 'Durée d\'expiration trop longue (max 604800 secondes)'
+      });
+    }
+    
+    const command = new GetObjectCommand({
+      Bucket: bucket,
+      Key: key
+    });
+
+    const url = await getSignedUrl(req.s3Client, command, { expiresIn });
+    
+    res.json({
+      success: true,
+      data: { url }
+    });
+  } catch (error) {
+    console.error('Erreur génération URL pré-signée:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur lors de la génération de l\'URL pré-signée'
     });
   }
 });

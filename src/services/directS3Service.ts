@@ -8,6 +8,7 @@ import {
   DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
+  HeadBucketCommand,
   GetBucketVersioningCommand,
   PutBucketVersioningCommand,
   GetObjectLockConfigurationCommand,
@@ -21,10 +22,13 @@ import {
   ListObjectVersionsCommand,
   GetObjectRetentionCommand,
   PutObjectRetentionCommand,
-  GetObjectAclCommand
+  GetObjectAclCommand,
+  GetBucketLifecycleConfigurationCommand,
+  PutBucketLifecycleConfigurationCommand,
+  DeleteBucketLifecycleCommand
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { S3Credentials, S3Bucket, S3Object, ObjectVersion, ObjectRetention, ObjectLockConfiguration } from '../types/s3';
+import { S3Credentials, S3Bucket, S3Object, ObjectVersion, ObjectRetention, ObjectLockConfiguration, BucketLifecycleConfiguration, BucketMetadata, ObjectMetadata, PresignedUrlOptions } from '../types/s3';
 import { OutscaleConfig } from './outscaleConfig';
 import { cacheService, CacheService } from './cacheService';
 
@@ -805,6 +809,221 @@ class DirectS3Service {
       return {
         success: false,
         error: 'Erreur lors de la récupération des ACL',
+        message: error instanceof Error ? error.message : 'Erreur inconnue'
+      };
+    }
+  }
+
+  // Lifecycle Configuration
+  async getBucketLifecycleConfiguration(bucket: string): Promise<DirectS3Response<BucketLifecycleConfiguration>> {
+    if (!this.client) {
+      return { success: false, error: 'Client non initialisé' };
+    }
+
+    try {
+      const command = new GetBucketLifecycleConfigurationCommand({ Bucket: bucket });
+      const response = await this.client.send(command);
+      
+      const rules = (response.Rules || []).map(rule => ({
+        id: rule.ID || '',
+        status: rule.Status as 'Enabled' | 'Disabled',
+        prefix: rule.Filter?.Prefix,
+        expiration: rule.Expiration ? {
+          days: rule.Expiration.Days,
+          date: rule.Expiration.Date,
+          expiredObjectDeleteMarker: rule.Expiration.ExpiredObjectDeleteMarker
+        } : undefined,
+        noncurrentVersionExpiration: rule.NoncurrentVersionExpiration ? {
+          noncurrentDays: rule.NoncurrentVersionExpiration.NoncurrentDays
+        } : undefined,
+        abortIncompleteMultipartUpload: rule.AbortIncompleteMultipartUpload ? {
+          daysAfterInitiation: rule.AbortIncompleteMultipartUpload.DaysAfterInitiation
+        } : undefined,
+        transitions: rule.Transitions?.map(t => ({
+          days: t.Days,
+          date: t.Date,
+          storageClass: t.StorageClass || ''
+        }))
+      }));
+
+      return { success: true, data: { rules } };
+    } catch (error: any) {
+      if (error.name === 'NoSuchLifecycleConfiguration') {
+        return { success: true, data: { rules: [] } };
+      }
+      console.error('Erreur getBucketLifecycleConfiguration:', error);
+      return {
+        success: false,
+        error: 'Erreur lors de la récupération de la configuration lifecycle',
+        message: error instanceof Error ? error.message : 'Erreur inconnue'
+      };
+    }
+  }
+
+  async putBucketLifecycleConfiguration(bucket: string, configuration: BucketLifecycleConfiguration): Promise<DirectS3Response<void>> {
+    if (!this.client) {
+      return { success: false, error: 'Client non initialisé' };
+    }
+
+    try {
+      const command = new PutBucketLifecycleConfigurationCommand({
+        Bucket: bucket,
+        LifecycleConfiguration: {
+          Rules: configuration.rules.map(rule => ({
+            ID: rule.id,
+            Status: rule.status,
+            Filter: rule.prefix ? { Prefix: rule.prefix } : {},
+            Expiration: rule.expiration ? {
+              Days: rule.expiration.days,
+              Date: rule.expiration.date,
+              ExpiredObjectDeleteMarker: rule.expiration.expiredObjectDeleteMarker
+            } : undefined,
+            NoncurrentVersionExpiration: rule.noncurrentVersionExpiration ? {
+              NoncurrentDays: rule.noncurrentVersionExpiration.noncurrentDays
+            } : undefined,
+            AbortIncompleteMultipartUpload: rule.abortIncompleteMultipartUpload ? {
+              DaysAfterInitiation: rule.abortIncompleteMultipartUpload.daysAfterInitiation
+            } : undefined,
+            Transitions: rule.transitions?.map(t => ({
+              Days: t.days,
+              Date: t.date,
+              StorageClass: t.storageClass as any
+            }))
+          }))
+        }
+      });
+      
+      await this.client.send(command);
+      
+      // Invalider le cache
+      cacheService.delete(`buckets_${this.credentials?.region}`);
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Erreur putBucketLifecycleConfiguration:', error);
+      return {
+        success: false,
+        error: 'Erreur lors de la configuration lifecycle',
+        message: error instanceof Error ? error.message : 'Erreur inconnue'
+      };
+    }
+  }
+
+  async deleteBucketLifecycle(bucket: string): Promise<DirectS3Response<void>> {
+    if (!this.client) {
+      return { success: false, error: 'Client non initialisé' };
+    }
+
+    try {
+      const command = new DeleteBucketLifecycleCommand({ Bucket: bucket });
+      await this.client.send(command);
+      
+      // Invalider le cache
+      cacheService.delete(`buckets_${this.credentials?.region}`);
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Erreur deleteBucketLifecycle:', error);
+      return {
+        success: false,
+        error: 'Erreur lors de la suppression de la configuration lifecycle',
+        message: error instanceof Error ? error.message : 'Erreur inconnue'
+      };
+    }
+  }
+
+  // Head Operations
+  async headBucket(bucket: string): Promise<DirectS3Response<BucketMetadata>> {
+    if (!this.client) {
+      return { success: false, error: 'Client non initialisé' };
+    }
+
+    try {
+      const command = new HeadBucketCommand({ Bucket: bucket });
+      await this.client.send(command);
+      
+      const metadata: BucketMetadata = {
+        region: this.credentials?.region
+      };
+
+      return { success: true, data: metadata };
+    } catch (error) {
+      console.error('Erreur headBucket:', error);
+      return {
+        success: false,
+        error: 'Erreur lors de la vérification du bucket',
+        message: error instanceof Error ? error.message : 'Erreur inconnue'
+      };
+    }
+  }
+
+  async headObject(bucket: string, objectKey: string): Promise<DirectS3Response<ObjectMetadata>> {
+    if (!this.client) {
+      return { success: false, error: 'Client non initialisé' };
+    }
+
+    try {
+      const command = new HeadObjectCommand({ 
+        Bucket: bucket, 
+        Key: objectKey 
+      });
+      const response = await this.client.send(command);
+      
+      const metadata: ObjectMetadata = {
+        contentLength: response.ContentLength,
+        contentType: response.ContentType,
+        lastModified: response.LastModified,
+        etag: response.ETag,
+        versionId: response.VersionId,
+        metadata: response.Metadata
+      };
+
+      return { success: true, data: metadata };
+    } catch (error) {
+      console.error('Erreur headObject:', error);
+      return {
+        success: false,
+        error: 'Erreur lors de la vérification de l\'objet',
+        message: error instanceof Error ? error.message : 'Erreur inconnue'
+      };
+    }
+  }
+
+  // Presigned URLs
+  async getPresignedUrl(
+    bucket: string, 
+    objectKey: string, 
+    options?: PresignedUrlOptions
+  ): Promise<DirectS3Response<string>> {
+    if (!this.client) {
+      return { success: false, error: 'Client non initialisé' };
+    }
+
+    try {
+      const expiresIn = options?.expiresIn || 3600; // 1 heure par défaut
+      
+      // Limiter à 1 semaine max (604800 secondes)
+      if (expiresIn > 604800) {
+        return {
+          success: false,
+          error: 'Durée d\'expiration trop longue',
+          message: 'La durée maximum est de 604800 secondes (1 semaine)'
+        };
+      }
+
+      const command = new GetObjectCommand({ 
+        Bucket: bucket, 
+        Key: objectKey 
+      });
+      
+      const url = await getSignedUrl(this.client, command, { expiresIn });
+      
+      return { success: true, data: url };
+    } catch (error) {
+      console.error('Erreur getPresignedUrl:', error);
+      return {
+        success: false,
+        error: 'Erreur lors de la génération de l\'URL pré-signée',
         message: error instanceof Error ? error.message : 'Erreur inconnue'
       };
     }
