@@ -119,6 +119,60 @@ class DirectS3Service {
     }
   }
 
+  /**
+   * Compte le nombre TOTAL d'objets dans un bucket (avec pagination)
+   * ⚠️ L'API S3 limite à 1000 objets par requête, il faut paginer avec ContinuationToken
+   */
+  async countAllObjects(bucket: string): Promise<DirectS3Response<{ count: number; size: number }>> {
+    if (!this.client) {
+      return { success: false, error: 'Client S3 non initialisé' };
+    }
+
+    try {
+      let totalCount = 0;
+      let totalSize = 0;
+      let continuationToken: string | undefined = undefined;
+      let isTruncated = true;
+
+      console.log(`📊 Comptage de TOUS les objets dans ${bucket}...`);
+
+      while (isTruncated) {
+        const command = new ListObjectsV2Command({
+          Bucket: bucket,
+          ContinuationToken: continuationToken
+        });
+
+        const response = await this.client.send(command);
+
+        if (response.Contents) {
+          totalCount += response.Contents.length;
+          totalSize += response.Contents.reduce((sum, obj) => sum + (obj.Size || 0), 0);
+        }
+
+        isTruncated = response.IsTruncated || false;
+        continuationToken = response.NextContinuationToken;
+
+        if (response.Contents && response.Contents.length > 0) {
+          console.log(`📄 Page: ${response.Contents.length} objets | Total: ${totalCount}`);
+        }
+      }
+
+      console.log(`✅ Comptage terminé: ${totalCount} objets (${totalSize} octets)`);
+
+      return { 
+        success: true, 
+        data: { count: totalCount, size: totalSize } 
+      };
+    } catch (error) {
+      console.error('❌ Erreur countAllObjects:', error);
+      return {
+        success: false,
+        error: 'Erreur lors du comptage des objets',
+        message: error instanceof Error ? error.message : 'Erreur inconnue'
+      };
+    }
+  }
+
   async getBuckets(): Promise<DirectS3Response<S3Bucket[]>> {
     if (!this.client) {
       return { success: false, error: 'Client S3 non initialisé' };
@@ -181,13 +235,18 @@ class DirectS3Service {
             // Encryption n'est pas configurée
           }
           
+          // 🎯 COMPTAGE COMPLET avec pagination
+          const countResult = await this.countAllObjects(bucketName);
+          const objectCount = countResult.success ? countResult.data!.count : 0;
+          const size = countResult.success ? countResult.data!.size : 0;
+          
           return {
             name: bucketName,
             creationDate: bucket.CreationDate || new Date(),
             region: this.credentials?.region || '',
             location,
-            objectCount: 0,
-            size: 0,
+            objectCount, // ✅ Maintenant inclut TOUS les objets
+            size,        // ✅ Taille totale correcte
             versioningEnabled,
             objectLockEnabled,
             encryptionEnabled
@@ -197,7 +256,7 @@ class DirectS3Service {
 
       // Mettre en cache
       cacheService.set(cacheKey, buckets, CacheService.TTL.BUCKETS);
-      console.log(`✅ ${buckets.length} buckets chargés et mis en cache`);
+      console.log(`✅ ${buckets.length} buckets chargés avec comptage complet`);
 
       return { success: true, data: buckets };
     } catch (error) {
@@ -774,7 +833,13 @@ class DirectS3Service {
     }
   }
 
-  async getObjectAcl(bucket: string, objectKey: string): Promise<DirectS3Response<any>> {
+  async getObjectAcl(bucket: string, objectKey: string): Promise<DirectS3Response<{
+    owner: { displayName?: string; id?: string } | null;
+    grants: Array<{
+      grantee: { type?: string; displayName?: string; id?: string; uri?: string };
+      permission?: string;
+    }>;
+  }>> {
     if (!this.client) {
       return { success: false, error: 'Client S3 non initialisé' };
     }
@@ -847,8 +912,8 @@ class DirectS3Service {
       }));
 
       return { success: true, data: { rules } };
-    } catch (error: any) {
-      if (error.name === 'NoSuchLifecycleConfiguration') {
+    } catch (error: unknown) {
+      if (error instanceof Error && error.name === 'NoSuchLifecycleConfiguration') {
         return { success: true, data: { rules: [] } };
       }
       console.error('Erreur getBucketLifecycleConfiguration:', error);
@@ -887,6 +952,7 @@ class DirectS3Service {
             Transitions: rule.transitions?.map(t => ({
               Days: t.days,
               Date: t.date,
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               StorageClass: t.storageClass as any
             }))
           }))
