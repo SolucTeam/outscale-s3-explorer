@@ -1,0 +1,91 @@
+# Configuration de production pour NumS3-Console
+
+replicaCount: 3
+
+image:
+  repository: myregistry.azurecr.io/nums3-console
+  tag: "v1.0.0"
+  pullPolicy: Always
+
+service:
+  type: LoadBalancer
+  port: 443
+  targetPort: 8080
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+  hosts:
+    - host: nums3-console.production.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: nums3-console-tls
+      hosts:
+        - nums3-console.production.com
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 500m
+    memory: 512Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 20
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+# Variables d'environnement pour la production
+env:
+  - name: ENVIRONMENT
+    value: "production"
+  - name: LOG_LEVEL
+    value: "warn"
+  - name: S3_REGION
+    value: "us-east-1"
+
+# Utiliser des secrets pour les credentials
+envFrom:
+  - secretRef:
+      name: nums3-console-secrets
+
+persistence:
+  enabled: true
+  storageClass: "premium-ssd"
+  size: 50Gi
+  mountPath: /app/data
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: true
+
+# Anti-affinity pour distribuer les pods sur différents nodes
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - nums3-console
+          topologyKey: kubernetes.io/hostname

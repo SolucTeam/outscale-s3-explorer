@@ -33,13 +33,9 @@ spec:
             pathType: {{ .pathType }}
             backend:
               service:
-                name: {{ include "nums3-console.fullname" $ }}-{{ .backend }}
+                name: {{ include "nums3-console.fullname" $ }}
                 port:
-                  {{- if eq .backend "frontend" }}
-                  number: {{ $.Values.service.frontend.port }}
-                  {{- else if eq .backend "proxy" }}
-                  number: {{ $.Values.service.proxy.port }}
-                  {{- end }}
+                  number: {{ $.Values.service.port }}
           {{- end }}
     {{- end }}
 {{- end }}

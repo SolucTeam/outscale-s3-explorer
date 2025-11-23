@@ -49,38 +49,6 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
-Frontend labels
-*/}}
-{{- define "nums3-console.frontend.labels" -}}
-{{ include "nums3-console.labels" . }}
-app.kubernetes.io/component: frontend
-{{- end }}
-
-{{/*
-Frontend selector labels
-*/}}
-{{- define "nums3-console.frontend.selectorLabels" -}}
-{{ include "nums3-console.selectorLabels" . }}
-app.kubernetes.io/component: frontend
-{{- end }}
-
-{{/*
-Proxy labels
-*/}}
-{{- define "nums3-console.proxy.labels" -}}
-{{ include "nums3-console.labels" . }}
-app.kubernetes.io/component: proxy
-{{- end }}
-
-{{/*
-Proxy selector labels
-*/}}
-{{- define "nums3-console.proxy.selectorLabels" -}}
-{{ include "nums3-console.selectorLabels" . }}
-app.kubernetes.io/component: proxy
-{{- end }}
-
-{{/*
 Create the name of the service account to use
 */}}
 {{- define "nums3-console.serviceAccountName" -}}
@@ -89,12 +57,4 @@ Create the name of the service account to use
 {{- else }}
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
-{{- end }}
-
-{{/*
-Return the proper image name
-*/}}
-{{- define "nums3-console.image" -}}
-{{- $tag := .Values.image.tag | default .Chart.AppVersion -}}
-{{- printf "%s:%s" .Values.image.repository $tag -}}
 {{- end }}
