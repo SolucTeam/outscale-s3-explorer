@@ -1,10 +1,43 @@
-
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useS3Store } from '../hooks/useS3Store';
 import { BreadcrumbItem } from '../types/s3';
 import { ChevronRight, Home, Folder } from 'lucide-react';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+
+/**
+ * Raccourcit un segment de chemin trop long
+ * @param segment - Le segment à raccourcir
+ * @param maxLength - Longueur maximale (défaut: 20)
+ * @returns Segment raccourci avec ellipsis
+ */
+const truncateSegment = (segment: string, maxLength: number = 20): string => {
+  if (segment.length <= maxLength) return segment;
+  
+  // Pour les hashes (SHA256, etc.), garder début et fin
+  if (/^[a-f0-9]{40,}$/i.test(segment)) {
+    return `${segment.slice(0, 8)}...${segment.slice(-8)}`;
+  }
+  
+  // Pour les noms normaux, garder le début et l'extension
+  const parts = segment.split('.');
+  if (parts.length > 1) {
+    const extension = parts.pop();
+    const name = parts.join('.');
+    if (name.length > maxLength - extension!.length - 4) {
+      return `${name.slice(0, maxLength - extension!.length - 7)}...${extension}`;
+    }
+  }
+  
+  // Sinon, couper au milieu
+  return `${segment.slice(0, maxLength - 3)}...`;
+};
 
 export const Breadcrumb = () => {
   const { currentBucket, currentPath, setCurrentBucket, setCurrentPath } = useS3Store();
@@ -32,47 +65,148 @@ export const Breadcrumb = () => {
   const handleBreadcrumbClick = (item: BreadcrumbItem) => {
     if (item.path === '') {
       setCurrentPath('');
-      // Retour à la liste des buckets
       navigate('/dashboard');
     } else if (item.path === currentBucket) {
       setCurrentPath('');
-      // Retour à la racine du bucket
       navigate(`/bucket/${encodeURIComponent(currentBucket)}`);
     } else {
-      // Navigation vers un dossier spécifique
       const newPath = item.path.replace(`${currentBucket}/`, '');
       setCurrentPath(newPath);
-      // Encoder chaque segment du chemin séparément pour gérer les caractères spéciaux
       const encodedPath = newPath.split('/').map(segment => encodeURIComponent(segment)).join('/');
       navigate(`/bucket/${encodeURIComponent(currentBucket)}/folder/${encodedPath}`);
     }
   };
 
-  return (
-    <nav className="flex items-center space-x-2 text-sm text-gray-600 mb-6 bg-gray-50 p-3 rounded-lg">
-      {breadcrumbItems.map((item, index) => (
+  // Fonction pour afficher un élément de breadcrumb avec tooltip si tronqué
+  const renderBreadcrumbItem = (item: BreadcrumbItem, index: number) => {
+    const isLast = index === breadcrumbItems.length - 1;
+    const isTruncated = item.name.length > 20;
+    const displayName = truncateSegment(item.name);
+    
+    const buttonContent = (
+      <Button
+        variant="ghost"
+        size="sm"
+        className={`h-auto px-2 py-1 font-medium hover:text-blue-600 transition-colors ${
+          isLast 
+            ? 'text-blue-600 cursor-default' 
+            : 'text-gray-600 hover:bg-white'
+        }`}
+        onClick={() => !isLast && handleBreadcrumbClick(item)}
+        disabled={isLast}
+      >
+        {index === 0 ? (
+          <Home className="w-4 h-4 mr-1" />
+        ) : index === 1 ? (
+          <Folder className="w-4 h-4 mr-1" />
+        ) : null}
+        <span className="max-w-[200px] truncate">{displayName}</span>
+      </Button>
+    );
+
+    // Si le nom est tronqué, afficher un tooltip avec le nom complet
+    if (isTruncated) {
+      return (
+        <TooltipProvider key={`${item.path}-${index}`}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              {buttonContent}
+            </TooltipTrigger>
+            <TooltipContent 
+              side="bottom" 
+              className="max-w-md break-all bg-gray-900 text-white text-xs"
+            >
+              <p>{item.name}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+    }
+
+    return (
+      <React.Fragment key={`${item.path}-${index}`}>
+        {buttonContent}
+      </React.Fragment>
+    );
+  };
+
+  // Gérer l'affichage avec ellipsis si trop de segments
+  const renderBreadcrumbs = () => {
+    // Si moins de 5 segments, afficher tout
+    if (breadcrumbItems.length <= 5) {
+      return breadcrumbItems.map((item, index) => (
         <div key={`${item.path}-${index}`} className="flex items-center">
-          {index > 0 && <ChevronRight className="w-4 h-4 text-gray-400 mr-2" />}
-          <Button
-            variant="ghost"
-            size="sm"
-            className={`h-auto p-1 font-medium hover:text-blue-600 ${
-              index === breadcrumbItems.length - 1 
-                ? 'text-blue-600 cursor-default' 
-                : 'text-gray-600 hover:bg-white'
-            }`}
-            onClick={() => index !== breadcrumbItems.length - 1 && handleBreadcrumbClick(item)}
-            disabled={index === breadcrumbItems.length - 1}
-          >
-            {index === 0 ? (
-              <Home className="w-4 h-4 mr-1" />
-            ) : index === 1 ? (
-              <Folder className="w-4 h-4 mr-1" />
-            ) : null}
-            {item.name}
-          </Button>
+          {index > 0 && <ChevronRight className="w-4 h-4 text-gray-400 mx-1 flex-shrink-0" />}
+          {renderBreadcrumbItem(item, index)}
         </div>
-      ))}
+      ));
+    }
+
+    // Si plus de 5 segments, afficher : Home / Bucket / ... / Avant-dernier / Dernier
+    const result = [];
+    
+    // Toujours afficher les 2 premiers (Home + Bucket)
+    for (let i = 0; i < 2; i++) {
+      result.push(
+        <div key={`${breadcrumbItems[i].path}-${i}`} className="flex items-center">
+          {i > 0 && <ChevronRight className="w-4 h-4 text-gray-400 mx-1 flex-shrink-0" />}
+          {renderBreadcrumbItem(breadcrumbItems[i], i)}
+        </div>
+      );
+    }
+
+    // Ellipsis pour les segments du milieu
+    result.push(
+      <div key="ellipsis" className="flex items-center">
+        <ChevronRight className="w-4 h-4 text-gray-400 mx-1 flex-shrink-0" />
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-auto px-2 py-1 text-gray-400 cursor-default"
+                disabled
+              >
+                <span>...</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent 
+              side="bottom" 
+              className="max-w-md bg-gray-900 text-white text-xs"
+            >
+              <div className="space-y-1">
+                <p className="font-semibold">Segments cachés :</p>
+                {breadcrumbItems.slice(2, -2).map((item, idx) => (
+                  <p key={idx} className="truncate">• {item.name}</p>
+                ))}
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </div>
+    );
+
+    // Afficher les 2 derniers segments
+    const lastTwo = breadcrumbItems.slice(-2);
+    lastTwo.forEach((item, idx) => {
+      const actualIndex = breadcrumbItems.length - 2 + idx;
+      result.push(
+        <div key={`${item.path}-${actualIndex}`} className="flex items-center">
+          <ChevronRight className="w-4 h-4 text-gray-400 mx-1 flex-shrink-0" />
+          {renderBreadcrumbItem(item, actualIndex)}
+        </div>
+      );
+    });
+
+    return result;
+  };
+
+  return (
+    <nav className="flex items-center text-sm text-gray-600 mb-4 bg-gray-50 p-3 rounded-lg overflow-x-auto">
+      <div className="flex items-center min-w-0 flex-nowrap">
+        {renderBreadcrumbs()}
+      </div>
     </nav>
   );
 };

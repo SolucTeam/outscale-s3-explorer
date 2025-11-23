@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -9,6 +8,8 @@ import { useS3Store } from '../hooks/useS3Store';
 import { Activity, Clock, CheckCircle, XCircle, AlertCircle, Filter, Trash2, User, Settings, ChevronLeft, ChevronRight } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
+
+type FilterType = 'all' | 'success' | 'error' | 'info';
 
 export const ActionHistory = () => {
   const { credentials } = useS3Store();
@@ -21,7 +22,7 @@ export const ActionHistory = () => {
     toggleLogging
   } = useActionHistoryStore();
   
-  const [filter, setFilter] = useState<'all' | 'success' | 'error' | 'info'>('all');
+  const [filter, setFilter] = useState<FilterType>('all');
   const [isExpanded, setIsExpanded] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -87,6 +88,36 @@ export const ActionHistory = () => {
   const getCurrentUserDisplay = () => {
     if (!credentials) return 'Aucun compte';
     return `${credentials.accessKey.substring(0, 8)}... (${credentials.region})`;
+  };
+
+  const getFilterLabel = (filterType: FilterType): string => {
+    switch (filterType) {
+      case 'all':
+        return 'Toutes';
+      case 'success':
+        return 'Succès';
+      case 'error':
+        return 'Erreurs';
+      case 'info':
+        return 'En cours';
+      default:
+        return 'Toutes';
+    }
+  };
+
+  const getStatusLabel = (status: string): string => {
+    switch (status) {
+      case 'success':
+        return 'Réussi';
+      case 'error':
+        return 'Échec';
+      case 'started':
+        return 'Démarré';
+      case 'progress':
+        return 'En cours';
+      default:
+        return status;
+    }
   };
 
   return (
@@ -158,17 +189,15 @@ export const ActionHistory = () => {
         
         {/* Filtres */}
         <div className={`flex flex-wrap gap-1 mt-2 ${isExpanded ? 'block' : 'hidden xl:flex'}`}>
-          {['all', 'success', 'error', 'info'].map((status) => (
+          {(['all', 'success', 'error', 'info'] as const).map((status) => (
             <Button
               key={status}
               variant={filter === status ? 'default' : 'outline'}
               size="sm"
-              onClick={() => setFilter(status as any)}
+              onClick={() => setFilter(status)}
               className="text-xs h-7 border-gray-300"
             >
-              {status === 'all' ? 'Toutes' : 
-               status === 'success' ? 'Succès' :
-               status === 'error' ? 'Erreurs' : 'En cours'}
+              {getFilterLabel(status)}
             </Button>
           ))}
         </div>
@@ -223,10 +252,7 @@ export const ActionHistory = () => {
                       variant="secondary"
                       className={`text-xs flex-shrink-0 border ${getStatusColor(entry.status)}`}
                     >
-                      {entry.status === 'success' ? 'Réussi' :
-                       entry.status === 'error' ? 'Échec' :
-                       entry.status === 'started' ? 'Démarré' :
-                       entry.status === 'progress' ? 'En cours' : entry.status}
+                      {getStatusLabel(entry.status)}
                     </Badge>
                   </div>
                   
