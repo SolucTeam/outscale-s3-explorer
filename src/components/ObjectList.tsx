@@ -112,6 +112,41 @@ export const ObjectList = () => {
     }
   };
 
+
+  const truncatePath = (path: string, maxLength: number = 60): string => {
+    if (path.length <= maxLength) return path;
+    
+    const parts = path.split('/');
+    
+    // Si un seul segment est trop long (hash SHA256 par exemple)
+    if (parts.length === 1) {
+      if (/^[a-f0-9]{40,}$/i.test(path)) {
+        // Hash: garder début et fin
+        return `${path.slice(0, 12)}...${path.slice(-12)}`;
+      }
+      // Nom normal: couper au milieu
+      return `${path.slice(0, maxLength - 3)}...`;
+    }
+    
+    // Plusieurs segments: afficher premier / ... / dernier
+    if (parts.length > 3) {
+      const first = parts[0];
+      const last = parts[parts.length - 1];
+      return `${first}/.../${last}`;
+    }
+    
+    // 2-3 segments: afficher normalement mais tronquer les segments longs
+    return parts.map(part => {
+      if (part.length > 20) {
+        if (/^[a-f0-9]{40,}$/i.test(part)) {
+          return `${part.slice(0, 8)}...${part.slice(-8)}`;
+        }
+        return `${part.slice(0, 17)}...`;
+      }
+      return part;
+    }).join('/');
+  };
+
   const handleDownload = async (objectKey: string) => {
     try {
       const fullKey = currentPath ? `${currentPath}/${objectKey}` : objectKey;
@@ -156,14 +191,16 @@ export const ObjectList = () => {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-xl font-semibold text-gray-900">
+        <div className="min-w-0 flex-1">
+          <h3 className="text-xl font-semibold text-gray-900 truncate">
             Contenu de {currentBucket}
             {currentPath && (
-              <span className="text-gray-500 font-normal"> / {currentPath}</span>
+              <span className="text-gray-500 font-normal" title={currentPath}>
+                {' '} / {truncatePath(currentPath)}
+              </span>
             )}
           </h3>
-          <p className="text-gray-600">
+          <p className="text-gray-600 text-sm">
             {objects.length} élément{objects.length > 1 ? 's' : ''}
           </p>
         </div>

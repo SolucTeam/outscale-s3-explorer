@@ -13,9 +13,6 @@ import {
 
 /**
  * Raccourcit un segment de chemin trop long
- * @param segment - Le segment à raccourcir
- * @param maxLength - Longueur maximale (défaut: 20)
- * @returns Segment raccourci avec ellipsis
  */
 const truncateSegment = (segment: string, maxLength: number = 20): string => {
   if (segment.length <= maxLength) return segment;
@@ -40,7 +37,7 @@ const truncateSegment = (segment: string, maxLength: number = 20): string => {
 };
 
 export const Breadcrumb = () => {
-  const { currentBucket, currentPath, setCurrentBucket, setCurrentPath } = useS3Store();
+  const { currentBucket, currentPath, setCurrentPath } = useS3Store();
   const navigate = useNavigate();
 
   if (!currentBucket) return null;
@@ -49,31 +46,51 @@ export const Breadcrumb = () => {
   
   const breadcrumbItems: BreadcrumbItem[] = [
     { name: 'Buckets', path: '' },
-    { name: currentBucket, path: currentBucket }
+    { name: currentBucket, path: '' } // Path vide = racine du bucket
   ];
 
-  // Ajouter les parties du chemin
-  let currentFullPath = currentBucket;
-  pathParts.forEach((part) => {
-    currentFullPath += `/${part}`;
+  // 🔧 FIX: Construire le chemin de manière incrémentale
+  // Chaque item.path contient UNIQUEMENT le chemin relatif au bucket
+  pathParts.forEach((part, index) => {
+    const pathUpToHere = pathParts.slice(0, index + 1).join('/');
     breadcrumbItems.push({
       name: part,
-      path: currentFullPath
+      path: pathUpToHere // Chemin relatif (sans le bucket)
     });
   });
 
   const handleBreadcrumbClick = (item: BreadcrumbItem) => {
-    if (item.path === '') {
+    console.log('🔍 Breadcrumb click:', {
+      item,
+      currentBucket,
+      currentPath
+    });
+
+    if (item.path === '' && item.name === 'Buckets') {
+      // Retour à la liste des buckets
       setCurrentPath('');
       navigate('/dashboard');
-    } else if (item.path === currentBucket) {
+    } else if (item.path === '' && item.name === currentBucket) {
+      // Retour à la racine du bucket
       setCurrentPath('');
       navigate(`/bucket/${encodeURIComponent(currentBucket)}`);
     } else {
-      const newPath = item.path.replace(`${currentBucket}/`, '');
-      setCurrentPath(newPath);
-      const encodedPath = newPath.split('/').map(segment => encodeURIComponent(segment)).join('/');
+      // Navigation vers un dossier spécifique
+      setCurrentPath(item.path);
+      
+      // Encoder chaque segment du chemin séparément
+      const encodedPath = item.path
+        .split('/')
+        .map(segment => encodeURIComponent(segment))
+        .join('/');
+      
       navigate(`/bucket/${encodeURIComponent(currentBucket)}/folder/${encodedPath}`);
+      
+      console.log('✅ Navigating to:', {
+        newPath: item.path,
+        encodedPath,
+        fullUrl: `/bucket/${encodeURIComponent(currentBucket)}/folder/${encodedPath}`
+      });
     }
   };
 
@@ -107,7 +124,7 @@ export const Breadcrumb = () => {
     // Si le nom est tronqué, afficher un tooltip avec le nom complet
     if (isTruncated) {
       return (
-        <TooltipProvider key={`${item.path}-${index}`}>
+        <TooltipProvider key={`${item.path}-${item.name}-${index}`}>
           <Tooltip>
             <TooltipTrigger asChild>
               {buttonContent}
@@ -124,7 +141,7 @@ export const Breadcrumb = () => {
     }
 
     return (
-      <React.Fragment key={`${item.path}-${index}`}>
+      <React.Fragment key={`${item.path}-${item.name}-${index}`}>
         {buttonContent}
       </React.Fragment>
     );
@@ -135,7 +152,7 @@ export const Breadcrumb = () => {
     // Si moins de 5 segments, afficher tout
     if (breadcrumbItems.length <= 5) {
       return breadcrumbItems.map((item, index) => (
-        <div key={`${item.path}-${index}`} className="flex items-center">
+        <div key={`container-${item.path}-${item.name}-${index}`} className="flex items-center">
           {index > 0 && <ChevronRight className="w-4 h-4 text-gray-400 mx-1 flex-shrink-0" />}
           {renderBreadcrumbItem(item, index)}
         </div>
@@ -148,7 +165,7 @@ export const Breadcrumb = () => {
     // Toujours afficher les 2 premiers (Home + Bucket)
     for (let i = 0; i < 2; i++) {
       result.push(
-        <div key={`${breadcrumbItems[i].path}-${i}`} className="flex items-center">
+        <div key={`container-${breadcrumbItems[i].path}-${breadcrumbItems[i].name}-${i}`} className="flex items-center">
           {i > 0 && <ChevronRight className="w-4 h-4 text-gray-400 mx-1 flex-shrink-0" />}
           {renderBreadcrumbItem(breadcrumbItems[i], i)}
         </div>
@@ -192,7 +209,7 @@ export const Breadcrumb = () => {
     lastTwo.forEach((item, idx) => {
       const actualIndex = breadcrumbItems.length - 2 + idx;
       result.push(
-        <div key={`${item.path}-${actualIndex}`} className="flex items-center">
+        <div key={`container-${item.path}-${item.name}-${actualIndex}`} className="flex items-center">
           <ChevronRight className="w-4 h-4 text-gray-400 mx-1 flex-shrink-0" />
           {renderBreadcrumbItem(item, actualIndex)}
         </div>
