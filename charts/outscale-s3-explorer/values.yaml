@@ -1,17 +1,22 @@
-# Configuration de production pour NumS3-Console
+# ============================================
+# Configuration pour NumS3-Console
+# ============================================
 
+# Nombre de réplicas
 replicaCount: 3
 
+# Configuration de l'image Docker
 image:
-  repository: myregistry.azurecr.io/nums3-console
+  repository: myregistry.azurecr.io/outscale-s3-explorer
   tag: "v1.0.0"
   pullPolicy: Always
 
+# Configuration du Service
 service:
   type: LoadBalancer
-  port: 443
-  targetPort: 8080
+  port: 80
 
+# Configuration de l'Ingress
 ingress:
   enabled: true
   className: "nginx"
@@ -20,15 +25,16 @@ ingress:
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
     nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
   hosts:
-    - host: nums3-console.production.com
+    - host: outscale-s3-explorer.production.com
       paths:
         - path: /
           pathType: Prefix
   tls:
-    - secretName: nums3-console-tls
+    - secretName: outscale-s3-explorer-tls
       hosts:
-        - nums3-console.production.com
+        - outscale-s3-explorer.production.com
 
+# Ressources (CPU/Mémoire)
 resources:
   limits:
     cpu: 1000m
@@ -37,6 +43,7 @@ resources:
     cpu: 500m
     memory: 512Mi
 
+# Autoscaling (HPA)
 autoscaling:
   enabled: true
   minReplicas: 3
@@ -44,39 +51,20 @@ autoscaling:
   targetCPUUtilizationPercentage: 70
   targetMemoryUtilizationPercentage: 80
 
-# Variables d'environnement pour la production
-env:
-  - name: ENVIRONMENT
-    value: "production"
-  - name: LOG_LEVEL
-    value: "warn"
-  - name: S3_REGION
-    value: "us-east-1"
-
-# Utiliser des secrets pour les credentials
-envFrom:
-  - secretRef:
-      name: nums3-console-secrets
-
-persistence:
-  enabled: true
-  storageClass: "premium-ssd"
-  size: 50Gi
-  mountPath: /app/data
-
+# Sécurité des pods
 podSecurityContext:
   runAsNonRoot: true
-  runAsUser: 1000
-  fsGroup: 1000
+  runAsUser: 101
+  fsGroup: 101
 
 securityContext:
   allowPrivilegeEscalation: false
   capabilities:
     drop:
-    - ALL
-  readOnlyRootFilesystem: true
+      - ALL
+  readOnlyRootFilesystem: false
 
-# Anti-affinity pour distribuer les pods sur différents nodes
+# Anti-affinity pour haute disponibilité
 affinity:
   podAntiAffinity:
     preferredDuringSchedulingIgnoredDuringExecution:
@@ -87,5 +75,22 @@ affinity:
               - key: app.kubernetes.io/name
                 operator: In
                 values:
-                  - nums3-console
+                  - outscale-s3-explorer
           topologyKey: kubernetes.io/hostname
+
+# Probes de santé (déjà dans le Dockerfile HEALTHCHECK)
+livenessProbe:
+  httpGet:
+    path: /
+    port: http
+  initialDelaySeconds: 40
+  periodSeconds: 30
+  timeoutSeconds: 10
+
+readinessProbe:
+  httpGet:
+    path: /
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 5
