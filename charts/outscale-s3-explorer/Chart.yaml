@@ -1,14 +1,70 @@
 apiVersion: v2
-name: outscale-s3-explorer-helm
-description: A Helm chart for NumS3-Console deployment on Kubernetes
+name: outscale-s3-explorer
+description: Interface web moderne pour la gestion d'objets S3 compatible Outscale
 type: application
-version: 999.999.999
-appVersion: 999.999.999
+version: 0.1.0
+appVersion: "1.0.0"
+
+# URLs du projet
+home: https://github.com/SolucTeam/outscale-s3-explorer
+sources:
+  - https://github.com/SolucTeam/outscale-s3-explorer
+
+# Mots-clés pour la recherche
 keywords:
-  - outscale-s3-explorer
+  - outscale
   - s3
-  - console
   - storage
+  - object-storage
+  - web-interface
+  - cloud
+  - bucket
+  - oos
+
+# Mainteneurs
 maintainers:
-  - name: Your Name
-    email: your.email@example.com
+  - name: SolucTeam
+    email: k.aziz.k@live.fr
+    url: https://github.com/SolucTeam
+
+# Icône du chart (à créer si vous avez un logo)
+# icon: https://raw.githubusercontent.com/SolucTeam/outscale-s3-explorer/main/docs/icon.png
+
+# Annotations spécifiques à Artifact Hub
+annotations:
+  # Catégorie dans Artifact Hub
+  artifacthub.io/category: storage
+
+  # Nom d'affichage
+  artifacthub.io/displayName: Outscale S3 Explorer
+
+  # Ce n'est pas un opérateur Kubernetes
+  artifacthub.io/operator: "false"
+
+  # Ce n'est pas une version pre-release
+  artifacthub.io/prerelease: "false"
+
+  # License (à adapter selon votre licence)
+  artifacthub.io/license: Apache-2.0
+
+  # Liens utiles
+  artifacthub.io/links: |
+    - name: Documentation
+      url: https://github.com/SolucTeam/outscale-s3-explorer/blob/main/README.md
+    - name: Source
+      url: https://github.com/SolucTeam/outscale-s3-explorer
+
+  # Description longue (optionnel)
+  artifacthub.io/recommendations: |
+    - url: https://artifacthub.io/packages/helm/cert-manager/cert-manager
+
+  # Changements dans cette version
+  artifacthub.io/changes: |
+    - kind: added
+      description: Première version publique du chart Helm
+    - kind: added
+      description: Support complet de l'authentification Outscale S3
+    - kind: added
+      description: Interface web moderne React/TypeScript
+    - kind: added
+      description: Support multi-régions Outscale

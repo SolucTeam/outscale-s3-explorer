@@ -7,9 +7,9 @@ replicaCount: 3
 
 # Configuration de l'image Docker
 image:
-  repository: myregistry.azurecr.io/outscale-s3-explorer
+  repository: ghcr.io/solucteam/outscale-s3-explorer
   tag: "v1.0.0"
-  pullPolicy: Always
+  pullPolicy: IfNotPresent
 
 # Configuration du Service
 service:
