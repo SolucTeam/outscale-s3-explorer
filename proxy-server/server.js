@@ -29,7 +29,9 @@ const {
   GetObjectAclCommand,
   GetBucketLifecycleConfigurationCommand,
   PutBucketLifecycleConfigurationCommand,
-  DeleteBucketLifecycleCommand
+  DeleteBucketLifecycleCommand,
+  GetBucketAclCommand,
+  GetBucketPolicyCommand
 } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 
@@ -1158,6 +1160,83 @@ app.get('/api/buckets/:bucket/objects/:key(*)/presigned', extractCredentials, as
     res.status(500).json({
       success: false,
       error: 'Erreur lors de la génération de l\'URL pré-signée'
+    });
+  }
+});
+
+// ============================================================
+// BUCKET ACL & POLICY
+// ============================================================
+
+// GET /api/buckets/:bucket/acl - Obtenir les ACL du bucket
+app.get('/api/buckets/:bucket/acl', extractCredentials, async (req, res) => {
+  try {
+    const { bucket } = req.params;
+
+    const command = new GetBucketAclCommand({
+      Bucket: bucket
+    });
+
+    const response = await req.s3Client.send(command);
+
+    res.json({
+      success: true,
+      data: {
+        owner: {
+          displayName: response.Owner?.DisplayName,
+          id: response.Owner?.ID || ''
+        },
+        grants: (response.Grants || []).map(grant => ({
+          grantee: {
+            type: grant.Grantee?.Type || '',
+            displayName: grant.Grantee?.DisplayName,
+            id: grant.Grantee?.ID,
+            uri: grant.Grantee?.URI,
+            emailAddress: grant.Grantee?.EmailAddress
+          },
+          permission: grant.Permission || ''
+        }))
+      }
+    });
+  } catch (error) {
+    console.error('Erreur get bucket ACL:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur lors de la récupération des ACL du bucket'
+    });
+  }
+});
+
+// GET /api/buckets/:bucket/policy - Obtenir la policy du bucket
+app.get('/api/buckets/:bucket/policy', extractCredentials, async (req, res) => {
+  try {
+    const { bucket } = req.params;
+
+    const command = new GetBucketPolicyCommand({
+      Bucket: bucket
+    });
+
+    const response = await req.s3Client.send(command);
+
+    res.json({
+      success: true,
+      data: {
+        policy: response.Policy
+      }
+    });
+  } catch (error) {
+    // Si la policy n'existe pas, ce n'est pas une erreur
+    if (error.name === 'NoSuchBucketPolicy') {
+      return res.json({
+        success: true,
+        data: { policy: undefined }
+      });
+    }
+    
+    console.error('Erreur get bucket policy:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur lors de la récupération de la policy du bucket'
     });
   }
 });

@@ -3,7 +3,7 @@
  * Contourne les limitations CORS en utilisant un serveur proxy
  */
 
-import { S3Credentials, S3Bucket, S3Object, ObjectVersion, ObjectRetention, ObjectLockConfiguration } from '../types/s3';
+import { S3Credentials, S3Bucket, S3Object, ObjectVersion, ObjectRetention, ObjectLockConfiguration, BucketAcl, BucketPolicy } from '../types/s3';
 import { cacheService, CacheService } from './cacheService';
 import { env } from '../config/environment';
 
@@ -740,6 +740,42 @@ class ProxyS3Service {
       return {
         success: false,
         error: 'Erreur lors de la génération de l\'URL pré-signée',
+        message: error instanceof Error ? error.message : 'Erreur inconnue'
+      };
+    }
+  }
+
+  async getBucketAcl(bucket: string): Promise<ProxyS3Response<BucketAcl>> {
+    if (!this.credentials) {
+      return { success: false, error: 'Client S3 non initialisé' };
+    }
+
+    try {
+      const endpoint = `/buckets/${encodeURIComponent(bucket)}/acl`;
+      const response = await this.makeRequest<BucketAcl>(endpoint);
+      return response;
+    } catch (error) {
+      return {
+        success: false,
+        error: 'Erreur lors de la récupération des ACL du bucket',
+        message: error instanceof Error ? error.message : 'Erreur inconnue'
+      };
+    }
+  }
+
+  async getBucketPolicy(bucket: string): Promise<ProxyS3Response<BucketPolicy>> {
+    if (!this.credentials) {
+      return { success: false, error: 'Client S3 non initialisé' };
+    }
+
+    try {
+      const endpoint = `/buckets/${encodeURIComponent(bucket)}/policy`;
+      const response = await this.makeRequest<BucketPolicy>(endpoint);
+      return response;
+    } catch (error) {
+      return {
+        success: false,
+        error: 'Erreur lors de la récupération de la policy du bucket',
         message: error instanceof Error ? error.message : 'Erreur inconnue'
       };
     }

@@ -191,7 +191,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({
         s3LoggingService.logOperationError(
           logEntryId,
           'object_upload',
-          error instanceof Error ? error : errorMessage,
+          error instanceof Error ? error.message : errorMessage,
           bucket,
           currentFile.file.name,
           'NETWORK_ERROR'
