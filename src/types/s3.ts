@@ -97,6 +97,27 @@ export interface BucketLifecycleConfiguration {
   rules: LifecycleRule[];
 }
 
+export interface BucketAcl {
+  owner: {
+    displayName?: string;
+    id: string;
+  };
+  grants: Array<{
+    grantee: {
+      type: string;
+      displayName?: string;
+      id?: string;
+      uri?: string;
+      emailAddress?: string;
+    };
+    permission: string;
+  }>;
+}
+
+export interface BucketPolicy {
+  policy?: string;
+}
+
 export interface BucketMetadata {
   region?: string;
   creationDate?: Date;

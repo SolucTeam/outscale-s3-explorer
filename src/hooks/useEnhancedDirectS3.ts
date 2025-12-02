@@ -396,7 +396,7 @@ export const useEnhancedDirectS3 = () => {
       s3LoggingService.logOperationError(
         logEntryId,
         'bucket_create',
-        error instanceof Error ? error : 'Erreur de connexion',
+        error instanceof Error ? error.message : 'Erreur de connexion',
         name,
         undefined,
         'NETWORK_ERROR'
@@ -466,7 +466,7 @@ export const useEnhancedDirectS3 = () => {
       s3LoggingService.logOperationError(
         logEntryId,
         'bucket_delete',
-        error instanceof Error ? error : 'Erreur de connexion',
+        error instanceof Error ? error.message : 'Erreur de connexion',
         name,
         undefined,
         'NETWORK_ERROR'
@@ -526,7 +526,7 @@ export const useEnhancedDirectS3 = () => {
       s3LoggingService.logOperationError(
         logEntryId,
         'object_delete',
-        error instanceof Error ? error : 'Erreur de connexion',
+        error instanceof Error ? error.message : 'Erreur de connexion',
         bucket,
         objectKey,
         'NETWORK_ERROR'
@@ -615,7 +615,7 @@ export const useEnhancedDirectS3 = () => {
       s3LoggingService.logOperationError(
         logEntryId,
         'folder_create',
-        error instanceof Error ? error : 'Erreur de connexion',
+        error instanceof Error ? error.message : 'Erreur de connexion',
         bucket,
         `${path}${folderName}/`,
         'NETWORK_ERROR'
@@ -969,6 +969,50 @@ export const useEnhancedDirectS3 = () => {
     }
   }, [initialized]);
 
+  const getBucketAcl = useCallback(async (bucket: string) => {
+    if (!initialized) return null;
+
+    try {
+      const response = await withRetry(
+        () => proxyS3Service.getBucketAcl(bucket),
+        `récupération ACL ${bucket}`
+      );
+
+      if (response.success && response.data) {
+        return response.data;
+      } else {
+        handleError(response, 'Erreur lors de la récupération des ACL');
+        return null;
+      }
+    } catch (error) {
+      console.error('❌ Get bucket ACL error:', error);
+      setError('Erreur de connexion');
+      return null;
+    }
+  }, [initialized]);
+
+  const getBucketPolicy = useCallback(async (bucket: string) => {
+    if (!initialized) return null;
+
+    try {
+      const response = await withRetry(
+        () => proxyS3Service.getBucketPolicy(bucket),
+        `récupération policy ${bucket}`
+      );
+
+      if (response.success && response.data) {
+        return response.data;
+      } else {
+        handleError(response, 'Erreur lors de la récupération de la policy');
+        return null;
+      }
+    } catch (error) {
+      console.error('❌ Get bucket policy error:', error);
+      setError('Erreur de connexion');
+      return null;
+    }
+  }, [initialized]);
+
   return {
     initialized,
     uploadProgress,
@@ -996,6 +1040,8 @@ export const useEnhancedDirectS3 = () => {
     deleteBucketLifecycle,
     headBucket,
     headObject,
-    getPresignedUrl
+    getPresignedUrl,
+    getBucketAcl,
+    getBucketPolicy
   };
 };

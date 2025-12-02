@@ -25,10 +25,12 @@ import {
   GetObjectAclCommand,
   GetBucketLifecycleConfigurationCommand,
   PutBucketLifecycleConfigurationCommand,
-  DeleteBucketLifecycleCommand
+  DeleteBucketLifecycleCommand,
+  GetBucketAclCommand,
+  GetBucketPolicyCommand
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { S3Credentials, S3Bucket, S3Object, ObjectVersion, ObjectRetention, ObjectLockConfiguration, BucketLifecycleConfiguration, BucketMetadata, ObjectMetadata, PresignedUrlOptions } from '../types/s3';
+import { S3Credentials, S3Bucket, S3Object, ObjectVersion, ObjectRetention, ObjectLockConfiguration, BucketLifecycleConfiguration, BucketMetadata, ObjectMetadata, PresignedUrlOptions, BucketAcl, BucketPolicy } from '../types/s3';
 import { OutscaleConfig } from './outscaleConfig';
 import { cacheService, CacheService } from './cacheService';
 
@@ -1090,6 +1092,96 @@ class DirectS3Service {
       return {
         success: false,
         error: 'Erreur lors de la génération de l\'URL pré-signée',
+        message: error instanceof Error ? error.message : 'Erreur inconnue'
+      };
+    }
+  }
+
+  async getBucketAcl(bucket: string): Promise<DirectS3Response<BucketAcl>> {
+    if (!this.client) {
+      return { success: false, error: 'Client S3 non initialisé' };
+    }
+
+    try {
+      console.log('🔐 Getting bucket ACL:', bucket);
+
+      const command = new GetBucketAclCommand({
+        Bucket: bucket
+      });
+
+      const response = await this.client.send(command);
+
+      const aclData: BucketAcl = {
+        owner: {
+          displayName: response.Owner?.DisplayName,
+          id: response.Owner?.ID || ''
+        },
+        grants: (response.Grants || []).map(grant => ({
+          grantee: {
+            type: grant.Grantee?.Type || '',
+            displayName: grant.Grantee?.DisplayName,
+            id: grant.Grantee?.ID,
+            uri: grant.Grantee?.URI,
+            emailAddress: grant.Grantee?.EmailAddress
+          },
+          permission: grant.Permission || ''
+        }))
+      };
+
+      console.log('✅ Bucket ACL retrieved successfully');
+
+      return {
+        success: true,
+        data: aclData
+      };
+    } catch (error) {
+      console.error('❌ Error getting bucket ACL:', error);
+      return {
+        success: false,
+        error: 'Erreur lors de la récupération des ACL du bucket',
+        message: error instanceof Error ? error.message : 'Erreur inconnue'
+      };
+    }
+  }
+
+  async getBucketPolicy(bucket: string): Promise<DirectS3Response<BucketPolicy>> {
+    if (!this.client) {
+      return { success: false, error: 'Client S3 non initialisé' };
+    }
+
+    try {
+      console.log('📜 Getting bucket policy:', bucket);
+
+      const command = new GetBucketPolicyCommand({
+        Bucket: bucket
+      });
+
+      const response = await this.client.send(command);
+
+      const policyData: BucketPolicy = {
+        policy: response.Policy
+      };
+
+      console.log('✅ Bucket policy retrieved successfully');
+
+      return {
+        success: true,
+        data: policyData
+      };
+    } catch (error) {
+      console.error('❌ Error getting bucket policy:', error);
+      
+      // Si la policy n'existe pas, ce n'est pas une erreur
+      if (error instanceof Error && error.name === 'NoSuchBucketPolicy') {
+        return {
+          success: true,
+          data: { policy: undefined }
+        };
+      }
+      
+      return {
+        success: false,
+        error: 'Erreur lors de la récupération de la policy du bucket',
         message: error instanceof Error ? error.message : 'Erreur inconnue'
       };
     }
