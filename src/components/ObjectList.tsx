@@ -275,13 +275,18 @@ export const ObjectList = () => {
                       )}
                     </div>
                     
-                    <div className="flex-1">
+                    <div className="flex-1 min-w-0">
                       <div className="flex items-center space-x-2">
-                        <h4 className="font-medium text-gray-900 hover:text-blue-600 transition-colors">
-                          {object.key}
+                        <h4 
+                          className="font-medium text-gray-900 hover:text-blue-600 transition-colors truncate max-w-md"
+                          title={object.key}
+                        >
+                          {object.key.length > 50 
+                            ? `${object.key.slice(0, 25)}...${object.key.slice(-20)}` 
+                            : object.key}
                         </h4>
                         {object.isFolder && (
-                          <Badge variant="secondary">Dossier</Badge>
+                          <Badge variant="secondary" className="shrink-0">Dossier</Badge>
                         )}
                       </div>
                       <div className="flex items-center space-x-4 text-sm text-gray-600 mt-1">
