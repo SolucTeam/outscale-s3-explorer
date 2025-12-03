@@ -536,13 +536,13 @@ export const useEnhancedDirectS3 = () => {
     }
   }, [initialized, toast]);
 
-  const downloadObject = useCallback(async (bucket: string, objectKey: string, fileName?: string): Promise<void> => {
+  const downloadObject = useCallback(async (bucket: string, objectKey: string, fileName?: string, versionId?: string): Promise<void> => {
     if (!initialized) return;
 
     try {
       const response = await withRetry(
-        () => proxyS3Service.getDownloadUrl(bucket, objectKey),
-        `téléchargement ${objectKey}`
+        () => proxyS3Service.getDownloadUrl(bucket, objectKey, versionId),
+        `téléchargement ${objectKey}${versionId ? ` (version: ${versionId})` : ''}`
       );
       
       if (response.success && response.data?.url) {

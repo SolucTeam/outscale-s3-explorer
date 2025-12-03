@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,7 @@ import { CreateBucketDialog } from './CreateBucketDialog';
 import { ForceDeleteBucketDialog } from './ForceDeleteBucketDialog';
 import { BucketSettingsDialog } from './BucketSettingsDialog';
 import { BucketSecurityDialog } from './BucketSecurityDialog';
+import { SearchFilter } from './SearchFilter';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { S3Bucket } from '../types/s3';
 
@@ -28,6 +29,18 @@ export const BucketList = () => {
   const [bucketToEdit, setBucketToEdit] = useState<S3Bucket | null>(null);
   const [bucketToView, setBucketToView] = useState<S3Bucket | null>(null);
   const [hasInitiallyLoaded, setHasInitiallyLoaded] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Filtrer les buckets selon la recherche
+  const filteredBuckets = useMemo(() => {
+    if (!searchQuery.trim()) return buckets;
+    const query = searchQuery.toLowerCase();
+    return buckets.filter(bucket => 
+      bucket.name.toLowerCase().includes(query) ||
+      bucket.location?.toLowerCase().includes(query) ||
+      bucket.region.toLowerCase().includes(query)
+    );
+  }, [buckets, searchQuery]);
 
   useEffect(() => {
     if (!initialized) return;
@@ -159,6 +172,22 @@ export const BucketList = () => {
         </div>
       </div>
 
+      {/* Barre de recherche */}
+      {buckets.length > 0 && (
+        <div className="flex items-center gap-4">
+          <SearchFilter
+            value={searchQuery}
+            onChange={setSearchQuery}
+            placeholder="Rechercher un bucket..."
+          />
+          {searchQuery && (
+            <span className="text-sm text-muted-foreground">
+              {filteredBuckets.length} résultat{filteredBuckets.length > 1 ? 's' : ''}
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Afficher le message "aucun bucket" seulement si on a fini de charger ET qu'il n'y a vraiment aucun bucket */}
       {hasInitiallyLoaded && buckets.length === 0 && !loading ? (
         <div className="text-center py-12">
@@ -174,9 +203,13 @@ export const BucketList = () => {
             Créer mon premier bucket
           </Button>
         </div>
+      ) : filteredBuckets.length === 0 && searchQuery ? (
+        <div className="text-center py-12">
+          <p className="text-gray-600">Aucun bucket ne correspond à "{searchQuery}"</p>
+        </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
-          {buckets.map((bucket) => (
+          {filteredBuckets.map((bucket) => (
             <Card key={bucket.name} className="hover:shadow-lg transition-all duration-200 cursor-pointer group" onClick={() => handleBucketClick(bucket.name)}>
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between gap-2">

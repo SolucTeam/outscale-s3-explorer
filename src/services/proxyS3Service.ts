@@ -251,13 +251,16 @@ class ProxyS3Service {
     }
   }
 
-  async getDownloadUrl(bucket: string, objectKey: string): Promise<ProxyS3Response<{ url: string }>> {
+  async getDownloadUrl(bucket: string, objectKey: string, versionId?: string): Promise<ProxyS3Response<{ url: string }>> {
     if (!this.credentials) {
       return { success: false, error: 'Service non initialisé' };
     }
 
     try {
-      const endpoint = `/buckets/${encodeURIComponent(bucket)}/objects/${encodeURIComponent(objectKey)}/download`;
+      const params = new URLSearchParams();
+      if (versionId) params.append('versionId', versionId);
+      
+      const endpoint = `/buckets/${encodeURIComponent(bucket)}/objects/${encodeURIComponent(objectKey)}/download${params.toString() ? '?' + params.toString() : ''}`;
       const response = await this.makeRequest<{ url: string }>(endpoint);
       return response;
     } catch (error) {
