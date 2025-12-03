@@ -1,18 +1,20 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useS3Store } from '../hooks/useS3Store';
 import { useEnhancedDirectS3 } from '../hooks/useEnhancedDirectS3';
-import { Upload, Download, Trash2, FolderOpen, File, RefreshCw, Plus, FolderPlus, Tag, Info } from 'lucide-react';
+import { Upload, Download, Trash2, FolderOpen, File, RefreshCw, Plus, FolderPlus, Tag, Info, History } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { FileUpload } from './FileUpload';
 import { CreateFolderDialog } from './CreateFolderDialog';
 import { DeleteObjectDialog } from './DeleteObjectDialog';
 import { ObjectDetailsDialog } from './ObjectDetailsDialog';
+import { SearchFilter } from './SearchFilter';
+import { VersionDownloadDialog } from './VersionDownloadDialog';
 
 export const ObjectList = () => {
   const { currentBucket, currentPath, objects, loading, setCurrentPath } = useS3Store();
@@ -21,6 +23,7 @@ export const ObjectList = () => {
   const [showUpload, setShowUpload] = useState(false);
   const [showCreateFolder, setShowCreateFolder] = useState(false);
   const [isLoadingObjects, setIsLoadingObjects] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; objectKey: string; isFolder: boolean }>({
     open: false,
     objectKey: '',
@@ -32,6 +35,20 @@ export const ObjectList = () => {
     objectKey: '',
     object: null
   });
+  const [versionDialog, setVersionDialog] = useState<{ open: boolean; objectKey: string; fileName: string }>({
+    open: false,
+    objectKey: '',
+    fileName: ''
+  });
+
+  // Filtrer les objets selon la recherche
+  const filteredObjects = useMemo(() => {
+    if (!searchQuery.trim()) return objects;
+    const query = searchQuery.toLowerCase();
+    return objects.filter(obj => 
+      obj.key.toLowerCase().includes(query)
+    );
+  }, [objects, searchQuery]);
 
   useEffect(() => {
     if (currentBucket) {
@@ -160,6 +177,12 @@ export const ObjectList = () => {
     }
   };
 
+  const handleVersionDownload = (objectKey: string) => {
+    const fullKey = currentPath ? `${currentPath}/${objectKey}` : objectKey;
+    const fileName = fullKey.split('/').pop() || objectKey;
+    setVersionDialog({ open: true, objectKey: fullKey, fileName });
+  };
+
   const handleFolderCreated = () => {
     loadObjects();
   };
@@ -231,6 +254,22 @@ export const ObjectList = () => {
         </div>
       </div>
 
+      {/* Barre de recherche */}
+      {objects.length > 0 && (
+        <div className="flex items-center gap-4">
+          <SearchFilter
+            value={searchQuery}
+            onChange={setSearchQuery}
+            placeholder="Rechercher un fichier ou dossier..."
+          />
+          {searchQuery && (
+            <span className="text-sm text-muted-foreground">
+              {filteredObjects.length} résultat{filteredObjects.length > 1 ? 's' : ''}
+            </span>
+          )}
+        </div>
+      )}
+
       {objects.length === 0 ? (
         <Card className="p-12 text-center">
           <div className="space-y-4">
@@ -253,9 +292,13 @@ export const ObjectList = () => {
             </div>
           </div>
         </Card>
+      ) : filteredObjects.length === 0 && searchQuery ? (
+        <div className="text-center py-12">
+          <p className="text-gray-600">Aucun élément ne correspond à "{searchQuery}"</p>
+        </div>
       ) : (
         <div className="space-y-2">
-          {objects.map((object) => (
+          {filteredObjects.map((object) => (
             <Card key={object.key} className="hover:bg-gray-50 transition-colors">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
@@ -327,7 +370,16 @@ export const ObjectList = () => {
                         <Button
                           size="sm"
                           variant="outline"
+                          onClick={() => handleVersionDownload(object.key)}
+                          title="Télécharger une version"
+                        >
+                          <History className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
                           onClick={() => handleDownload(object.key)}
+                          title="Télécharger"
                         >
                           <Download className="w-4 h-4" />
                         </Button>
@@ -386,6 +438,14 @@ export const ObjectList = () => {
           object={detailsDialog.object}
         />
       )}
+
+      <VersionDownloadDialog
+        open={versionDialog.open}
+        onOpenChange={(open) => setVersionDialog({ ...versionDialog, open })}
+        bucket={currentBucket!}
+        objectKey={versionDialog.objectKey}
+        fileName={versionDialog.fileName}
+      />
     </div>
   );
 };

@@ -492,7 +492,14 @@ app.get('/api/buckets/:bucket/objects', extractCredentials, async (req, res) => 
 app.get('/api/buckets/:bucket/objects/:key(*)/download', extractCredentials, async (req, res) => {
   try {
     const { bucket, key } = req.params;
-    const command = new GetObjectCommand({ Bucket: bucket, Key: key });
+    const { versionId } = req.query;
+    
+    const commandParams = { Bucket: bucket, Key: key };
+    if (versionId) {
+      commandParams.VersionId = versionId;
+    }
+    
+    const command = new GetObjectCommand(commandParams);
     const url = await getSignedUrl(req.s3Client, command, { expiresIn: 3600 });
 
     res.json({ success: true, data: { url } });

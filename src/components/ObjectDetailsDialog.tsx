@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useEnhancedDirectS3 } from '@/hooks/useEnhancedDirectS3';
-import { Clock, Lock, Tag, History, RefreshCw, Shield, Link as LinkIcon, Copy, Check } from 'lucide-react';
+import { Clock, Lock, Tag, History, RefreshCw, Shield, Link as LinkIcon, Copy, Check, Download } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -28,7 +28,7 @@ export const ObjectDetailsDialog: React.FC<ObjectDetailsDialogProps> = ({
   objectKey,
   object
 }) => {
-  const { listObjectVersions, getObjectRetention, getObjectLockConfiguration, getObjectAcl, getPresignedUrl } = useEnhancedDirectS3();
+  const { listObjectVersions, getObjectRetention, getObjectLockConfiguration, getObjectAcl, getPresignedUrl, downloadObject } = useEnhancedDirectS3();
   const { toast } = useToast();
   const [versions, setVersions] = useState<any[]>([]);
   const [retention, setRetention] = useState<any>(null);
@@ -39,6 +39,7 @@ export const ObjectDetailsDialog: React.FC<ObjectDetailsDialogProps> = ({
   const [expiresIn, setExpiresIn] = useState<number>(3600);
   const [generatingUrl, setGeneratingUrl] = useState(false);
   const [urlCopied, setUrlCopied] = useState(false);
+  const [downloadingVersion, setDownloadingVersion] = useState<string | null>(null);
 
   const loadDetails = async () => {
     setLoading(true);
@@ -219,11 +220,16 @@ export const ObjectDetailsDialog: React.FC<ObjectDetailsDialogProps> = ({
                           key={version.versionId}
                           className="flex items-center justify-between p-3 border rounded-lg"
                         >
-                          <div className="flex-1 min-w-0">
+                          <div className="flex-1 min-w-0 mr-3">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <ScrollArea className="max-w-full">
-                                <span className="font-mono text-xs break-all">{version.versionId}</span>
-                              </ScrollArea>
+                              <span 
+                                className="font-mono text-xs break-all"
+                                title={version.versionId}
+                              >
+                                {version.versionId.length > 20 
+                                  ? `${version.versionId.slice(0, 8)}...${version.versionId.slice(-8)}`
+                                  : version.versionId}
+                              </span>
                               {version.isLatest && (
                                 <Badge variant="default" className="text-xs flex-shrink-0">Actuelle</Badge>
                               )}
@@ -232,6 +238,23 @@ export const ObjectDetailsDialog: React.FC<ObjectDetailsDialogProps> = ({
                               {formatBytes(version.size)} • {formatDistanceToNow(new Date(version.lastModified), { addSuffix: true, locale: fr })}
                             </div>
                           </div>
+                          <Button
+                            size="sm"
+                            variant={version.isLatest ? "default" : "outline"}
+                            onClick={async () => {
+                              setDownloadingVersion(version.versionId);
+                              const fileName = objectKey.split('/').pop() || objectKey;
+                              await downloadObject(bucket, objectKey, fileName, version.versionId);
+                              setDownloadingVersion(null);
+                            }}
+                            disabled={downloadingVersion !== null}
+                          >
+                            {downloadingVersion === version.versionId ? (
+                              <RefreshCw className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Download className="w-4 h-4" />
+                            )}
+                          </Button>
                         </div>
                       ))}
                     </div>
