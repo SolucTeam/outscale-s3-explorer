@@ -128,7 +128,7 @@ export const LoginForm = () => {
           </div>
           <div>
             <CardTitle className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
-              NumS3 Console
+              Outscale S3 Explorer
             </CardTitle>
             <CardDescription className="text-gray-600 mt-2">
               Connectez-vous avec vos identifiants Outscale
