@@ -293,7 +293,9 @@ export const BucketList = () => {
                 </div>
                 
                 <div className="flex items-center justify-between text-xs sm:text-sm">
-                  <span className="text-gray-600">{bucket.objectCount || 0} objets</span>
+                  <span className="text-gray-600">
+                    {bucket.hasMoreObjects ? '1000+' : (bucket.objectCount || 0)} objets
+                  </span>
                   <div className="flex items-center space-x-2 text-gray-600">
                     <HardDrive className="w-3 h-3 sm:w-4 sm:h-4" />
                     <span>{formatBytes(bucket.size || 0)}</span>
@@ -314,7 +316,7 @@ export const BucketList = () => {
               </CardContent>
                   </Card>
                 </TooltipTrigger>
-                <TooltipContent side="bottom" className="max-w-xs">
+                <TooltipContent side="top" className="max-w-xs">
                   <p className="font-medium">{bucket.name}</p>
                 </TooltipContent>
               </Tooltip>

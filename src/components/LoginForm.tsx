@@ -80,11 +80,9 @@ export const LoginForm = () => {
         });
 
         // Redirection immédiate avec replace pour éviter de revenir à la page de login
-        setTimeout(() => {
-          navigate('/dashboard', {
-            replace: true
-          });
-        }, 500);
+        navigate('/dashboard', {
+          replace: true
+        });
       } else {
         throw new Error('Échec de l\'initialisation');
       }

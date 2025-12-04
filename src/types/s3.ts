@@ -18,6 +18,7 @@ export interface S3Bucket {
   location?: string;
   objectCount?: number;
   size?: number;
+  hasMoreObjects?: boolean;
   versioningEnabled?: boolean;
   objectLockEnabled?: boolean;
   encryptionEnabled?: boolean;

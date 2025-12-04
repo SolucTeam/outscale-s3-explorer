@@ -165,7 +165,36 @@ app.get('/health', (req, res) => {
   res.json({ status: 'OK', message: 'Proxy CORS NumS3 opérationnel' });
 });
 
-// Fonction utilitaire pour compter TOUS les objets avec pagination
+// Fonction utilitaire pour obtenir une estimation rapide des objets (1 seule requête)
+async function getQuickObjectStats(s3Client, bucketName) {
+  try {
+    const listCommand = new ListObjectsV2Command({
+      Bucket: bucketName,
+      MaxKeys: 1000 // Limite à 1000 pour un chargement rapide
+    });
+
+    const response = await s3Client.send(listCommand);
+
+    let count = response.KeyCount || 0;
+    let size = 0;
+    
+    if (response.Contents) {
+      size = response.Contents.reduce((sum, obj) => sum + (obj.Size || 0), 0);
+    }
+    
+    // Si tronqué, indiquer qu'il y a plus de 1000 objets
+    if (response.IsTruncated) {
+      count = 1000; // Afficher "1000+" dans l'UI
+    }
+
+    return { count, size, hasMore: response.IsTruncated || false };
+  } catch (error) {
+    console.warn(`Erreur stats rapides pour ${bucketName}:`, error.message);
+    return { count: 0, size: 0, hasMore: false };
+  }
+}
+
+// Fonction utilitaire pour compter TOUS les objets avec pagination (utilisé pour les détails)
 async function countAllObjects(s3Client, bucketName) {
   let totalCount = 0;
   let totalSize = 0;
@@ -200,8 +229,8 @@ app.get('/api/buckets', extractCredentials, async (req, res) => {
 
     const buckets = await Promise.all((response.Buckets || []).map(async (bucket) => {
       try {
-        // Récupérer les statistiques du bucket avec pagination complète
-        const { count: objectCount, size } = await countAllObjects(req.s3Client, bucket.Name);
+        // Récupérer les statistiques rapides du bucket (1 seule requête)
+        const { count: objectCount, size, hasMore } = await getQuickObjectStats(req.s3Client, bucket.Name);
 
         // Récupérer le statut du versioning
         let versioningEnabled = false;
@@ -250,6 +279,7 @@ app.get('/api/buckets', extractCredentials, async (req, res) => {
           location,
           objectCount,
           size,
+          hasMoreObjects: hasMore,
           versioningEnabled,
           objectLockEnabled,
           encryptionEnabled
