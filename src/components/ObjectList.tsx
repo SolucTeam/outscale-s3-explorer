@@ -399,7 +399,7 @@ export const ObjectList = () => {
                     </CardContent>
                   </Card>
                 </TooltipTrigger>
-                <TooltipContent side="bottom" className="max-w-md">
+                <TooltipContent side="top" className="max-w-md">
                   <p className="font-medium break-all">{object.key}</p>
                 </TooltipContent>
               </Tooltip>
