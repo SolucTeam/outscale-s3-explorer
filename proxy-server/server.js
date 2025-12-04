@@ -165,6 +165,33 @@ app.get('/health', (req, res) => {
   res.json({ status: 'OK', message: 'Proxy CORS NumS3 opérationnel' });
 });
 
+// Fonction utilitaire pour compter TOUS les objets avec pagination
+async function countAllObjects(s3Client, bucketName) {
+  let totalCount = 0;
+  let totalSize = 0;
+  let continuationToken = undefined;
+  let isTruncated = true;
+
+  while (isTruncated) {
+    const listCommand = new ListObjectsV2Command({
+      Bucket: bucketName,
+      ContinuationToken: continuationToken
+    });
+
+    const response = await s3Client.send(listCommand);
+
+    if (response.Contents) {
+      totalCount += response.Contents.length;
+      totalSize += response.Contents.reduce((sum, obj) => sum + (obj.Size || 0), 0);
+    }
+
+    isTruncated = response.IsTruncated || false;
+    continuationToken = response.NextContinuationToken;
+  }
+
+  return { count: totalCount, size: totalSize };
+}
+
 // Liste des buckets avec statistiques
 app.get('/api/buckets', extractCredentials, async (req, res) => {
   try {
@@ -173,14 +200,8 @@ app.get('/api/buckets', extractCredentials, async (req, res) => {
 
     const buckets = await Promise.all((response.Buckets || []).map(async (bucket) => {
       try {
-        // Récupérer les statistiques du bucket
-        const listCommand = new ListObjectsV2Command({
-          Bucket: bucket.Name
-        });
-        const objectsResponse = await req.s3Client.send(listCommand);
-
-        const objectCount = objectsResponse.KeyCount || 0;
-        const size = (objectsResponse.Contents || []).reduce((total, obj) => total + (obj.Size || 0), 0);
+        // Récupérer les statistiques du bucket avec pagination complète
+        const { count: objectCount, size } = await countAllObjects(req.s3Client, bucket.Name);
 
         // Récupérer le statut du versioning
         let versioningEnabled = false;
