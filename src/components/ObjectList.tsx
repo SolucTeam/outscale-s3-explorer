@@ -15,6 +15,7 @@ import { DeleteObjectDialog } from './DeleteObjectDialog';
 import { ObjectDetailsDialog } from './ObjectDetailsDialog';
 import { SearchFilter } from './SearchFilter';
 import { VersionDownloadDialog } from './VersionDownloadDialog';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 export const ObjectList = () => {
   const { currentBucket, currentPath, objects, loading, setCurrentPath } = useS3Store();
@@ -299,104 +300,110 @@ export const ObjectList = () => {
       ) : (
         <div className="space-y-2">
           {filteredObjects.map((object) => (
-            <Card key={object.key} className="hover:bg-gray-50 transition-colors">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div 
-                    className="flex items-center space-x-4 flex-1 cursor-pointer"
-                    onClick={() => handleObjectClick(object)}
-                  >
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                      object.isFolder 
-                        ? 'bg-blue-100 text-blue-600' 
-                        : 'bg-gray-100 text-gray-600'
-                    }`}>
-                      {object.isFolder ? (
-                        <FolderOpen className="w-5 h-5" />
-                      ) : (
-                        <File className="w-5 h-5" />
-                      )}
-                    </div>
-                    
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center space-x-2">
-                        <h4 
-                          className="font-medium text-gray-900 hover:text-blue-600 transition-colors truncate max-w-md"
-                          title={object.key}
+            <TooltipProvider key={object.key}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Card className="hover:bg-gray-50 transition-colors">
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div 
+                          className="flex items-center space-x-4 flex-1 cursor-pointer"
+                          onClick={() => handleObjectClick(object)}
                         >
-                          {object.key.length > 50 
-                            ? `${object.key.slice(0, 25)}...${object.key.slice(-20)}` 
-                            : object.key}
-                        </h4>
-                        {object.isFolder && (
-                          <Badge variant="secondary" className="shrink-0">Dossier</Badge>
-                        )}
-                      </div>
-                      <div className="flex items-center space-x-4 text-sm text-gray-600 mt-1">
-                        {!object.isFolder && (
-                          <span>{formatBytes(object.size)}</span>
-                        )}
-                        <span>
-                          Modifié {formatDistanceToNow(object.lastModified, { 
-                            addSuffix: true, 
-                            locale: fr 
-                          })}
-                        </span>
-                      </div>
-                      {object.tags && Object.keys(object.tags).length > 0 && (
-                        <div className="flex items-center gap-2 mt-2 flex-wrap">
-                          <Tag className="w-3 h-3 text-gray-500" />
-                          {Object.entries(object.tags).map(([key, value]) => (
-                            <Badge key={key} variant="outline" className="text-xs">
-                              {key}: {value}
-                            </Badge>
-                          ))}
+                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                            object.isFolder 
+                              ? 'bg-blue-100 text-blue-600' 
+                              : 'bg-gray-100 text-gray-600'
+                          }`}>
+                            {object.isFolder ? (
+                              <FolderOpen className="w-5 h-5" />
+                            ) : (
+                              <File className="w-5 h-5" />
+                            )}
+                          </div>
+                          
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center space-x-2">
+                              <h4 className="font-medium text-gray-900 hover:text-blue-600 transition-colors truncate max-w-md">
+                                {object.key.length > 50 
+                                  ? `${object.key.slice(0, 25)}...${object.key.slice(-20)}` 
+                                  : object.key}
+                              </h4>
+                              {object.isFolder && (
+                                <Badge variant="secondary" className="shrink-0">Dossier</Badge>
+                              )}
+                            </div>
+                            <div className="flex items-center space-x-4 text-sm text-gray-600 mt-1">
+                              {!object.isFolder && (
+                                <span>{formatBytes(object.size)}</span>
+                              )}
+                              <span>
+                                Modifié {formatDistanceToNow(object.lastModified, { 
+                                  addSuffix: true, 
+                                  locale: fr 
+                                })}
+                              </span>
+                            </div>
+                            {object.tags && Object.keys(object.tags).length > 0 && (
+                              <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                <Tag className="w-3 h-3 text-gray-500" />
+                                {Object.entries(object.tags).map(([key, value]) => (
+                                  <Badge key={key} variant="outline" className="text-xs">
+                                    {key}: {value}
+                                  </Badge>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center space-x-2">
-                    {!object.isFolder && (
-                      <>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleShowDetails(object)}
-                          title="Détails de l'objet"
-                        >
-                          <Info className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleVersionDownload(object.key)}
-                          title="Télécharger une version"
-                        >
-                          <History className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleDownload(object.key)}
-                          title="Télécharger"
-                        >
-                          <Download className="w-4 h-4" />
-                        </Button>
-                      </>
-                    )}
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleDeleteClick(object.key, object.isFolder)}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                        
+                        <div className="flex items-center space-x-2">
+                          {!object.isFolder && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleShowDetails(object)}
+                                title="Détails de l'objet"
+                              >
+                                <Info className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleVersionDownload(object.key)}
+                                title="Télécharger une version"
+                              >
+                                <History className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleDownload(object.key)}
+                                title="Télécharger"
+                              >
+                                <Download className="w-4 h-4" />
+                              </Button>
+                            </>
+                          )}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleDeleteClick(object.key, object.isFolder)}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-md">
+                  <p className="font-medium break-all">{object.key}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           ))}
         </div>
       )}

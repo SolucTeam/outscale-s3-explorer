@@ -210,27 +210,21 @@ export const BucketList = () => {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
           {filteredBuckets.map((bucket) => (
-            <Card key={bucket.name} className="hover:shadow-lg transition-all duration-200 cursor-pointer group" onClick={() => handleBucketClick(bucket.name)}>
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-start space-x-3 min-w-0 flex-1">
-                    <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-200 transition-colors flex-shrink-0">
-                      <Folder className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
+            <TooltipProvider key={bucket.name}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Card className="hover:shadow-lg transition-all duration-200 cursor-pointer group" onClick={() => handleBucketClick(bucket.name)}>
+                    <CardHeader className="pb-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-start space-x-3 min-w-0 flex-1">
+                          <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-200 transition-colors flex-shrink-0">
+                            <Folder className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
+                          </div>
+                          <div className="min-w-0 flex-1">
                             <CardTitle className="text-sm sm:text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors truncate">
                               {bucket.name}
                             </CardTitle>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>{bucket.name}</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                      <div className="flex flex-wrap gap-1 mt-1 max-w-full">
+                            <div className="flex flex-wrap gap-1 mt-1 max-w-full">
                         <Badge variant="secondary" className="text-xs whitespace-nowrap">
                           {bucket.location || bucket.region}
                         </Badge>
@@ -318,7 +312,13 @@ export const BucketList = () => {
                   <ChevronRight className="w-3 h-3 sm:w-4 sm:h-4 ml-2" />
                 </Button>
               </CardContent>
-            </Card>
+                  </Card>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-xs">
+                  <p className="font-medium">{bucket.name}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           ))}
         </div>
       )}
