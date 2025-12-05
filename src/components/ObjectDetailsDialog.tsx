@@ -7,12 +7,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useEnhancedDirectS3 } from '@/hooks/useEnhancedDirectS3';
-import { Clock, Lock, Tag, History, RefreshCw, Shield, Link as LinkIcon, Copy, Check, Download, AlertTriangle, Calendar } from 'lucide-react';
-import { formatDistanceToNow, addDays, format } from 'date-fns';
+import { Lock, Tag, History, RefreshCw, Shield, Link as LinkIcon, Copy, Check, Download } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 interface ObjectDetailsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -28,7 +26,7 @@ export const ObjectDetailsDialog: React.FC<ObjectDetailsDialogProps> = ({
   objectKey,
   object
 }) => {
-  const { listObjectVersions, getObjectRetention, setObjectRetention, getObjectLockConfiguration, getObjectAcl, getPresignedUrl, downloadObject } = useEnhancedDirectS3();
+  const { listObjectVersions, getObjectRetention, getObjectLockConfiguration, getObjectAcl, getPresignedUrl, downloadObject } = useEnhancedDirectS3();
   const { toast } = useToast();
   const [versions, setVersions] = useState<any[]>([]);
   const [retention, setRetention] = useState<any>(null);
@@ -40,11 +38,6 @@ export const ObjectDetailsDialog: React.FC<ObjectDetailsDialogProps> = ({
   const [generatingUrl, setGeneratingUrl] = useState(false);
   const [urlCopied, setUrlCopied] = useState(false);
   const [downloadingVersion, setDownloadingVersion] = useState<string | null>(null);
-  
-  // États pour le formulaire de rétention
-  const [retentionDays, setRetentionDays] = useState<number>(30);
-  const [retentionDate, setRetentionDate] = useState<string>('');
-  const [settingRetention, setSettingRetention] = useState(false);
 
   const loadDetails = async () => {
     setLoading(true);
@@ -76,58 +69,6 @@ export const ObjectDetailsDialog: React.FC<ObjectDetailsDialogProps> = ({
       console.error('Error loading object details:', error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  // Fonction pour appliquer la rétention (mode COMPLIANCE uniquement pour Outscale)
-  const handleSetRetention = async () => {
-    if (!objectLockConfig?.enabled) {
-      toast({
-        title: "Erreur",
-        description: "L'Object Lock doit être activé sur le bucket pour configurer la rétention",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    let targetDate: Date;
-    if (retentionDate) {
-      targetDate = new Date(retentionDate);
-    } else {
-      targetDate = addDays(new Date(), retentionDays);
-    }
-
-    // Vérifier que la date est dans le futur
-    if (targetDate <= new Date()) {
-      toast({
-        title: "Erreur",
-        description: "La date de rétention doit être dans le futur",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setSettingRetention(true);
-    try {
-      const retentionConfig = {
-        mode: 'COMPLIANCE' as const, // Outscale ne supporte que COMPLIANCE
-        retainUntilDate: targetDate.toISOString()
-      };
-
-      const success = await setObjectRetention(bucket, objectKey, retentionConfig);
-      if (success) {
-        // Recharger les détails pour afficher la nouvelle rétention
-        await loadDetails();
-      }
-    } catch (error) {
-      console.error('Error setting retention:', error);
-      toast({
-        title: "Erreur",
-        description: "Impossible de configurer la rétention",
-        variant: "destructive"
-      });
-    } finally {
-      setSettingRetention(false);
     }
   };
 
@@ -375,7 +316,7 @@ export const ObjectDetailsDialog: React.FC<ObjectDetailsDialogProps> = ({
                       
                       {/* Rétention actuelle */}
                       {retention && (retention.mode || retention.retainUntilDate) ? (
-                        <div className="mb-4 p-3 border rounded-lg bg-amber-50 border-amber-200">
+                        <div className="p-3 border rounded-lg bg-amber-50 border-amber-200">
                           <div className="flex items-center gap-2 mb-2">
                             <Lock className="w-4 h-4 text-amber-600" />
                             <span className="font-medium text-sm text-amber-800">Rétention active</span>
@@ -404,97 +345,9 @@ export const ObjectDetailsDialog: React.FC<ObjectDetailsDialogProps> = ({
                           </div>
                         </div>
                       ) : (
-                        <p className="text-sm text-muted-foreground text-center py-2 mb-4">
+                        <p className="text-sm text-muted-foreground text-center py-4">
                           Aucune rétention configurée pour cet objet.
                         </p>
-                      )}
-
-                      {/* Formulaire de configuration de la rétention */}
-                      {objectLockConfig?.enabled ? (
-                        <div className="space-y-4 border-t pt-4">
-                          <div className="flex items-center gap-2">
-                            <Calendar className="w-4 h-4 text-primary" />
-                            <span className="font-medium text-sm">Configurer la rétention</span>
-                          </div>
-                          
-                          <Alert className="bg-blue-50 border-blue-200">
-                            <AlertTriangle className="w-4 h-4 text-blue-600" />
-                            <AlertDescription className="text-xs text-blue-800">
-                              <strong>Mode COMPLIANCE uniquement:</strong> Outscale ne supporte que le mode COMPLIANCE.
-                              Une fois configurée, la rétention ne peut pas être réduite ni supprimée avant son expiration.
-                            </AlertDescription>
-                          </Alert>
-
-                          <div className="grid gap-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="retention-days" className="text-sm">Durée en jours</Label>
-                              <div className="flex gap-2">
-                                <Input
-                                  id="retention-days"
-                                  type="number"
-                                  min="1"
-                                  max="36500"
-                                  value={retentionDays}
-                                  onChange={(e) => {
-                                    setRetentionDays(parseInt(e.target.value) || 1);
-                                    setRetentionDate('');
-                                  }}
-                                  className="flex-1"
-                                  placeholder="30"
-                                />
-                                <Badge variant="secondary" className="px-3 py-2">
-                                  Jusqu'au {format(addDays(new Date(), retentionDays), 'dd/MM/yyyy')}
-                                </Badge>
-                              </div>
-                            </div>
-                            
-                            <div className="text-center text-xs text-muted-foreground">ou</div>
-                            
-                            <div className="space-y-2">
-                              <Label htmlFor="retention-date" className="text-sm">Date spécifique (ISO 8601)</Label>
-                              <Input
-                                id="retention-date"
-                                type="datetime-local"
-                                value={retentionDate}
-                                onChange={(e) => {
-                                  setRetentionDate(e.target.value);
-                                }}
-                                min={format(addDays(new Date(), 1), "yyyy-MM-dd'T'HH:mm")}
-                                className="w-full"
-                              />
-                            </div>
-                          </div>
-
-                          <Button
-                            onClick={handleSetRetention}
-                            disabled={settingRetention}
-                            className="w-full"
-                            variant="default"
-                          >
-                            {settingRetention ? (
-                              <>
-                                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                                Configuration...
-                              </>
-                            ) : (
-                              <>
-                                <Lock className="w-4 h-4 mr-2" />
-                                Appliquer la rétention COMPLIANCE
-                              </>
-                            )}
-                          </Button>
-                        </div>
-                      ) : (
-                        <Alert className="bg-destructive/10 border-destructive/30">
-                          <AlertTriangle className="w-4 h-4 text-destructive" />
-                          <AlertDescription className="text-sm">
-                            <strong className="text-destructive">Configuration impossible</strong>
-                            <p className="mt-1 text-muted-foreground">
-                              L'Object Lock doit être activé sur le bucket lors de sa création pour pouvoir configurer la rétention sur les objets. 
-                              Cette fonctionnalité ne peut pas être activée après la création du bucket.
-                            </p>
-                          </AlertDescription>
-                        </Alert>
                       )}
                     </>
                   )}
