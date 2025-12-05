@@ -1013,6 +1013,96 @@ export const useEnhancedDirectS3 = () => {
     }
   }, [initialized]);
 
+  const setBucketAcl = useCallback(async (bucket: string, acl: string): Promise<boolean> => {
+    if (!initialized) return false;
+
+    const entryId = s3LoggingService.logOperationStart('acl_update', bucket);
+    try {
+      const response = await withRetry(
+        () => proxyS3Service.setBucketAcl(bucket, acl),
+        `définition ACL ${bucket}`
+      );
+
+      if (response.success) {
+        toast({
+          title: 'ACL mis à jour',
+          description: `L'ACL du bucket ${bucket} a été modifié`,
+        });
+        s3LoggingService.logOperationSuccess(entryId, 'acl_update', bucket);
+        return true;
+      } else {
+        handleError(response, 'Erreur lors de la mise à jour des ACL');
+        s3LoggingService.logOperationError(entryId, 'acl_update', response.error || 'Erreur inconnue', bucket);
+        return false;
+      }
+    } catch (error) {
+      console.error('❌ Set bucket ACL error:', error);
+      setError('Erreur de connexion');
+      s3LoggingService.logOperationError(entryId, 'acl_update', 'Erreur de connexion', bucket);
+      return false;
+    }
+  }, [initialized, toast]);
+
+  const setBucketPolicy = useCallback(async (bucket: string, policy: string): Promise<boolean> => {
+    if (!initialized) return false;
+
+    const entryId = s3LoggingService.logOperationStart('policy_update', bucket);
+    try {
+      const response = await withRetry(
+        () => proxyS3Service.setBucketPolicy(bucket, policy),
+        `définition policy ${bucket}`
+      );
+
+      if (response.success) {
+        toast({
+          title: 'Policy mise à jour',
+          description: `La policy du bucket ${bucket} a été modifiée`,
+        });
+        s3LoggingService.logOperationSuccess(entryId, 'policy_update', bucket);
+        return true;
+      } else {
+        handleError(response, 'Erreur lors de la mise à jour de la policy');
+        s3LoggingService.logOperationError(entryId, 'policy_update', response.error || 'Erreur inconnue', bucket);
+        return false;
+      }
+    } catch (error) {
+      console.error('❌ Set bucket policy error:', error);
+      setError('Erreur de connexion');
+      s3LoggingService.logOperationError(entryId, 'policy_update', 'Erreur de connexion', bucket);
+      return false;
+    }
+  }, [initialized, toast]);
+
+  const deleteBucketPolicy = useCallback(async (bucket: string): Promise<boolean> => {
+    if (!initialized) return false;
+
+    const entryId = s3LoggingService.logOperationStart('policy_update', bucket, undefined, 'Suppression de policy');
+    try {
+      const response = await withRetry(
+        () => proxyS3Service.deleteBucketPolicy(bucket),
+        `suppression policy ${bucket}`
+      );
+
+      if (response.success) {
+        toast({
+          title: 'Policy supprimée',
+          description: `La policy du bucket ${bucket} a été supprimée`,
+        });
+        s3LoggingService.logOperationSuccess(entryId, 'policy_update', bucket);
+        return true;
+      } else {
+        handleError(response, 'Erreur lors de la suppression de la policy');
+        s3LoggingService.logOperationError(entryId, 'policy_update', response.error || 'Erreur inconnue', bucket);
+        return false;
+      }
+    } catch (error) {
+      console.error('❌ Delete bucket policy error:', error);
+      setError('Erreur de connexion');
+      s3LoggingService.logOperationError(entryId, 'policy_update', 'Erreur de connexion', bucket);
+      return false;
+    }
+  }, [initialized, toast]);
+
   return {
     initialized,
     uploadProgress,
@@ -1042,6 +1132,9 @@ export const useEnhancedDirectS3 = () => {
     headObject,
     getPresignedUrl,
     getBucketAcl,
-    getBucketPolicy
+    getBucketPolicy,
+    setBucketAcl,
+    setBucketPolicy,
+    deleteBucketPolicy
   };
 };
