@@ -6,13 +6,14 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useS3Store } from '../hooks/useS3Store';
 import { useEnhancedDirectS3 } from '../hooks/useEnhancedDirectS3';
-import { Upload, Download, Trash2, FolderOpen, File, RefreshCw, Plus, FolderPlus, Tag, Info, History } from 'lucide-react';
+import { Upload, Download, Trash2, FolderOpen, File, RefreshCw, Plus, FolderPlus, Tag, Info, History, Edit } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { FileUpload } from './FileUpload';
 import { CreateFolderDialog } from './CreateFolderDialog';
 import { DeleteObjectDialog } from './DeleteObjectDialog';
 import { ObjectDetailsDialog } from './ObjectDetailsDialog';
+import { ObjectEditDialog } from './ObjectEditDialog';
 import { SearchFilter } from './SearchFilter';
 import { VersionDownloadDialog } from './VersionDownloadDialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -40,6 +41,11 @@ export const ObjectList = () => {
     open: false,
     objectKey: '',
     fileName: ''
+  });
+  const [editDialog, setEditDialog] = useState<{ open: boolean; objectKey: string; object: any | null }>({
+    open: false,
+    objectKey: '',
+    object: null
   });
 
   // Filtrer les objets selon la recherche
@@ -196,6 +202,11 @@ export const ObjectList = () => {
   const handleShowDetails = (object: any) => {
     const fullKey = currentPath ? `${currentPath}/${object.key}` : object.key;
     setDetailsDialog({ open: true, objectKey: fullKey, object });
+  };
+
+  const handleEditObject = (object: any) => {
+    const fullKey = currentPath ? `${currentPath}/${object.key}` : object.key;
+    setEditDialog({ open: true, objectKey: fullKey, object });
   };
 
   if (!currentBucket) return null;
@@ -371,6 +382,14 @@ export const ObjectList = () => {
                               <Button
                                 size="sm"
                                 variant="outline"
+                                onClick={() => handleEditObject(object)}
+                                title="Modifier (tags, ACL, rétention)"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
                                 onClick={() => handleVersionDownload(object.key)}
                                 title="Télécharger une version"
                               >
@@ -453,6 +472,17 @@ export const ObjectList = () => {
         objectKey={versionDialog.objectKey}
         fileName={versionDialog.fileName}
       />
+
+      {editDialog.object && (
+        <ObjectEditDialog
+          open={editDialog.open}
+          onOpenChange={(open) => setEditDialog({ ...editDialog, open })}
+          bucket={currentBucket!}
+          objectKey={editDialog.objectKey}
+          object={editDialog.object}
+          onUpdated={loadObjects}
+        />
+      )}
     </div>
   );
 };
