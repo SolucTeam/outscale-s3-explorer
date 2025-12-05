@@ -784,6 +784,61 @@ class ProxyS3Service {
     }
   }
 
+  async setBucketPolicy(bucket: string, policy: string): Promise<ProxyS3Response<void>> {
+    if (!this.credentials) return { success: false, error: 'Service non initialisé' };
+    return this.makeRequest(`/buckets/${encodeURIComponent(bucket)}/policy`, { method: 'PUT', body: JSON.stringify({ policy }) });
+  }
+
+  async deleteBucketPolicy(bucket: string): Promise<ProxyS3Response<void>> {
+    if (!this.credentials) return { success: false, error: 'Service non initialisé' };
+    return this.makeRequest(`/buckets/${encodeURIComponent(bucket)}/policy`, { method: 'DELETE' });
+  }
+
+  async setBucketAcl(bucket: string, acl: string): Promise<ProxyS3Response<void>> {
+    if (!this.credentials) return { success: false, error: 'Service non initialisé' };
+    return this.makeRequest(`/buckets/${encodeURIComponent(bucket)}/acl`, { method: 'PUT', body: JSON.stringify({ acl }) });
+  }
+
+  async getBucketCors(bucket: string): Promise<ProxyS3Response<{ corsRules: any[] }>> {
+    if (!this.credentials) return { success: false, error: 'Service non initialisé' };
+    return this.makeRequest(`/buckets/${encodeURIComponent(bucket)}/cors`);
+  }
+
+  async setBucketCors(bucket: string, corsRules: any[]): Promise<ProxyS3Response<void>> {
+    if (!this.credentials) return { success: false, error: 'Service non initialisé' };
+    return this.makeRequest(`/buckets/${encodeURIComponent(bucket)}/cors`, { method: 'PUT', body: JSON.stringify({ corsRules }) });
+  }
+
+  async deleteBucketCors(bucket: string): Promise<ProxyS3Response<void>> {
+    if (!this.credentials) return { success: false, error: 'Service non initialisé' };
+    return this.makeRequest(`/buckets/${encodeURIComponent(bucket)}/cors`, { method: 'DELETE' });
+  }
+
+  async getBucketWebsite(bucket: string): Promise<ProxyS3Response<{ indexDocument?: string; errorDocument?: string }>> {
+    if (!this.credentials) return { success: false, error: 'Service non initialisé' };
+    return this.makeRequest(`/buckets/${encodeURIComponent(bucket)}/website`);
+  }
+
+  async setBucketWebsite(bucket: string, indexDocument: string, errorDocument?: string): Promise<ProxyS3Response<void>> {
+    if (!this.credentials) return { success: false, error: 'Service non initialisé' };
+    return this.makeRequest(`/buckets/${encodeURIComponent(bucket)}/website`, { method: 'PUT', body: JSON.stringify({ indexDocument, errorDocument }) });
+  }
+
+  async deleteBucketWebsite(bucket: string): Promise<ProxyS3Response<void>> {
+    if (!this.credentials) return { success: false, error: 'Service non initialisé' };
+    return this.makeRequest(`/buckets/${encodeURIComponent(bucket)}/website`, { method: 'DELETE' });
+  }
+
+  async setBucketObjectLock(bucket: string, mode: string, days: number): Promise<ProxyS3Response<void>> {
+    if (!this.credentials) return { success: false, error: 'Service non initialisé' };
+    return this.makeRequest(`/buckets/${encodeURIComponent(bucket)}/object-lock`, { method: 'PUT', body: JSON.stringify({ mode, days }) });
+  }
+
+  async setObjectAcl(bucket: string, objectKey: string, acl: string): Promise<ProxyS3Response<void>> {
+    if (!this.credentials) return { success: false, error: 'Service non initialisé' };
+    return this.makeRequest(`/buckets/${encodeURIComponent(bucket)}/objects/${encodeURIComponent(objectKey)}/acl`, { method: 'PUT', body: JSON.stringify({ acl }) });
+  }
+
   isInitialized(): boolean {
     return !!this.credentials;
   }

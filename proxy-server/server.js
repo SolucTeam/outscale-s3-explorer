@@ -16,6 +16,7 @@ const {
   GetBucketVersioningCommand,
   PutBucketVersioningCommand,
   GetObjectLockConfigurationCommand,
+  PutObjectLockConfigurationCommand,
   GetObjectTaggingCommand,
   PutObjectTaggingCommand,
   DeleteObjectTaggingCommand,
@@ -27,11 +28,21 @@ const {
   GetObjectRetentionCommand,
   PutObjectRetentionCommand,
   GetObjectAclCommand,
+  PutObjectAclCommand,
   GetBucketLifecycleConfigurationCommand,
   PutBucketLifecycleConfigurationCommand,
   DeleteBucketLifecycleCommand,
   GetBucketAclCommand,
-  GetBucketPolicyCommand
+  PutBucketAclCommand,
+  GetBucketPolicyCommand,
+  PutBucketPolicyCommand,
+  DeleteBucketPolicyCommand,
+  GetBucketCorsCommand,
+  PutBucketCorsCommand,
+  DeleteBucketCorsCommand,
+  GetBucketWebsiteCommand,
+  PutBucketWebsiteCommand,
+  DeleteBucketWebsiteCommand
 } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 
@@ -1295,6 +1306,333 @@ app.get('/api/buckets/:bucket/policy', extractCredentials, async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Erreur lors de la récupération de la policy du bucket'
+    });
+  }
+});
+
+// PUT /api/buckets/:bucket/policy - Définir la policy du bucket
+app.put('/api/buckets/:bucket/policy', strictLimiter, extractCredentials, async (req, res) => {
+  try {
+    const { bucket } = req.params;
+    const { policy } = req.body;
+
+    const command = new PutBucketPolicyCommand({
+      Bucket: bucket,
+      Policy: typeof policy === 'string' ? policy : JSON.stringify(policy)
+    });
+
+    await req.s3Client.send(command);
+
+    res.json({
+      success: true,
+      message: 'Policy mise à jour'
+    });
+  } catch (error) {
+    console.error('Erreur put bucket policy:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur lors de la mise à jour de la policy',
+      message: error.message
+    });
+  }
+});
+
+// DELETE /api/buckets/:bucket/policy - Supprimer la policy du bucket
+app.delete('/api/buckets/:bucket/policy', strictLimiter, extractCredentials, async (req, res) => {
+  try {
+    const { bucket } = req.params;
+
+    const command = new DeleteBucketPolicyCommand({
+      Bucket: bucket
+    });
+
+    await req.s3Client.send(command);
+
+    res.json({
+      success: true,
+      message: 'Policy supprimée'
+    });
+  } catch (error) {
+    console.error('Erreur delete bucket policy:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur lors de la suppression de la policy'
+    });
+  }
+});
+
+// PUT /api/buckets/:bucket/acl - Définir les ACL du bucket
+app.put('/api/buckets/:bucket/acl', strictLimiter, extractCredentials, async (req, res) => {
+  try {
+    const { bucket } = req.params;
+    const { acl } = req.body;
+
+    const command = new PutBucketAclCommand({
+      Bucket: bucket,
+      ACL: acl
+    });
+
+    await req.s3Client.send(command);
+
+    res.json({
+      success: true,
+      message: 'ACL du bucket mise à jour'
+    });
+  } catch (error) {
+    console.error('Erreur put bucket ACL:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur lors de la mise à jour des ACL',
+      message: error.message
+    });
+  }
+});
+
+// ============================================================
+// BUCKET CORS
+// ============================================================
+
+// GET /api/buckets/:bucket/cors - Obtenir la configuration CORS
+app.get('/api/buckets/:bucket/cors', extractCredentials, async (req, res) => {
+  try {
+    const { bucket } = req.params;
+
+    const command = new GetBucketCorsCommand({
+      Bucket: bucket
+    });
+
+    const response = await req.s3Client.send(command);
+
+    res.json({
+      success: true,
+      data: {
+        corsRules: response.CORSRules || []
+      }
+    });
+  } catch (error) {
+    if (error.name === 'NoSuchCORSConfiguration') {
+      return res.json({
+        success: true,
+        data: { corsRules: [] }
+      });
+    }
+    console.error('Erreur get bucket CORS:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur lors de la récupération de la configuration CORS'
+    });
+  }
+});
+
+// PUT /api/buckets/:bucket/cors - Configurer CORS
+app.put('/api/buckets/:bucket/cors', strictLimiter, extractCredentials, async (req, res) => {
+  try {
+    const { bucket } = req.params;
+    const { corsRules } = req.body;
+
+    const command = new PutBucketCorsCommand({
+      Bucket: bucket,
+      CORSConfiguration: {
+        CORSRules: corsRules
+      }
+    });
+
+    await req.s3Client.send(command);
+
+    res.json({
+      success: true,
+      message: 'Configuration CORS mise à jour'
+    });
+  } catch (error) {
+    console.error('Erreur put bucket CORS:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur lors de la configuration CORS',
+      message: error.message
+    });
+  }
+});
+
+// DELETE /api/buckets/:bucket/cors - Supprimer la configuration CORS
+app.delete('/api/buckets/:bucket/cors', strictLimiter, extractCredentials, async (req, res) => {
+  try {
+    const { bucket } = req.params;
+
+    const command = new DeleteBucketCorsCommand({
+      Bucket: bucket
+    });
+
+    await req.s3Client.send(command);
+
+    res.json({
+      success: true,
+      message: 'Configuration CORS supprimée'
+    });
+  } catch (error) {
+    console.error('Erreur delete bucket CORS:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur lors de la suppression de la configuration CORS'
+    });
+  }
+});
+
+// ============================================================
+// BUCKET WEBSITE
+// ============================================================
+
+// GET /api/buckets/:bucket/website - Obtenir la configuration Website
+app.get('/api/buckets/:bucket/website', extractCredentials, async (req, res) => {
+  try {
+    const { bucket } = req.params;
+
+    const command = new GetBucketWebsiteCommand({
+      Bucket: bucket
+    });
+
+    const response = await req.s3Client.send(command);
+
+    res.json({
+      success: true,
+      data: {
+        indexDocument: response.IndexDocument?.Suffix,
+        errorDocument: response.ErrorDocument?.Key,
+        redirectAllRequestsTo: response.RedirectAllRequestsTo
+      }
+    });
+  } catch (error) {
+    if (error.name === 'NoSuchWebsiteConfiguration') {
+      return res.json({
+        success: true,
+        data: { indexDocument: null, errorDocument: null }
+      });
+    }
+    console.error('Erreur get bucket website:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur lors de la récupération de la configuration website'
+    });
+  }
+});
+
+// PUT /api/buckets/:bucket/website - Configurer Website
+app.put('/api/buckets/:bucket/website', strictLimiter, extractCredentials, async (req, res) => {
+  try {
+    const { bucket } = req.params;
+    const { indexDocument, errorDocument } = req.body;
+
+    const command = new PutBucketWebsiteCommand({
+      Bucket: bucket,
+      WebsiteConfiguration: {
+        IndexDocument: indexDocument ? { Suffix: indexDocument } : undefined,
+        ErrorDocument: errorDocument ? { Key: errorDocument } : undefined
+      }
+    });
+
+    await req.s3Client.send(command);
+
+    res.json({
+      success: true,
+      message: 'Configuration website mise à jour'
+    });
+  } catch (error) {
+    console.error('Erreur put bucket website:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur lors de la configuration website',
+      message: error.message
+    });
+  }
+});
+
+// DELETE /api/buckets/:bucket/website - Supprimer la configuration Website
+app.delete('/api/buckets/:bucket/website', strictLimiter, extractCredentials, async (req, res) => {
+  try {
+    const { bucket } = req.params;
+
+    const command = new DeleteBucketWebsiteCommand({
+      Bucket: bucket
+    });
+
+    await req.s3Client.send(command);
+
+    res.json({
+      success: true,
+      message: 'Configuration website supprimée'
+    });
+  } catch (error) {
+    console.error('Erreur delete bucket website:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur lors de la suppression de la configuration website'
+    });
+  }
+});
+
+// ============================================================
+// OBJECT ACL & LOCK
+// ============================================================
+
+// PUT /api/buckets/:bucket/objects/:key(*)/acl - Définir les ACL d'un objet
+app.put('/api/buckets/:bucket/objects/:key(*)/acl', strictLimiter, extractCredentials, async (req, res) => {
+  try {
+    const { bucket, key } = req.params;
+    const { acl } = req.body;
+
+    const command = new PutObjectAclCommand({
+      Bucket: bucket,
+      Key: key,
+      ACL: acl
+    });
+
+    await req.s3Client.send(command);
+
+    res.json({
+      success: true,
+      message: 'ACL de l\'objet mise à jour'
+    });
+  } catch (error) {
+    console.error('Erreur put object ACL:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur lors de la mise à jour des ACL',
+      message: error.message
+    });
+  }
+});
+
+// PUT /api/buckets/:bucket/object-lock - Configurer Object Lock du bucket
+app.put('/api/buckets/:bucket/object-lock', strictLimiter, extractCredentials, async (req, res) => {
+  try {
+    const { bucket } = req.params;
+    const { mode, days, years } = req.body;
+
+    const command = new PutObjectLockConfigurationCommand({
+      Bucket: bucket,
+      ObjectLockConfiguration: {
+        ObjectLockEnabled: 'Enabled',
+        Rule: {
+          DefaultRetention: {
+            Mode: mode,
+            Days: days,
+            Years: years
+          }
+        }
+      }
+    });
+
+    await req.s3Client.send(command);
+
+    res.json({
+      success: true,
+      message: 'Configuration Object Lock mise à jour'
+    });
+  } catch (error) {
+    console.error('Erreur put object lock config:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur lors de la configuration Object Lock',
+      message: error.message
     });
   }
 });
