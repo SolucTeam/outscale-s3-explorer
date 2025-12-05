@@ -11,6 +11,7 @@ const {
   PutObjectCommand,
   DeleteObjectCommand,
   GetObjectCommand,
+  CopyObjectCommand,
   HeadBucketCommand,
   HeadObjectCommand,
   GetBucketVersioningCommand,
@@ -627,6 +628,41 @@ app.delete('/api/buckets/:bucket/objects/:key(*)', strictLimiter, extractCredent
     res.status(500).json({
       success: false,
       error: 'Erreur lors de la suppression',
+      message: error.message
+    });
+  }
+});
+
+// Copier un objet (avec rate limiting strict)
+app.post('/api/buckets/:bucket/objects/copy', strictLimiter, extractCredentials, async (req, res) => {
+  try {
+    const { bucket } = req.params;
+    const { sourceBucket, sourceKey, destKey } = req.body;
+
+    if (!sourceBucket || !sourceKey || !destKey) {
+      return res.status(400).json({
+        success: false,
+        error: 'sourceBucket, sourceKey et destKey sont requis'
+      });
+    }
+
+    const command = new CopyObjectCommand({
+      Bucket: bucket,
+      CopySource: `${sourceBucket}/${sourceKey}`,
+      Key: destKey
+    });
+
+    await req.s3Client.send(command);
+
+    res.json({
+      success: true,
+      message: `Objet copié vers "${destKey}"`
+    });
+  } catch (error) {
+    console.error('Erreur copie objet:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur lors de la copie',
       message: error.message
     });
   }
