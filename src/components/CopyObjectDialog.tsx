@@ -347,12 +347,12 @@ export const CopyObjectDialog: React.FC<CopyObjectDialogProps> = ({
 
               <div className="space-y-2">
                 <Label>Content-Disposition</Label>
-                <Select value={contentDisposition} onValueChange={setContentDisposition}>
+                <Select value={contentDisposition || "_none"} onValueChange={(v) => setContentDisposition(v === "_none" ? "" : v)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Sélectionner..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Non défini</SelectItem>
+                    <SelectItem value="_none">Non défini</SelectItem>
                     <SelectItem value="inline">Inline</SelectItem>
                     <SelectItem value="attachment">Attachment</SelectItem>
                   </SelectContent>
@@ -361,12 +361,12 @@ export const CopyObjectDialog: React.FC<CopyObjectDialogProps> = ({
 
               <div className="space-y-2">
                 <Label>Content-Encoding</Label>
-                <Select value={contentEncoding} onValueChange={setContentEncoding}>
+                <Select value={contentEncoding || "_none"} onValueChange={(v) => setContentEncoding(v === "_none" ? "" : v)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Sélectionner..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Non défini</SelectItem>
+                    <SelectItem value="_none">Non défini</SelectItem>
                     <SelectItem value="gzip">gzip</SelectItem>
                     <SelectItem value="compress">compress</SelectItem>
                     <SelectItem value="deflate">deflate</SelectItem>
@@ -388,12 +388,12 @@ export const CopyObjectDialog: React.FC<CopyObjectDialogProps> = ({
 
             <div className="space-y-2">
               <Label>Cache-Control</Label>
-              <Select value={cacheControl} onValueChange={setCacheControl}>
+              <Select value={cacheControl || "_none"} onValueChange={(v) => setCacheControl(v === "_none" ? "" : v)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Sélectionner..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Non défini</SelectItem>
+                  <SelectItem value="_none">Non défini</SelectItem>
                   <SelectItem value="no-cache">no-cache</SelectItem>
                   <SelectItem value="no-store">no-store</SelectItem>
                   <SelectItem value="max-age=3600">max-age=3600 (1h)</SelectItem>
