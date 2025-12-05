@@ -17,6 +17,7 @@ interface ObjectEditDialogProps {
   bucket: string;
   objectKey: string;
   object: any;
+  objectLockEnabled?: boolean;
   onUpdated?: () => void;
 }
 
@@ -26,6 +27,7 @@ export const ObjectEditDialog: React.FC<ObjectEditDialogProps> = ({
   bucket,
   objectKey,
   object,
+  objectLockEnabled = false,
   onUpdated
 }) => {
   const { toast } = useToast();
@@ -300,44 +302,58 @@ export const ObjectEditDialog: React.FC<ObjectEditDialogProps> = ({
                 <CardTitle className="text-sm">Configuration de rétention</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  La rétention empêche la suppression ou la modification d'un objet pendant une période définie.
-                  Object Lock doit être activé sur le bucket.
-                </p>
-
-                <div className="space-y-2">
-                  <Label>Mode de rétention</Label>
-                  <Select value={retentionMode} onValueChange={(v) => setRetentionMode(v as 'COMPLIANCE')}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner un mode" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="COMPLIANCE">
-                        Compliance - Protection WORM stricte
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">
-                    Outscale ne supporte que le mode COMPLIANCE. La rétention ne peut pas être réduite ni supprimée avant expiration.
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Conserver jusqu'au</Label>
-                  <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-muted-foreground" />
-                    <Input
-                      type="date"
-                      value={retentionDate}
-                      onChange={(e) => setRetentionDate(e.target.value)}
-                      min={new Date().toISOString().split('T')[0]}
-                    />
+                {!objectLockEnabled ? (
+                  <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Lock className="w-4 h-4 text-destructive" />
+                      <strong className="text-destructive text-sm">Configuration impossible</strong>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      L'Object Lock doit être activé sur le bucket lors de sa création pour pouvoir configurer la rétention sur les objets.
+                      Cette fonctionnalité ne peut pas être activée après la création du bucket.
+                    </p>
                   </div>
-                </div>
+                ) : (
+                  <>
+                    <p className="text-sm text-muted-foreground">
+                      La rétention empêche la suppression ou la modification d'un objet pendant une période définie.
+                    </p>
 
-                <Button onClick={handleSaveRetention} disabled={saving || !retentionMode || !retentionDate} className="w-full">
-                  {saving ? 'Enregistrement...' : 'Configurer la rétention'}
-                </Button>
+                    <div className="space-y-2">
+                      <Label>Mode de rétention</Label>
+                      <Select value={retentionMode} onValueChange={(v) => setRetentionMode(v as 'COMPLIANCE')}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Sélectionner un mode" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="COMPLIANCE">
+                            Compliance - Protection WORM stricte
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">
+                        Outscale ne supporte que le mode COMPLIANCE. La rétention ne peut pas être réduite ni supprimée avant expiration.
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Conserver jusqu'au</Label>
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-muted-foreground" />
+                        <Input
+                          type="date"
+                          value={retentionDate}
+                          onChange={(e) => setRetentionDate(e.target.value)}
+                          min={new Date().toISOString().split('T')[0]}
+                        />
+                      </div>
+                    </div>
+
+                    <Button onClick={handleSaveRetention} disabled={saving || !retentionMode || !retentionDate} className="w-full">
+                      {saving ? 'Enregistrement...' : 'Configurer la rétention'}
+                    </Button>
+                  </>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

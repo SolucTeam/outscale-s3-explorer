@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { Copy, Loader2 } from 'lucide-react';
+import { Copy, Loader2, Lock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { proxyS3Service } from '@/services/proxyS3Service';
 import { useS3Store } from '@/hooks/useS3Store';
@@ -411,41 +411,61 @@ export const CopyObjectDialog: React.FC<CopyObjectDialogProps> = ({
               <Switch checked={serverSideEncryption} onCheckedChange={setServerSideEncryption} />
             </div>
 
-            <div className="flex items-center justify-between">
-              <div>
-                <Label>Object Lock</Label>
-                <p className="text-xs text-muted-foreground">Configurer la rétention</p>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label>Object Lock</Label>
+                  <p className="text-xs text-muted-foreground">Configurer la rétention</p>
+                </div>
+                <Switch 
+                  checked={objectLockEnabled} 
+                  onCheckedChange={setObjectLockEnabled}
+                  disabled={!buckets.find(b => b.name === destBucket)?.objectLockEnabled}
+                />
               </div>
-              <Switch checked={objectLockEnabled} onCheckedChange={setObjectLockEnabled} />
+
+              {!buckets.find(b => b.name === destBucket)?.objectLockEnabled && (
+                <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <Lock className="w-4 h-4 text-destructive flex-shrink-0" />
+                    <div>
+                      <strong className="text-destructive text-sm">Configuration impossible</strong>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        L'Object Lock doit être activé sur le bucket de destination lors de sa création pour configurer la rétention.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {objectLockEnabled && buckets.find(b => b.name === destBucket)?.objectLockEnabled && (
+                <div className="grid grid-cols-2 gap-4 pl-4 border-l-2 border-muted">
+                  <div className="space-y-2">
+                    <Label>Mode de rétention</Label>
+                    <Select value={objectLockMode} onValueChange={(v: 'COMPLIANCE') => setObjectLockMode(v)}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="COMPLIANCE">Compliance (WORM strict)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Outscale ne supporte que le mode COMPLIANCE.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Retenir jusqu'au</Label>
+                    <Input
+                      type="datetime-local"
+                      value={objectLockRetainUntilDate}
+                      onChange={(e) => setObjectLockRetainUntilDate(e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
-
-            {objectLockEnabled && (
-              <div className="grid grid-cols-2 gap-4 pl-4 border-l-2 border-muted">
-                <div className="space-y-2">
-                  <Label>Mode de rétention</Label>
-                  <Select value={objectLockMode} onValueChange={(v: 'COMPLIANCE') => setObjectLockMode(v)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="COMPLIANCE">Compliance (WORM strict)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">
-                    Outscale ne supporte que le mode COMPLIANCE.
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Retenir jusqu'au</Label>
-                  <Input
-                    type="datetime-local"
-                    value={objectLockRetainUntilDate}
-                    onChange={(e) => setObjectLockRetainUntilDate(e.target.value)}
-                  />
-                </div>
-              </div>
-            )}
           </TabsContent>
 
           <TabsContent value="conditions" className="space-y-4 mt-4">

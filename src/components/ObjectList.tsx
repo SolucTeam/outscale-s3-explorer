@@ -20,7 +20,7 @@ import { CopyObjectDialog } from './CopyObjectDialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 export const ObjectList = () => {
-  const { currentBucket, currentPath, objects, loading, setCurrentPath } = useS3Store();
+  const { currentBucket, currentPath, objects, loading, setCurrentPath, buckets } = useS3Store();
   const { fetchObjects, deleteObject, downloadObject } = useEnhancedDirectS3();
   const navigate = useNavigate();
   const [showUpload, setShowUpload] = useState(false);
@@ -498,6 +498,7 @@ export const ObjectList = () => {
           bucket={currentBucket!}
           objectKey={editDialog.objectKey}
           object={editDialog.object}
+          objectLockEnabled={buckets.find(b => b.name === currentBucket)?.objectLockEnabled}
           onUpdated={loadObjects}
         />
       )}
