@@ -236,9 +236,17 @@ class ProxyS3Service {
       const response = await this.makeRequest<S3Object[]>(endpoint);
       
       if (response.success && response.data) {
+        // Convertir les dates string en objets Date
+        const objectsWithDates = response.data.map(obj => ({
+          ...obj,
+          lastModified: obj.lastModified ? new Date(obj.lastModified) : new Date()
+        }));
+        
         // Mettre en cache
-        cacheService.set(cacheKey, response.data, CacheService.TTL.OBJECTS);
-        console.log(`✅ ${response.data.length} objets chargés`);
+        cacheService.set(cacheKey, objectsWithDates, CacheService.TTL.OBJECTS);
+        console.log(`✅ ${objectsWithDates.length} objets chargés`);
+        
+        return { success: true, data: objectsWithDates };
       }
       
       return response;
@@ -837,6 +845,19 @@ class ProxyS3Service {
   async setObjectAcl(bucket: string, objectKey: string, acl: string): Promise<ProxyS3Response<void>> {
     if (!this.credentials) return { success: false, error: 'Service non initialisé' };
     return this.makeRequest(`/buckets/${encodeURIComponent(bucket)}/objects/${encodeURIComponent(objectKey)}/acl`, { method: 'PUT', body: JSON.stringify({ acl }) });
+  }
+
+  async deleteObjectTagging(bucket: string, objectKey: string): Promise<ProxyS3Response<void>> {
+    if (!this.credentials) return { success: false, error: 'Service non initialisé' };
+    return this.makeRequest(`/buckets/${encodeURIComponent(bucket)}/objects/${encodeURIComponent(objectKey)}/tagging`, { method: 'DELETE' });
+  }
+
+  async copyObject(sourceBucket: string, sourceKey: string, destBucket: string, destKey: string): Promise<ProxyS3Response<void>> {
+    if (!this.credentials) return { success: false, error: 'Service non initialisé' };
+    return this.makeRequest(`/buckets/${encodeURIComponent(destBucket)}/objects/copy`, {
+      method: 'POST',
+      body: JSON.stringify({ sourceBucket, sourceKey, destKey })
+    });
   }
 
   isInitialized(): boolean {
