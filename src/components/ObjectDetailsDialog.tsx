@@ -485,10 +485,14 @@ export const ObjectDetailsDialog: React.FC<ObjectDetailsDialogProps> = ({
                           </Button>
                         </div>
                       ) : (
-                        <Alert className="bg-muted border-muted-foreground/20">
-                          <AlertTriangle className="w-4 h-4" />
-                          <AlertDescription className="text-xs">
-                            L'Object Lock doit être activé sur le bucket lors de sa création pour pouvoir configurer la rétention sur les objets.
+                        <Alert className="bg-destructive/10 border-destructive/30">
+                          <AlertTriangle className="w-4 h-4 text-destructive" />
+                          <AlertDescription className="text-sm">
+                            <strong className="text-destructive">Configuration impossible</strong>
+                            <p className="mt-1 text-muted-foreground">
+                              L'Object Lock doit être activé sur le bucket lors de sa création pour pouvoir configurer la rétention sur les objets. 
+                              Cette fonctionnalité ne peut pas être activée après la création du bucket.
+                            </p>
                           </AlertDescription>
                         </Alert>
                       )}
