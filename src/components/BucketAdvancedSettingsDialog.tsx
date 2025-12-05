@@ -447,8 +447,15 @@ export const BucketAdvancedSettingsDialog: React.FC<BucketAdvancedSettingsDialog
               </CardHeader>
               <CardContent className="space-y-4">
                 {!bucket.objectLockEnabled && (
-                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm">
-                    Object Lock n'est pas activé sur ce bucket. Cette fonctionnalité ne peut être activée qu'à la création du bucket.
+                  <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Lock className="w-4 h-4 text-destructive" />
+                      <strong className="text-destructive text-sm">Configuration impossible</strong>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      L'Object Lock doit être activé sur le bucket lors de sa création pour pouvoir configurer la rétention par défaut.
+                      Cette fonctionnalité ne peut pas être activée après la création du bucket.
+                    </p>
                   </div>
                 )}
 
