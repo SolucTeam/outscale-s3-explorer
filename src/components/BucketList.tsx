@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useS3Store } from '../hooks/useS3Store';
 import { useEnhancedDirectS3 } from '../hooks/useEnhancedDirectS3';
-import { Folder, Calendar, HardDrive, ChevronRight, RefreshCw, Plus, Trash2, Cloud, GitBranch, Lock, Settings, Shield, LayoutGrid, List } from 'lucide-react';
+import { Folder, Calendar, HardDrive, ChevronRight, RefreshCw, Plus, Trash2, Cloud, GitBranch, Lock, Settings, Shield, LayoutGrid, List, Wrench } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { CreateBucketDialog } from './CreateBucketDialog';
@@ -28,9 +28,11 @@ export const BucketList = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
   const [showSecurityDialog, setShowSecurityDialog] = useState(false);
+  const [showAdvancedDialog, setShowAdvancedDialog] = useState(false);
   const [bucketToDelete, setBucketToDelete] = useState<string>('');
   const [bucketToEdit, setBucketToEdit] = useState<S3Bucket | null>(null);
   const [bucketToView, setBucketToView] = useState<S3Bucket | null>(null);
+  const [bucketToAdvanced, setBucketToAdvanced] = useState<S3Bucket | null>(null);
   const [hasInitiallyLoaded, setHasInitiallyLoaded] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('list');
@@ -96,6 +98,12 @@ export const BucketList = () => {
     event.stopPropagation();
     setBucketToView(bucket);
     setShowSecurityDialog(true);
+  };
+
+  const handleAdvancedBucket = (bucket: S3Bucket, event: React.MouseEvent) => {
+    event.stopPropagation();
+    setBucketToAdvanced(bucket);
+    setShowAdvancedDialog(true);
   };
 
   const handleRefresh = async () => {
@@ -206,6 +214,15 @@ export const BucketList = () => {
                         title="Paramètres du bucket"
                       >
                         <Settings className="w-3 h-3 sm:w-4 sm:h-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={(e) => handleAdvancedBucket(bucket, e)}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity text-purple-600 hover:text-purple-700 hover:bg-purple-50 h-8 w-8 p-0"
+                        title="Paramètres avancés"
+                      >
+                        <Wrench className="w-3 h-3 sm:w-4 sm:h-4" />
                       </Button>
                       <Button
                         size="sm"
@@ -329,6 +346,15 @@ export const BucketList = () => {
                         title="Paramètres"
                       >
                         <Settings className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={(e) => handleAdvancedBucket(bucket, e)}
+                        className="text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+                        title="Paramètres avancés"
+                      >
+                        <Wrench className="w-4 h-4" />
                       </Button>
                       <Button
                         size="sm"
@@ -471,6 +497,15 @@ export const BucketList = () => {
           open={showSecurityDialog}
           onOpenChange={setShowSecurityDialog}
           bucket={bucketToView}
+        />
+      )}
+
+      {bucketToAdvanced && (
+        <BucketAdvancedSettingsDialog
+          open={showAdvancedDialog}
+          onOpenChange={setShowAdvancedDialog}
+          bucket={bucketToAdvanced}
+          onSettingsUpdated={handleSettingsUpdated}
         />
       )}
     </div>
