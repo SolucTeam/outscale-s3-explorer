@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { Globe, FileText, Shield, RefreshCw, Plus, Trash2, Lock } from 'lucide-react';
+import { Globe, RefreshCw, Plus, Trash2, Lock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { proxyS3Service } from '@/services/proxyS3Service';
 import { S3Bucket } from '@/types/s3';
@@ -44,20 +44,10 @@ export const BucketAdvancedSettingsDialog: React.FC<BucketAdvancedSettingsDialog
   const [newCorsOrigin, setNewCorsOrigin] = useState('*');
   const [newCorsMethods, setNewCorsMethods] = useState<string[]>(['GET']);
 
-  // Policy state
-  const [policy, setPolicy] = useState<string>('');
-
   // Website state
   const [websiteEnabled, setWebsiteEnabled] = useState(false);
   const [indexDocument, setIndexDocument] = useState('index.html');
   const [errorDocument, setErrorDocument] = useState('error.html');
-
-  // ACL state
-  const [bucketAcl, setBucketAcl] = useState<string>('private');
-  const [currentAcl, setCurrentAcl] = useState<{
-    owner?: { id: string; displayName?: string };
-    grants: Array<{ grantee: string; permission: string; type: string }>;
-  } | null>(null);
 
   // Object Lock state
   const [objectLockMode, setObjectLockMode] = useState<'COMPLIANCE' | ''>('');
@@ -84,12 +74,6 @@ export const BucketAdvancedSettingsDialog: React.FC<BucketAdvancedSettingsDialog
         setCorsRules(corsResponse.data.corsRules);
       }
 
-      // Load Policy
-      const policyResponse = await proxyS3Service.getBucketPolicy(bucket.name);
-      if (policyResponse.success && policyResponse.data?.policy) {
-        setPolicy(policyResponse.data.policy);
-      }
-
       // Load Website
       const websiteResponse = await proxyS3Service.getBucketWebsite(bucket.name);
       if (websiteResponse.success && websiteResponse.data) {
@@ -100,25 +84,6 @@ export const BucketAdvancedSettingsDialog: React.FC<BucketAdvancedSettingsDialog
             setErrorDocument(websiteResponse.data.errorDocument);
           }
         }
-      }
-
-      // Load ACL
-      const aclResponse = await proxyS3Service.getBucketAcl(bucket.name);
-      if (aclResponse.success && aclResponse.data) {
-        const aclData = aclResponse.data;
-        const grants = aclData.grants?.map(grant => ({
-          grantee: grant.grantee?.displayName || grant.grantee?.id || grant.grantee?.uri || 'Inconnu',
-          permission: grant.permission || 'UNKNOWN',
-          type: grant.grantee?.type || 'Unknown'
-        })) || [];
-        
-        setCurrentAcl({
-          owner: aclData.owner ? {
-            id: aclData.owner.id || '',
-            displayName: aclData.owner.displayName
-          } : undefined,
-          grants
-        });
       }
 
       // Load Object Lock configuration if enabled
@@ -190,39 +155,6 @@ export const BucketAdvancedSettingsDialog: React.FC<BucketAdvancedSettingsDialog
     }
   };
 
-  const handleSavePolicy = async () => {
-    setSaving(true);
-    try {
-      if (!policy.trim()) {
-        const response = await proxyS3Service.deleteBucketPolicy(bucket.name);
-        if (response.success) {
-          toast({ title: "Succès", description: "Policy supprimée" });
-          onSettingsUpdated?.();
-        }
-      } else {
-        // Validate JSON
-        try {
-          JSON.parse(policy);
-        } catch {
-          toast({ title: "Erreur", description: "Policy JSON invalide", variant: "destructive" });
-          setSaving(false);
-          return;
-        }
-        const response = await proxyS3Service.setBucketPolicy(bucket.name, policy);
-        if (response.success) {
-          toast({ title: "Succès", description: "Policy mise à jour" });
-          onSettingsUpdated?.();
-        } else {
-          throw new Error(response.error);
-        }
-      }
-    } catch (error) {
-      toast({ title: "Erreur", description: "Impossible de mettre à jour la policy", variant: "destructive" });
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const handleSaveWebsite = async () => {
     setSaving(true);
     try {
@@ -243,23 +175,6 @@ export const BucketAdvancedSettingsDialog: React.FC<BucketAdvancedSettingsDialog
       }
     } catch (error) {
       toast({ title: "Erreur", description: "Impossible de configurer le website", variant: "destructive" });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleSaveAcl = async () => {
-    setSaving(true);
-    try {
-      const response = await proxyS3Service.setBucketAcl(bucket.name, bucketAcl);
-      if (response.success) {
-        toast({ title: "Succès", description: "ACL du bucket mise à jour" });
-        onSettingsUpdated?.();
-      } else {
-        throw new Error(response.error);
-      }
-    } catch (error) {
-      toast({ title: "Erreur", description: "Impossible de mettre à jour les ACL", variant: "destructive" });
     } finally {
       setSaving(false);
     }
@@ -299,22 +214,14 @@ export const BucketAdvancedSettingsDialog: React.FC<BucketAdvancedSettingsDialog
         </DialogHeader>
 
         <Tabs defaultValue="cors" className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="cors">
               <Globe className="w-4 h-4 mr-2" />
               CORS
             </TabsTrigger>
-            <TabsTrigger value="policy">
-              <FileText className="w-4 h-4 mr-2" />
-              Policy
-            </TabsTrigger>
             <TabsTrigger value="website">
               <Globe className="w-4 h-4 mr-2" />
               Website
-            </TabsTrigger>
-            <TabsTrigger value="acl">
-              <Shield className="w-4 h-4 mr-2" />
-              ACL
             </TabsTrigger>
             <TabsTrigger value="lock">
               <Lock className="w-4 h-4 mr-2" />
@@ -392,30 +299,6 @@ export const BucketAdvancedSettingsDialog: React.FC<BucketAdvancedSettingsDialog
             </Card>
           </TabsContent>
 
-          {/* Policy Tab */}
-          <TabsContent value="policy" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm">Bucket Policy</CardTitle>
-                <CardDescription>Définissez une policy JSON pour contrôler l'accès au bucket</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Textarea
-                  placeholder='{\"Version\": \"2012-10-17\", \"Statement\": [...]}'
-                  value={policy}
-                  onChange={(e) => setPolicy(e.target.value)}
-                  className="font-mono text-sm min-h-[200px]"
-                />
-                <div className="text-xs text-muted-foreground">
-                  Laissez vide pour supprimer la policy existante
-                </div>
-                <Button onClick={handleSavePolicy} disabled={saving} className="w-full">
-                  {saving ? 'Enregistrement...' : 'Enregistrer la Policy'}
-                </Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
           {/* Website Tab */}
           <TabsContent value="website" className="space-y-4">
             <Card>
@@ -453,88 +336,6 @@ export const BucketAdvancedSettingsDialog: React.FC<BucketAdvancedSettingsDialog
                 <Button onClick={handleSaveWebsite} disabled={saving} className="w-full">
                   {saving ? 'Enregistrement...' : 'Enregistrer Website'}
                 </Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* ACL Tab */}
-          <TabsContent value="acl" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm">ACL du Bucket</CardTitle>
-                <CardDescription>Définissez les permissions d'accès au bucket</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Configuration actuelle */}
-                {currentAcl && (
-                  <div className="p-4 bg-muted rounded-lg border">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Shield className="w-4 h-4 text-primary" />
-                      <strong className="text-sm">Configuration actuelle</strong>
-                    </div>
-                    <div className="space-y-3 text-sm">
-                      {currentAcl.owner && (
-                        <div className="flex justify-between items-start">
-                          <span className="text-muted-foreground">Propriétaire:</span>
-                          <span className="font-medium text-right truncate max-w-[60%]" title={currentAcl.owner.id}>
-                            {currentAcl.owner.displayName || currentAcl.owner.id.slice(0, 16) + '...'}
-                          </span>
-                        </div>
-                      )}
-                      <div className="space-y-2">
-                        <span className="text-muted-foreground">Permissions:</span>
-                        <div className="space-y-1 mt-1">
-                          {currentAcl.grants.map((grant, index) => (
-                            <div key={index} className="flex items-center justify-between p-2 bg-background rounded border text-xs">
-                              <div className="flex items-center gap-2">
-                                <Badge variant="outline" className="text-xs">
-                                  {grant.type === 'CanonicalUser' ? 'Utilisateur' : 
-                                   grant.type === 'Group' ? 'Groupe' : grant.type}
-                                </Badge>
-                                <span className="truncate max-w-[150px]" title={grant.grantee}>
-                                  {grant.grantee.includes('AllUsers') ? 'Tous les utilisateurs' :
-                                   grant.grantee.includes('AuthenticatedUsers') ? 'Utilisateurs authentifiés' :
-                                   grant.grantee.length > 20 ? grant.grantee.slice(0, 20) + '...' : grant.grantee}
-                                </span>
-                              </div>
-                              <Badge variant={grant.permission === 'FULL_CONTROL' ? 'default' : 'secondary'}>
-                                {grant.permission}
-                              </Badge>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Modifier l'ACL */}
-                <div className={currentAcl ? "border-t pt-4 mt-4" : ""}>
-                  {currentAcl && (
-                    <div className="flex items-center gap-2 mb-4">
-                      <span className="font-medium text-sm">Modifier l'ACL</span>
-                    </div>
-                  )}
-                  
-                  <div className="space-y-2">
-                    <Label>ACL prédéfini</Label>
-                    <Select value={bucketAcl} onValueChange={setBucketAcl}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="private">Private - Seul le propriétaire a accès</SelectItem>
-                        <SelectItem value="public-read">Public Read - Lecture publique</SelectItem>
-                        <SelectItem value="public-read-write">Public Read/Write - Lecture et écriture publiques</SelectItem>
-                        <SelectItem value="authenticated-read">Utilisateurs authentifiés</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <Button onClick={handleSaveAcl} disabled={saving} className="w-full mt-4">
-                    {saving ? 'Enregistrement...' : 'Appliquer l\'ACL'}
-                  </Button>
-                </div>
               </CardContent>
             </Card>
           </TabsContent>
