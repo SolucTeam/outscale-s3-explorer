@@ -66,7 +66,7 @@ export const CopyObjectDialog: React.FC<CopyObjectDialogProps> = ({
   
   // Object Lock
   const [objectLockEnabled, setObjectLockEnabled] = useState(false);
-  const [objectLockMode, setObjectLockMode] = useState<'GOVERNANCE' | 'COMPLIANCE'>('GOVERNANCE');
+  const [objectLockMode, setObjectLockMode] = useState<'COMPLIANCE'>('COMPLIANCE');
   const [objectLockRetainUntilDate, setObjectLockRetainUntilDate] = useState('');
   
   // Conditional copy
@@ -93,7 +93,7 @@ export const CopyObjectDialog: React.FC<CopyObjectDialogProps> = ({
       setCacheControl('');
       setServerSideEncryption(false);
       setObjectLockEnabled(false);
-      setObjectLockMode('GOVERNANCE');
+      setObjectLockMode('COMPLIANCE');
       setObjectLockRetainUntilDate('');
       setConditionalCopy(false);
       setCopySourceIfMatch('');
@@ -423,15 +423,17 @@ export const CopyObjectDialog: React.FC<CopyObjectDialogProps> = ({
               <div className="grid grid-cols-2 gap-4 pl-4 border-l-2 border-muted">
                 <div className="space-y-2">
                   <Label>Mode de rétention</Label>
-                  <Select value={objectLockMode} onValueChange={(v: 'GOVERNANCE' | 'COMPLIANCE') => setObjectLockMode(v)}>
+                  <Select value={objectLockMode} onValueChange={(v: 'COMPLIANCE') => setObjectLockMode(v)}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="GOVERNANCE">Governance</SelectItem>
-                      <SelectItem value="COMPLIANCE">Compliance</SelectItem>
+                      <SelectItem value="COMPLIANCE">Compliance (WORM strict)</SelectItem>
                     </SelectContent>
                   </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Outscale ne supporte que le mode COMPLIANCE.
+                  </p>
                 </div>
 
                 <div className="space-y-2">

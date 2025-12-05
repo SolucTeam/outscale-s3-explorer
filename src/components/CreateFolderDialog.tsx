@@ -67,7 +67,7 @@ export const CreateFolderDialog = ({ open, onOpenChange, bucket, currentPath, on
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>Créer un nouveau dossier</DialogTitle>
         </DialogHeader>
