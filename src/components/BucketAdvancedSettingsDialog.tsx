@@ -58,6 +58,12 @@ export const BucketAdvancedSettingsDialog: React.FC<BucketAdvancedSettingsDialog
   // Object Lock state
   const [objectLockMode, setObjectLockMode] = useState<'COMPLIANCE' | ''>('');
   const [objectLockDays, setObjectLockDays] = useState<number>(0);
+  const [currentObjectLockConfig, setCurrentObjectLockConfig] = useState<{
+    enabled: boolean;
+    mode?: string;
+    days?: number;
+    years?: number;
+  } | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -88,6 +94,29 @@ export const BucketAdvancedSettingsDialog: React.FC<BucketAdvancedSettingsDialog
           setIndexDocument(websiteResponse.data.indexDocument);
           if (websiteResponse.data.errorDocument) {
             setErrorDocument(websiteResponse.data.errorDocument);
+          }
+        }
+      }
+
+      // Load Object Lock configuration if enabled
+      if (bucket.objectLockEnabled) {
+        const lockResponse = await proxyS3Service.getObjectLockConfiguration(bucket.name);
+        if (lockResponse.success && lockResponse.data) {
+          const config = lockResponse.data;
+          setCurrentObjectLockConfig({
+            enabled: config.enabled || false,
+            mode: config.rule?.defaultRetention?.mode,
+            days: config.rule?.defaultRetention?.days,
+            years: config.rule?.defaultRetention?.years
+          });
+          // Pre-fill form with current values
+          if (config.rule?.defaultRetention?.mode) {
+            setObjectLockMode(config.rule.defaultRetention.mode as 'COMPLIANCE');
+          }
+          if (config.rule?.defaultRetention?.days) {
+            setObjectLockDays(config.rule.defaultRetention.days);
+          } else if (config.rule?.defaultRetention?.years) {
+            setObjectLockDays(config.rule.defaultRetention.years * 365);
           }
         }
       }
@@ -459,43 +488,79 @@ export const BucketAdvancedSettingsDialog: React.FC<BucketAdvancedSettingsDialog
                   </div>
                 )}
 
-                <div className="space-y-2">
-                  <Label>Mode de rétention par défaut</Label>
-                  <Select 
-                    value={objectLockMode} 
-                    onValueChange={(v) => setObjectLockMode(v as 'COMPLIANCE')}
-                    disabled={!bucket.objectLockEnabled}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner un mode" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="COMPLIANCE">Compliance (mode WORM strict)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">
-                    Outscale ne supporte que le mode COMPLIANCE. La rétention ne peut pas être réduite ni supprimée avant expiration.
-                  </p>
-                </div>
+                {bucket.objectLockEnabled && currentObjectLockConfig && (
+                  <div className="p-4 bg-muted rounded-lg border">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Lock className="w-4 h-4 text-primary" />
+                      <strong className="text-sm">Configuration actuelle</strong>
+                      <Badge variant="default" className="ml-auto">Object Lock activé</Badge>
+                    </div>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Mode par défaut:</span>
+                        <Badge variant="outline">
+                          {currentObjectLockConfig.mode || 'Non configuré'}
+                        </Badge>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Durée de rétention:</span>
+                        <span className="font-medium">
+                          {currentObjectLockConfig.days 
+                            ? `${currentObjectLockConfig.days} jours`
+                            : currentObjectLockConfig.years
+                              ? `${currentObjectLockConfig.years} ans`
+                              : 'Non configurée'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
-                <div className="space-y-2">
-                  <Label>Durée de rétention (jours)</Label>
-                  <Input
-                    type="number"
-                    value={objectLockDays}
-                    onChange={(e) => setObjectLockDays(parseInt(e.target.value) || 0)}
-                    min={1}
-                    disabled={!bucket.objectLockEnabled}
-                  />
-                </div>
+                {bucket.objectLockEnabled && (
+                  <div className="border-t pt-4 mt-4">
+                    <div className="flex items-center gap-2 mb-4">
+                      <span className="font-medium text-sm">Modifier la configuration</span>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label>Mode de rétention par défaut</Label>
+                        <Select 
+                          value={objectLockMode} 
+                          onValueChange={(v) => setObjectLockMode(v as 'COMPLIANCE')}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Sélectionner un mode" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="COMPLIANCE">Compliance (mode WORM strict)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">
+                          Outscale ne supporte que le mode COMPLIANCE. La rétention ne peut pas être réduite ni supprimée avant expiration.
+                        </p>
+                      </div>
 
-                <Button 
-                  onClick={handleSaveObjectLock} 
-                  disabled={saving || !bucket.objectLockEnabled || !objectLockMode || objectLockDays <= 0} 
-                  className="w-full"
-                >
-                  {saving ? 'Enregistrement...' : 'Configurer Object Lock'}
-                </Button>
+                      <div className="space-y-2">
+                        <Label>Durée de rétention (jours)</Label>
+                        <Input
+                          type="number"
+                          value={objectLockDays}
+                          onChange={(e) => setObjectLockDays(parseInt(e.target.value) || 0)}
+                          min={1}
+                        />
+                      </div>
+
+                      <Button 
+                        onClick={handleSaveObjectLock} 
+                        disabled={saving || !objectLockMode || objectLockDays <= 0} 
+                        className="w-full"
+                      >
+                        {saving ? 'Enregistrement...' : 'Mettre à jour la configuration'}
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
