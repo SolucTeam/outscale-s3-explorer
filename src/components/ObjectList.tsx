@@ -20,6 +20,7 @@ import { VersionDownloadDialog } from './VersionDownloadDialog';
 import { CopyObjectDialog } from './CopyObjectDialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
+import { useActionHistoryStore } from '../stores/actionHistoryStore';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,6 +35,7 @@ import {
 export const ObjectList = () => {
   const { currentBucket, currentPath, objects, loading, setCurrentPath, buckets } = useS3Store();
   const { fetchObjects, deleteObject, downloadObject } = useEnhancedDirectS3();
+  const { addEntry } = useActionHistoryStore();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [showUpload, setShowUpload] = useState(false);
@@ -115,6 +117,15 @@ export const ObjectList = () => {
     let successCount = 0;
     let errorCount = 0;
 
+    addEntry({
+      operationType: 'bulk_delete',
+      status: 'started',
+      bucketName: currentBucket!,
+      logLevel: 'info',
+      userFriendlyMessage: `Suppression groupée de ${selectedObjects.size} objet(s)`,
+      details: `Bucket: ${currentBucket}`
+    });
+
     try {
       for (const objectKey of selectedObjects) {
         const object = objects.find(o => o.key === objectKey);
@@ -137,6 +148,15 @@ export const ObjectList = () => {
       }
 
       if (successCount > 0) {
+        addEntry({
+          operationType: 'bulk_delete',
+          status: errorCount > 0 ? 'error' : 'success',
+          bucketName: currentBucket!,
+          logLevel: errorCount > 0 ? 'warning' : 'info',
+          userFriendlyMessage: `${successCount} objet(s) supprimé(s)${errorCount > 0 ? `, ${errorCount} erreur(s)` : ''}`,
+          details: `Bucket: ${currentBucket}`
+        });
+
         toast({
           title: "Suppression terminée",
           description: `${successCount} objet(s) supprimé(s)${errorCount > 0 ? `, ${errorCount} erreur(s)` : ''}`,
@@ -149,6 +169,14 @@ export const ObjectList = () => {
       loadObjects();
     } catch (error) {
       console.error('Bulk delete error:', error);
+      addEntry({
+        operationType: 'bulk_delete',
+        status: 'error',
+        bucketName: currentBucket!,
+        logLevel: 'error',
+        userFriendlyMessage: 'Erreur lors de la suppression groupée',
+        details: String(error)
+      });
       toast({
         title: "Erreur",
         description: "Erreur lors de la suppression groupée",
@@ -165,17 +193,37 @@ export const ObjectList = () => {
       .map(key => objects.find(o => o.key === key))
       .filter(obj => obj && !obj.isFolder);
 
+    addEntry({
+      operationType: 'bulk_download',
+      status: 'started',
+      bucketName: currentBucket!,
+      logLevel: 'info',
+      userFriendlyMessage: `Téléchargement groupé de ${filesToDownload.length} fichier(s)`,
+      details: `Bucket: ${currentBucket}`
+    });
+
+    let successCount = 0;
     for (const obj of filesToDownload) {
       if (obj) {
         try {
           const fullKey = currentPath ? `${currentPath}/${obj.key}` : obj.key;
           const fileName = fullKey.split('/').pop() || obj.key;
           await downloadObject(currentBucket!, fullKey, fileName);
+          successCount++;
         } catch (error) {
           console.error('Error downloading:', obj.key, error);
         }
       }
     }
+
+    addEntry({
+      operationType: 'bulk_download',
+      status: 'success',
+      bucketName: currentBucket!,
+      logLevel: 'info',
+      userFriendlyMessage: `${successCount} fichier(s) téléchargé(s)`,
+      details: `Bucket: ${currentBucket}`
+    });
 
     toast({
       title: "Téléchargement",
@@ -241,6 +289,17 @@ export const ObjectList = () => {
     const { objectKey, isFolder } = deleteDialog;
     
     setIsDeleting(true);
+    
+    addEntry({
+      operationType: isFolder ? 'folder_delete' : 'object_delete',
+      status: 'started',
+      bucketName: currentBucket!,
+      objectName: objectKey,
+      logLevel: 'info',
+      userFriendlyMessage: `Suppression de ${isFolder ? 'dossier' : 'fichier'}: ${objectKey}`,
+      details: `Bucket: ${currentBucket}`
+    });
+
     try {
       let keyToDelete = objectKey;
       if (isFolder) {
@@ -253,10 +312,29 @@ export const ObjectList = () => {
       
       await deleteObject(currentBucket!, keyToDelete);
       
+      addEntry({
+        operationType: isFolder ? 'folder_delete' : 'object_delete',
+        status: 'success',
+        bucketName: currentBucket!,
+        objectName: objectKey,
+        logLevel: 'info',
+        userFriendlyMessage: `${isFolder ? 'Dossier' : 'Fichier'} supprimé: ${objectKey}`,
+        details: `Bucket: ${currentBucket}`
+      });
+      
       setDeleteDialog({ open: false, objectKey: '', isFolder: false });
       loadObjects();
     } catch (error) {
       console.error('Error deleting object:', error);
+      addEntry({
+        operationType: isFolder ? 'folder_delete' : 'object_delete',
+        status: 'error',
+        bucketName: currentBucket!,
+        objectName: objectKey,
+        logLevel: 'error',
+        userFriendlyMessage: `Erreur suppression: ${objectKey}`,
+        details: String(error)
+      });
     } finally {
       setIsDeleting(false);
     }
@@ -298,21 +376,59 @@ export const ObjectList = () => {
   };
 
   const handleDownload = async (objectKey: string) => {
+    const fullKey = currentPath ? `${currentPath}/${objectKey}` : objectKey;
+    const fileName = fullKey.split('/').pop() || objectKey;
+    
+    addEntry({
+      operationType: 'object_download',
+      status: 'started',
+      bucketName: currentBucket!,
+      objectName: objectKey,
+      logLevel: 'info',
+      userFriendlyMessage: `Téléchargement: ${fileName}`,
+      details: `Bucket: ${currentBucket}`
+    });
+
     try {
-      const fullKey = currentPath ? `${currentPath}/${objectKey}` : objectKey;
-      
-      // Extraire le nom du fichier depuis la clé
-      const fileName = fullKey.split('/').pop() || objectKey;
-      
       await downloadObject(currentBucket!, fullKey, fileName);
+      
+      addEntry({
+        operationType: 'object_download',
+        status: 'success',
+        bucketName: currentBucket!,
+        objectName: objectKey,
+        logLevel: 'info',
+        userFriendlyMessage: `Téléchargé: ${fileName}`,
+        details: `Bucket: ${currentBucket}`
+      });
     } catch (error) {
       console.error('Error downloading object:', error);
+      addEntry({
+        operationType: 'object_download',
+        status: 'error',
+        bucketName: currentBucket!,
+        objectName: objectKey,
+        logLevel: 'error',
+        userFriendlyMessage: `Erreur téléchargement: ${fileName}`,
+        details: String(error)
+      });
     }
   };
 
   const handleVersionDownload = (objectKey: string) => {
     const fullKey = currentPath ? `${currentPath}/${objectKey}` : objectKey;
     const fileName = fullKey.split('/').pop() || objectKey;
+    
+    addEntry({
+      operationType: 'version_list',
+      status: 'started',
+      bucketName: currentBucket!,
+      objectName: objectKey,
+      logLevel: 'info',
+      userFriendlyMessage: `Consultation des versions: ${fileName}`,
+      details: `Bucket: ${currentBucket}`
+    });
+    
     setVersionDialog({ open: true, objectKey: fullKey, fileName });
   };
 
@@ -327,16 +443,49 @@ export const ObjectList = () => {
 
   const handleShowDetails = (object: any) => {
     const fullKey = currentPath ? `${currentPath}/${object.key}` : object.key;
+    
+    addEntry({
+      operationType: 'object_view',
+      status: 'success',
+      bucketName: currentBucket!,
+      objectName: object.key,
+      logLevel: 'info',
+      userFriendlyMessage: `Détails de: ${object.key}`,
+      details: `Bucket: ${currentBucket}`
+    });
+    
     setDetailsDialog({ open: true, objectKey: fullKey, object });
   };
 
   const handleEditObject = (object: any) => {
     const fullKey = currentPath ? `${currentPath}/${object.key}` : object.key;
+    
+    addEntry({
+      operationType: 'metadata_update',
+      status: 'started',
+      bucketName: currentBucket!,
+      objectName: object.key,
+      logLevel: 'info',
+      userFriendlyMessage: `Modification de: ${object.key}`,
+      details: `Bucket: ${currentBucket}`
+    });
+    
     setEditDialog({ open: true, objectKey: fullKey, object });
   };
 
   const handleCopyObject = (object: any) => {
     const fullKey = currentPath ? `${currentPath}/${object.key}` : object.key;
+    
+    addEntry({
+      operationType: 'object_copy',
+      status: 'started',
+      bucketName: currentBucket!,
+      objectName: object.key,
+      logLevel: 'info',
+      userFriendlyMessage: `Copie de: ${object.key}`,
+      details: `Bucket source: ${currentBucket}`
+    });
+    
     setCopyDialog({ open: true, objectKey: fullKey });
   };
 
