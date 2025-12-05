@@ -41,7 +41,7 @@ export const ObjectEditDialog: React.FC<ObjectEditDialogProps> = ({
   const [acl, setAcl] = useState<string>('private');
   
   // Retention state
-  const [retentionMode, setRetentionMode] = useState<'GOVERNANCE' | 'COMPLIANCE' | ''>('');
+  const [retentionMode, setRetentionMode] = useState<'COMPLIANCE' | ''>('');
   const [retentionDate, setRetentionDate] = useState<string>('');
 
   useEffect(() => {
@@ -62,7 +62,7 @@ export const ObjectEditDialog: React.FC<ObjectEditDialogProps> = ({
       const retentionResponse = await proxyS3Service.getObjectRetention(bucket, objectKey);
       if (retentionResponse.success && retentionResponse.data) {
         if (retentionResponse.data.mode) {
-          setRetentionMode(retentionResponse.data.mode as 'GOVERNANCE' | 'COMPLIANCE');
+          setRetentionMode(retentionResponse.data.mode as 'COMPLIANCE');
         }
         if (retentionResponse.data.retainUntilDate) {
           const date = new Date(retentionResponse.data.retainUntilDate);
@@ -307,19 +307,19 @@ export const ObjectEditDialog: React.FC<ObjectEditDialogProps> = ({
 
                 <div className="space-y-2">
                   <Label>Mode de rétention</Label>
-                  <Select value={retentionMode} onValueChange={(v) => setRetentionMode(v as 'GOVERNANCE' | 'COMPLIANCE')}>
+                  <Select value={retentionMode} onValueChange={(v) => setRetentionMode(v as 'COMPLIANCE')}>
                     <SelectTrigger>
                       <SelectValue placeholder="Sélectionner un mode" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="GOVERNANCE">
-                        Governance - Peut être contourné avec permissions spéciales
-                      </SelectItem>
                       <SelectItem value="COMPLIANCE">
-                        Compliance - Ne peut jamais être contourné
+                        Compliance - Protection WORM stricte
                       </SelectItem>
                     </SelectContent>
                   </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Outscale ne supporte que le mode COMPLIANCE. La rétention ne peut pas être réduite ni supprimée avant expiration.
+                  </p>
                 </div>
 
                 <div className="space-y-2">

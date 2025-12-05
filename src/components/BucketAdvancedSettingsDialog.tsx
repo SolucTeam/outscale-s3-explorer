@@ -56,7 +56,7 @@ export const BucketAdvancedSettingsDialog: React.FC<BucketAdvancedSettingsDialog
   const [bucketAcl, setBucketAcl] = useState<string>('private');
 
   // Object Lock state
-  const [objectLockMode, setObjectLockMode] = useState<'GOVERNANCE' | 'COMPLIANCE' | ''>('');
+  const [objectLockMode, setObjectLockMode] = useState<'COMPLIANCE' | ''>('');
   const [objectLockDays, setObjectLockDays] = useState<number>(0);
 
   useEffect(() => {
@@ -236,7 +236,7 @@ export const BucketAdvancedSettingsDialog: React.FC<BucketAdvancedSettingsDialog
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
             <span>Paramètres avancés - {bucket.name}</span>
@@ -456,17 +456,19 @@ export const BucketAdvancedSettingsDialog: React.FC<BucketAdvancedSettingsDialog
                   <Label>Mode de rétention par défaut</Label>
                   <Select 
                     value={objectLockMode} 
-                    onValueChange={(v) => setObjectLockMode(v as 'GOVERNANCE' | 'COMPLIANCE')}
+                    onValueChange={(v) => setObjectLockMode(v as 'COMPLIANCE')}
                     disabled={!bucket.objectLockEnabled}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Sélectionner un mode" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="GOVERNANCE">Governance</SelectItem>
-                      <SelectItem value="COMPLIANCE">Compliance</SelectItem>
+                      <SelectItem value="COMPLIANCE">Compliance (mode WORM strict)</SelectItem>
                     </SelectContent>
                   </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Outscale ne supporte que le mode COMPLIANCE. La rétention ne peut pas être réduite ni supprimée avant expiration.
+                  </p>
                 </div>
 
                 <div className="space-y-2">
