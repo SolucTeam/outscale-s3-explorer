@@ -852,11 +852,35 @@ class ProxyS3Service {
     return this.makeRequest(`/buckets/${encodeURIComponent(bucket)}/objects/${encodeURIComponent(objectKey)}/tagging`, { method: 'DELETE' });
   }
 
-  async copyObject(sourceBucket: string, sourceKey: string, destBucket: string, destKey: string): Promise<ProxyS3Response<void>> {
+  async copyObject(
+    sourceBucket: string, 
+    sourceKey: string, 
+    destBucket: string, 
+    destKey: string,
+    options?: {
+      acl?: string;
+      metadata?: Record<string, string>;
+      metadataDirective?: 'COPY' | 'REPLACE';
+      tagging?: string;
+      taggingDirective?: 'COPY' | 'REPLACE';
+      contentType?: string;
+      contentDisposition?: string;
+      contentEncoding?: string;
+      contentLanguage?: string;
+      cacheControl?: string;
+      serverSideEncryption?: string;
+      objectLockMode?: 'GOVERNANCE' | 'COMPLIANCE';
+      objectLockRetainUntilDate?: string;
+      copySourceIfMatch?: string;
+      copySourceIfNoneMatch?: string;
+      copySourceIfModifiedSince?: string;
+      copySourceIfUnmodifiedSince?: string;
+    }
+  ): Promise<ProxyS3Response<void>> {
     if (!this.credentials) return { success: false, error: 'Service non initialisé' };
     return this.makeRequest(`/buckets/${encodeURIComponent(destBucket)}/objects/copy`, {
       method: 'POST',
-      body: JSON.stringify({ sourceBucket, sourceKey, destKey })
+      body: JSON.stringify({ sourceBucket, sourceKey, destKey, ...options })
     });
   }
 

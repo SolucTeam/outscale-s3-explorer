@@ -637,7 +637,28 @@ app.delete('/api/buckets/:bucket/objects/:key(*)', strictLimiter, extractCredent
 app.post('/api/buckets/:bucket/objects/copy', strictLimiter, extractCredentials, async (req, res) => {
   try {
     const { bucket } = req.params;
-    const { sourceBucket, sourceKey, destKey } = req.body;
+    const { 
+      sourceBucket, 
+      sourceKey, 
+      destKey,
+      acl,
+      metadata,
+      metadataDirective,
+      tagging,
+      taggingDirective,
+      contentType,
+      contentDisposition,
+      contentEncoding,
+      contentLanguage,
+      cacheControl,
+      serverSideEncryption,
+      objectLockMode,
+      objectLockRetainUntilDate,
+      copySourceIfMatch,
+      copySourceIfNoneMatch,
+      copySourceIfModifiedSince,
+      copySourceIfUnmodifiedSince
+    } = req.body;
 
     if (!sourceBucket || !sourceKey || !destKey) {
       return res.status(400).json({
@@ -646,17 +667,54 @@ app.post('/api/buckets/:bucket/objects/copy', strictLimiter, extractCredentials,
       });
     }
 
-    const command = new CopyObjectCommand({
+    const commandParams = {
       Bucket: bucket,
-      CopySource: `${sourceBucket}/${sourceKey}`,
+      CopySource: encodeURIComponent(`${sourceBucket}/${sourceKey}`),
       Key: destKey
-    });
+    };
 
-    await req.s3Client.send(command);
+    // ACL options
+    if (acl) commandParams.ACL = acl;
+
+    // Metadata options
+    if (metadataDirective) commandParams.MetadataDirective = metadataDirective;
+    if (metadata && metadataDirective === 'REPLACE') commandParams.Metadata = metadata;
+
+    // Tagging options
+    if (taggingDirective) commandParams.TaggingDirective = taggingDirective;
+    if (tagging && taggingDirective === 'REPLACE') commandParams.Tagging = tagging;
+
+    // Content options
+    if (contentType) commandParams.ContentType = contentType;
+    if (contentDisposition) commandParams.ContentDisposition = contentDisposition;
+    if (contentEncoding) commandParams.ContentEncoding = contentEncoding;
+    if (contentLanguage) commandParams.ContentLanguage = contentLanguage;
+    if (cacheControl) commandParams.CacheControl = cacheControl;
+
+    // Encryption
+    if (serverSideEncryption) commandParams.ServerSideEncryption = serverSideEncryption;
+
+    // Object Lock
+    if (objectLockMode) commandParams.ObjectLockMode = objectLockMode;
+    if (objectLockRetainUntilDate) commandParams.ObjectLockRetainUntilDate = new Date(objectLockRetainUntilDate);
+
+    // Conditional copy
+    if (copySourceIfMatch) commandParams.CopySourceIfMatch = copySourceIfMatch;
+    if (copySourceIfNoneMatch) commandParams.CopySourceIfNoneMatch = copySourceIfNoneMatch;
+    if (copySourceIfModifiedSince) commandParams.CopySourceIfModifiedSince = new Date(copySourceIfModifiedSince);
+    if (copySourceIfUnmodifiedSince) commandParams.CopySourceIfUnmodifiedSince = new Date(copySourceIfUnmodifiedSince);
+
+    const command = new CopyObjectCommand(commandParams);
+    const result = await req.s3Client.send(command);
 
     res.json({
       success: true,
-      message: `Objet copié vers "${destKey}"`
+      message: `Objet copié vers "${destKey}"`,
+      data: {
+        versionId: result.VersionId,
+        serverSideEncryption: result.ServerSideEncryption,
+        copyObjectResult: result.CopyObjectResult
+      }
     });
   } catch (error) {
     console.error('Erreur copie objet:', error);

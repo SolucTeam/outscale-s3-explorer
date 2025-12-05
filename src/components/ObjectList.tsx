@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useS3Store } from '../hooks/useS3Store';
 import { useEnhancedDirectS3 } from '../hooks/useEnhancedDirectS3';
-import { Upload, Download, Trash2, FolderOpen, File, RefreshCw, Plus, FolderPlus, Tag, Info, History, Edit } from 'lucide-react';
+import { Upload, Download, Trash2, FolderOpen, File, RefreshCw, Plus, FolderPlus, Tag, Info, History, Edit, Copy } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { FileUpload } from './FileUpload';
@@ -16,6 +16,7 @@ import { ObjectDetailsDialog } from './ObjectDetailsDialog';
 import { ObjectEditDialog } from './ObjectEditDialog';
 import { SearchFilter } from './SearchFilter';
 import { VersionDownloadDialog } from './VersionDownloadDialog';
+import { CopyObjectDialog } from './CopyObjectDialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 export const ObjectList = () => {
@@ -46,6 +47,10 @@ export const ObjectList = () => {
     open: false,
     objectKey: '',
     object: null
+  });
+  const [copyDialog, setCopyDialog] = useState<{ open: boolean; objectKey: string }>({
+    open: false,
+    objectKey: ''
   });
 
   // Filtrer les objets selon la recherche
@@ -207,6 +212,11 @@ export const ObjectList = () => {
   const handleEditObject = (object: any) => {
     const fullKey = currentPath ? `${currentPath}/${object.key}` : object.key;
     setEditDialog({ open: true, objectKey: fullKey, object });
+  };
+
+  const handleCopyObject = (object: any) => {
+    const fullKey = currentPath ? `${currentPath}/${object.key}` : object.key;
+    setCopyDialog({ open: true, objectKey: fullKey });
   };
 
   if (!currentBucket) return null;
@@ -390,6 +400,14 @@ export const ObjectList = () => {
                               <Button
                                 size="sm"
                                 variant="outline"
+                                onClick={() => handleCopyObject(object)}
+                                title="Copier l'objet"
+                              >
+                                <Copy className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
                                 onClick={() => handleVersionDownload(object.key)}
                                 title="Télécharger une version"
                               >
@@ -483,6 +501,14 @@ export const ObjectList = () => {
           onUpdated={loadObjects}
         />
       )}
+
+      <CopyObjectDialog
+        open={copyDialog.open}
+        onOpenChange={(open) => setCopyDialog({ ...copyDialog, open })}
+        sourceBucket={currentBucket!}
+        sourceKey={copyDialog.objectKey}
+        onCopyComplete={loadObjects}
+      />
     </div>
   );
 };
