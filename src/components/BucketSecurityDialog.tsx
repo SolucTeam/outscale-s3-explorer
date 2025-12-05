@@ -354,35 +354,35 @@ export const BucketSecurityDialog: React.FC<BucketSecurityDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh]">
-        <DialogHeader>
+      <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
-            <Shield className="w-5 h-5" />
-            Gestion de la sécurité
+            <Shield className="w-5 h-5 flex-shrink-0" />
+            <span className="truncate">Gestion de la sécurité</span>
           </DialogTitle>
-          <DialogDescription>
-            ACL, policies et permissions pour <strong>{bucket.name}</strong>
+          <DialogDescription className="truncate">
+            ACL, policies et permissions pour <strong className="break-all">{bucket.name}</strong>
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs defaultValue="acl" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="acl" className="flex items-center gap-2">
-              <Users className="w-4 h-4" />
-              ACL
+        <Tabs defaultValue="acl" className="flex-1 flex flex-col overflow-hidden">
+          <TabsList className="grid w-full grid-cols-3 flex-shrink-0">
+            <TabsTrigger value="acl" className="flex items-center justify-center gap-1 sm:gap-2 text-xs sm:text-sm px-1 sm:px-3">
+              <Users className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+              <span className="hidden xs:inline sm:inline">ACL</span>
             </TabsTrigger>
-            <TabsTrigger value="policy" className="flex items-center gap-2">
-              <FileText className="w-4 h-4" />
-              Policy
+            <TabsTrigger value="policy" className="flex items-center justify-center gap-1 sm:gap-2 text-xs sm:text-sm px-1 sm:px-3">
+              <FileText className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+              <span className="hidden xs:inline sm:inline">Policy</span>
             </TabsTrigger>
-            <TabsTrigger value="preview" className="flex items-center gap-2">
-              <Eye className="w-4 h-4" />
-              Permissions
+            <TabsTrigger value="preview" className="flex items-center justify-center gap-1 sm:gap-2 text-xs sm:text-sm px-1 sm:px-3">
+              <Eye className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+              <span className="hidden xs:inline sm:inline">Permissions</span>
             </TabsTrigger>
           </TabsList>
 
           {/* ACL Tab */}
-          <TabsContent value="acl" className="space-y-4">
+          <TabsContent value="acl" className="flex-1 overflow-hidden mt-4">
             {loadingAcl ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="w-6 h-6 animate-spin text-primary" />
@@ -393,7 +393,7 @@ export const BucketSecurityDialog: React.FC<BucketSecurityDialogProps> = ({
                 <AlertDescription>{errorAcl}</AlertDescription>
               </Alert>
             ) : (
-              <ScrollArea className="h-[450px] pr-4">
+              <ScrollArea className="h-[calc(90vh-200px)] max-h-[500px] pr-2 sm:pr-4">
                 <div className="space-y-4">
                   {/* ACL prédéfini */}
                   <Card>
@@ -442,14 +442,14 @@ export const BucketSecurityDialog: React.FC<BucketSecurityDialogProps> = ({
                         <CardTitle className="text-sm">Propriétaire du bucket</CardTitle>
                       </CardHeader>
                       <CardContent className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">ID:</span>
-                          <span className="font-mono text-xs truncate max-w-[300px]">{acl.owner.id}</span>
+                        <div className="flex flex-col sm:flex-row sm:justify-between gap-1 text-sm">
+                          <span className="text-muted-foreground flex-shrink-0">ID:</span>
+                          <span className="font-mono text-xs break-all sm:text-right">{acl.owner.id}</span>
                         </div>
                         {acl.owner.displayName && (
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Nom:</span>
-                            <span>{acl.owner.displayName}</span>
+                          <div className="flex flex-col sm:flex-row sm:justify-between gap-1 text-sm">
+                            <span className="text-muted-foreground flex-shrink-0">Nom:</span>
+                            <span className="break-all sm:text-right">{acl.owner.displayName}</span>
                           </div>
                         )}
                       </CardContent>
@@ -468,24 +468,26 @@ export const BucketSecurityDialog: React.FC<BucketSecurityDialogProps> = ({
                       <CardContent>
                         <div className="space-y-3">
                           {acl.grants.map((grant, index) => (
-                            <div key={index} className="p-3 bg-muted/50 rounded-lg space-y-2">
-                              <div className="flex items-center justify-between">
-                                <span className="text-sm font-medium truncate max-w-[250px]">
+                            <div key={index} className="p-2 sm:p-3 bg-muted/50 rounded-lg space-y-2">
+                              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                <span className="text-xs sm:text-sm font-medium break-all">
                                   {grant.grantee.displayName || 
                                    (grant.grantee.uri?.includes('AllUsers') ? '🌍 Tout le monde' : 
                                     grant.grantee.uri?.includes('AuthenticatedUsers') ? '🔐 Utilisateurs authentifiés' :
                                     grant.grantee.emailAddress || 
                                     grant.grantee.id?.substring(0, 20) + '...')}
                                 </span>
-                                {getPermissionIcon(grant.permission)}
+                                <div className="flex-shrink-0">
+                                  {getPermissionIcon(grant.permission)}
+                                </div>
                               </div>
                               <div className="text-xs text-muted-foreground space-y-1">
                                 <div>Type: {grant.grantee.type}</div>
                                 {grant.grantee.id && (
-                                  <div className="font-mono truncate">ID: {grant.grantee.id}</div>
+                                  <div className="font-mono break-all">ID: {grant.grantee.id}</div>
                                 )}
                                 {grant.grantee.uri && (
-                                  <div className="truncate">URI: {grant.grantee.uri}</div>
+                                  <div className="break-all">URI: {grant.grantee.uri}</div>
                                 )}
                               </div>
                             </div>
@@ -500,7 +502,7 @@ export const BucketSecurityDialog: React.FC<BucketSecurityDialogProps> = ({
           </TabsContent>
 
           {/* Policy Tab */}
-          <TabsContent value="policy" className="space-y-4">
+          <TabsContent value="policy" className="flex-1 overflow-auto mt-4">
             {loadingPolicy ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="w-6 h-6 animate-spin text-primary" />
@@ -511,6 +513,7 @@ export const BucketSecurityDialog: React.FC<BucketSecurityDialogProps> = ({
                 <AlertDescription>{errorPolicy}</AlertDescription>
               </Alert>
             ) : (
+              <ScrollArea className="h-[calc(90vh-200px)] max-h-[500px] pr-2 sm:pr-4">
               <div className="space-y-4">
                 {/* Templates */}
                 <Card>
@@ -544,7 +547,7 @@ export const BucketSecurityDialog: React.FC<BucketSecurityDialogProps> = ({
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="space-y-2">
-                      <Label>Policy JSON</Label>
+                      <Label className="text-xs sm:text-sm">Policy JSON</Label>
                       <Textarea 
                         value={policyText}
                         onChange={(e) => {
@@ -552,25 +555,26 @@ export const BucketSecurityDialog: React.FC<BucketSecurityDialogProps> = ({
                           validatePolicy(e.target.value);
                         }}
                         placeholder='{"Version": "2012-10-17", "Statement": [...]}'
-                        className="font-mono text-xs min-h-[250px]"
+                        className="font-mono text-[10px] sm:text-xs min-h-[150px] sm:min-h-[200px]"
                       />
                       {policyError && (
                         <p className="text-xs text-destructive">{policyError}</p>
                       )}
                     </div>
                     
-                    <div className="flex gap-2">
+                    <div className="flex flex-col sm:flex-row gap-2">
                       <Button 
                         onClick={handleSavePolicy} 
                         disabled={savingPolicy || !!policyError}
-                        className="flex-1"
+                        className="flex-1 text-xs sm:text-sm"
+                        size="sm"
                       >
                         {savingPolicy ? (
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 animate-spin" />
                         ) : (
-                          <Save className="w-4 h-4 mr-2" />
+                          <Save className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
                         )}
-                        Enregistrer la policy
+                        <span className="truncate">Enregistrer</span>
                       </Button>
                       
                       {policy?.policy && (
@@ -578,115 +582,121 @@ export const BucketSecurityDialog: React.FC<BucketSecurityDialogProps> = ({
                           variant="destructive"
                           onClick={handleDeletePolicy}
                           disabled={deletingPolicy}
+                          size="sm"
+                          className="text-xs sm:text-sm"
                         >
                           {deletingPolicy ? (
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 animate-spin" />
                           ) : (
-                            <Trash2 className="w-4 h-4 mr-2" />
+                            <Trash2 className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
                           )}
-                          Supprimer
+                          <span className="truncate">Supprimer</span>
                         </Button>
                       )}
                     </div>
                   </CardContent>
                 </Card>
               </div>
+              </ScrollArea>
             )}
           </TabsContent>
 
           {/* Permissions Preview Tab */}
-          <TabsContent value="preview" className="space-y-4">
+          <TabsContent value="preview" className="flex-1 overflow-auto mt-4">
+            <ScrollArea className="h-[calc(90vh-200px)] max-h-[500px] pr-2 sm:pr-4">
+            <div className="space-y-4">
             <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
+              <CardHeader className="p-3 sm:p-6">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                   <div>
-                    <CardTitle className="text-sm">Permissions effectives</CardTitle>
-                    <CardDescription>
-                      Résumé des permissions calculées à partir des ACL et policies
+                    <CardTitle className="text-xs sm:text-sm">Permissions effectives</CardTitle>
+                    <CardDescription className="text-xs">
+                      Résumé des permissions calculées
                     </CardDescription>
                   </div>
                   <Button 
                     variant="outline" 
                     size="sm"
                     onClick={() => { loadAcl(); loadPolicy(); }}
+                    className="self-start sm:self-auto text-xs"
                   >
-                    <RefreshCw className="w-4 h-4 mr-2" />
+                    <RefreshCw className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
                     Actualiser
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent>
-                <ScrollArea className="h-[400px]">
+              <CardContent className="p-3 sm:p-6 pt-0 sm:pt-0">
                   <div className="space-y-2">
                     {effectivePermissions.length === 0 ? (
                       <div className="text-center py-8 text-muted-foreground">
-                        <Shield className="w-12 h-12 mx-auto mb-2 opacity-20" />
-                        <p className="text-sm">Chargement des permissions...</p>
+                        <Shield className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-2 opacity-20" />
+                        <p className="text-xs sm:text-sm">Chargement des permissions...</p>
                       </div>
                     ) : (
                       effectivePermissions.map((perm, index) => (
                         <div 
                           key={index} 
-                          className={`p-3 rounded-lg border flex items-center justify-between ${
+                          className={`p-2 sm:p-3 rounded-lg border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 ${
                             perm.allowed 
                               ? 'bg-green-500/10 border-green-500/20' 
                               : 'bg-red-500/10 border-red-500/20'
                           }`}
                         >
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-start sm:items-center gap-2 sm:gap-3">
                             {perm.allowed ? (
-                              <CheckCircle className="w-5 h-5 text-green-500" />
+                              <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-500 flex-shrink-0 mt-0.5 sm:mt-0" />
                             ) : (
-                              <XCircle className="w-5 h-5 text-red-500" />
+                              <XCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-500 flex-shrink-0 mt-0.5 sm:mt-0" />
                             )}
-                            <div>
-                              <p className="text-sm font-medium">{perm.action}</p>
-                              <p className="text-xs text-muted-foreground">{perm.details}</p>
+                            <div className="min-w-0">
+                              <p className="text-xs sm:text-sm font-medium break-all">{perm.action}</p>
+                              <p className="text-[10px] sm:text-xs text-muted-foreground break-all">{perm.details}</p>
                             </div>
                           </div>
-                          <Badge variant="outline">{perm.source}</Badge>
+                          <Badge variant="outline" className="self-start sm:self-auto text-[10px] sm:text-xs flex-shrink-0">{perm.source}</Badge>
                         </div>
                       ))
                     )}
                   </div>
-                </ScrollArea>
               </CardContent>
             </Card>
 
             {/* Légende */}
             <Card>
-              <CardHeader>
-                <CardTitle className="text-sm">Comprendre les permissions</CardTitle>
+              <CardHeader className="p-3 sm:p-6 pb-2 sm:pb-2">
+                <CardTitle className="text-xs sm:text-sm">Comprendre les permissions</CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+              <CardContent className="p-3 sm:p-6 pt-0">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 text-xs sm:text-sm">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <Badge variant="outline">ACL</Badge>
+                      <Badge variant="outline" className="text-[10px] sm:text-xs">ACL</Badge>
                     </div>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-[10px] sm:text-xs text-muted-foreground">
                       Permissions héritées des Access Control Lists
                     </p>
                   </div>
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <Badge variant="outline">Policy</Badge>
+                      <Badge variant="outline" className="text-[10px] sm:text-xs">Policy</Badge>
                     </div>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-[10px] sm:text-xs text-muted-foreground">
                       Permissions définies dans la bucket policy JSON
                     </p>
                   </div>
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <Badge variant="outline">Default</Badge>
+                      <Badge variant="outline" className="text-[10px] sm:text-xs">Default</Badge>
                     </div>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-[10px] sm:text-xs text-muted-foreground">
                       Permissions par défaut du propriétaire
                     </p>
                   </div>
                 </div>
               </CardContent>
             </Card>
+            </div>
+            </ScrollArea>
           </TabsContent>
         </Tabs>
       </DialogContent>
