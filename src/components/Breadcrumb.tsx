@@ -95,8 +95,8 @@ export const Breadcrumb = () => {
   };
 
   // Fonction pour afficher un élément de breadcrumb avec tooltip si tronqué
-  const renderBreadcrumbItem = (item: BreadcrumbItem, index: number) => {
-    const isLast = index === breadcrumbItems.length - 1;
+  const renderBreadcrumbItem = (item: BreadcrumbItem, index: number, totalItems: number) => {
+    const isLast = index === totalItems - 1;
     const isTruncated = item.name.length > 20;
     const displayName = truncateSegment(item.name);
     
@@ -124,7 +124,7 @@ export const Breadcrumb = () => {
     // Si le nom est tronqué, afficher un tooltip avec le nom complet
     if (isTruncated) {
       return (
-        <TooltipProvider key={`${item.path}-${item.name}-${index}`}>
+        <TooltipProvider key={`breadcrumb-${index}-${item.path}`}>
           <Tooltip>
             <TooltipTrigger asChild>
               {buttonContent}
@@ -141,20 +141,22 @@ export const Breadcrumb = () => {
     }
 
     return (
-      <React.Fragment key={`${item.path}-${item.name}-${index}`}>
+      <React.Fragment key={`breadcrumb-${index}-${item.path}`}>
         {buttonContent}
       </React.Fragment>
     );
   };
 
+  const totalBreadcrumbItems = breadcrumbItems.length;
+
   // Gérer l'affichage avec ellipsis si trop de segments
   const renderBreadcrumbs = () => {
     // Si moins de 6 segments, afficher tout
-    if (breadcrumbItems.length <= 6) {
+    if (totalBreadcrumbItems <= 6) {
       return breadcrumbItems.map((item, index) => (
         <div key={`container-${index}-${item.path}`} className="flex items-center">
           {index > 0 && <ChevronRight className="w-4 h-4 text-gray-400 mx-1 flex-shrink-0" />}
-          {renderBreadcrumbItem(item, index)}
+          {renderBreadcrumbItem(item, index, totalBreadcrumbItems)}
         </div>
       ));
     }
@@ -167,7 +169,7 @@ export const Breadcrumb = () => {
       result.push(
         <div key={`container-start-${i}`} className="flex items-center">
           {i > 0 && <ChevronRight className="w-4 h-4 text-gray-400 mx-1 flex-shrink-0" />}
-          {renderBreadcrumbItem(breadcrumbItems[i], i)}
+          {renderBreadcrumbItem(breadcrumbItems[i], i, totalBreadcrumbItems)}
         </div>
       );
     }
@@ -194,10 +196,9 @@ export const Breadcrumb = () => {
                   {/* Menu déroulant au survol */}
                   <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-50 min-w-[200px] hidden group-hover:block">
                     {hiddenItems.map((item, idx) => {
-                      const originalIndex = 2 + idx;
                       return (
                         <Button
-                          key={`hidden-${originalIndex}`}
+                          key={`hidden-${idx}-${item.path}`}
                           variant="ghost"
                           size="sm"
                           className="w-full justify-start h-auto px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 hover:text-blue-600"
@@ -226,11 +227,11 @@ export const Breadcrumb = () => {
     // Afficher les 3 derniers segments (pour éviter le problème de navigation)
     const lastThree = breadcrumbItems.slice(-3);
     lastThree.forEach((item, idx) => {
-      const originalIndex = breadcrumbItems.length - 3 + idx;
+      const originalIndex = totalBreadcrumbItems - 3 + idx;
       result.push(
-        <div key={`container-end-${originalIndex}`} className="flex items-center">
+        <div key={`container-end-${originalIndex}-${item.path}`} className="flex items-center">
           <ChevronRight className="w-4 h-4 text-gray-400 mx-1 flex-shrink-0" />
-          {renderBreadcrumbItem(item, originalIndex)}
+          {renderBreadcrumbItem(item, originalIndex, totalBreadcrumbItems)}
         </div>
       );
     });
