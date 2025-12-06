@@ -149,69 +149,88 @@ export const Breadcrumb = () => {
 
   // Gérer l'affichage avec ellipsis si trop de segments
   const renderBreadcrumbs = () => {
-    // Si moins de 5 segments, afficher tout
-    if (breadcrumbItems.length <= 5) {
+    // Si moins de 6 segments, afficher tout
+    if (breadcrumbItems.length <= 6) {
       return breadcrumbItems.map((item, index) => (
-        <div key={`container-${item.path}-${item.name}-${index}`} className="flex items-center">
+        <div key={`container-${index}-${item.path}`} className="flex items-center">
           {index > 0 && <ChevronRight className="w-4 h-4 text-gray-400 mx-1 flex-shrink-0" />}
           {renderBreadcrumbItem(item, index)}
         </div>
       ));
     }
 
-    // Si plus de 5 segments, afficher : Home / Bucket / ... / Avant-dernier / Dernier
-    const result = [];
+    // Si plus de 6 segments, afficher : Home / Bucket / ... / Avant-avant-dernier / Avant-dernier / Dernier
+    const result: React.ReactNode[] = [];
     
     // Toujours afficher les 2 premiers (Home + Bucket)
     for (let i = 0; i < 2; i++) {
       result.push(
-        <div key={`container-${breadcrumbItems[i].path}-${breadcrumbItems[i].name}-${i}`} className="flex items-center">
+        <div key={`container-start-${i}`} className="flex items-center">
           {i > 0 && <ChevronRight className="w-4 h-4 text-gray-400 mx-1 flex-shrink-0" />}
           {renderBreadcrumbItem(breadcrumbItems[i], i)}
         </div>
       );
     }
 
-    // Ellipsis pour les segments du milieu
-    result.push(
-      <div key="ellipsis" className="flex items-center">
-        <ChevronRight className="w-4 h-4 text-gray-400 mx-1 flex-shrink-0" />
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-auto px-2 py-1 text-gray-400 cursor-default"
-                disabled
-              >
-                <span>...</span>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent 
-              side="bottom" 
-              className="max-w-md bg-gray-900 text-white text-xs"
-            >
-              <div className="space-y-1">
-                <p className="font-semibold">Segments cachés :</p>
-                {breadcrumbItems.slice(2, -2).map((item, idx) => (
-                  <p key={idx} className="truncate">• {item.name}</p>
-                ))}
-              </div>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      </div>
-    );
-
-    // Afficher les 2 derniers segments
-    const lastTwo = breadcrumbItems.slice(-2);
-    lastTwo.forEach((item, idx) => {
-      const actualIndex = breadcrumbItems.length - 2 + idx;
+    // Segments cachés (du milieu)
+    const hiddenItems = breadcrumbItems.slice(2, -3);
+    
+    // Ellipsis cliquable pour les segments du milieu
+    if (hiddenItems.length > 0) {
       result.push(
-        <div key={`container-${item.path}-${item.name}-${actualIndex}`} className="flex items-center">
+        <div key="ellipsis" className="flex items-center">
           <ChevronRight className="w-4 h-4 text-gray-400 mx-1 flex-shrink-0" />
-          {renderBreadcrumbItem(item, actualIndex)}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="relative group">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-auto px-2 py-1 text-gray-400 hover:text-gray-600"
+                  >
+                    <span>...</span>
+                  </Button>
+                  {/* Menu déroulant au survol */}
+                  <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-50 min-w-[200px] hidden group-hover:block">
+                    {hiddenItems.map((item, idx) => {
+                      const originalIndex = 2 + idx;
+                      return (
+                        <Button
+                          key={`hidden-${originalIndex}`}
+                          variant="ghost"
+                          size="sm"
+                          className="w-full justify-start h-auto px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 hover:text-blue-600"
+                          onClick={() => handleBreadcrumbClick(item)}
+                        >
+                          <Folder className="w-4 h-4 mr-2 flex-shrink-0" />
+                          <span className="truncate">{truncateSegment(item.name, 30)}</span>
+                        </Button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent 
+                side="bottom" 
+                className="max-w-md bg-gray-900 text-white text-xs"
+              >
+                <p>Cliquez ou survolez pour voir les {hiddenItems.length} dossiers masqués</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+      );
+    }
+
+    // Afficher les 3 derniers segments (pour éviter le problème de navigation)
+    const lastThree = breadcrumbItems.slice(-3);
+    lastThree.forEach((item, idx) => {
+      const originalIndex = breadcrumbItems.length - 3 + idx;
+      result.push(
+        <div key={`container-end-${originalIndex}`} className="flex items-center">
+          <ChevronRight className="w-4 h-4 text-gray-400 mx-1 flex-shrink-0" />
+          {renderBreadcrumbItem(item, originalIndex)}
         </div>
       );
     });
