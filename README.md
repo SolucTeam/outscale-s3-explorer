@@ -43,11 +43,13 @@ Outscale S3 Explorer est une application web moderne qui facilite la gestion de 
 ## ✨ Fonctionnalités
 
 ### Gestion des buckets
+
 - 📁 Création et suppression de buckets
 - 👀 Visualisation en temps réel
 - 🔍 Recherche et filtrage rapides
 
 ### Gestion des objets
+
 - 📤 **Upload de fichiers**
   - Drag & drop intuitif
   - Barre de progression en temps réel
@@ -57,11 +59,13 @@ Outscale S3 Explorer est une application web moderne qui facilite la gestion de 
 - 📊 Affichage des métadonnées (taille, date, type MIME)
 
 ### Navigation
+
 - 🗂️ Navigation hiérarchique dans les dossiers
 - 🔙 Fil d'Ariane (breadcrumb) pour navigation rapide
 - ⚡ Chargement paresseux pour performances optimales
 
 ### Fonctionnalités avancées
+
 - 💾 **Cache intelligent** pour réduire les appels API
 - 🔄 **Retry automatique** en cas d'erreur réseau
 - 🔐 **Authentification sécurisée** avec gestion de session
@@ -79,6 +83,7 @@ Outscale S3 Explorer est une application web moderne qui facilite la gestion de 
 ### Démarrage
 
 **Terminal 1 - Démarrer le proxy:**
+
 ```bash
 cd proxy-server
 npm install
@@ -86,6 +91,7 @@ npm start
 ```
 
 **Terminal 2 - Démarrer le frontend:**
+
 ```bash
 npm install
 npm run dev
@@ -94,7 +100,8 @@ npm run dev
 ### Accès aux services
 
 Une fois démarrés, accédez aux services:
-- 🌐 **Frontend**: [http://localhost:5173](http://localhost:5173)
+
+- 🌐 **Frontend**: [http://localhost:8080](http://localhost:8080)
 - 🔌 **Proxy API**: [http://localhost:3001](http://localhost:3001)
 
 ---
@@ -139,13 +146,14 @@ VITE_DEFAULT_REGION=eu-west-2
 ┌─────────────────┐      ┌──────────────────┐      ┌─────────────────┐
 │   React App     │─────▶│   Proxy Server   │─────▶│  Outscale OOS   │
 │  (Frontend)     │      │    (Backend)     │      │     (S3 API)    │
-│  localhost:5173 │◀─────│  localhost:3001  │◀─────│                 │
+│  localhost:8080 │◀─────│  localhost:3001  │◀─────│                 │
 └─────────────────┘      └──────────────────┘      └─────────────────┘
 ```
 
 ### Stack technique
 
 #### Frontend
+
 - **Framework**: React 18.3 avec hooks modernes
 - **Langage**: TypeScript 5.6 pour la sûreté des types
 - **Build**: Vite 6.0 pour un développement ultra-rapide
@@ -155,6 +163,7 @@ VITE_DEFAULT_REGION=eu-west-2
 - **Routing**: React Router DOM 7.1 pour navigation SPA
 
 #### Backend (Proxy)
+
 - **Runtime**: Node.js 20+
 - **Framework**: Express 4.21 pour API REST
 - **SDK**: AWS S3 SDK v3 compatible Outscale
@@ -163,6 +172,7 @@ VITE_DEFAULT_REGION=eu-west-2
 #### Pourquoi un proxy?
 
 Le proxy backend est essentiel pour:
+
 1. 🔒 **Sécurité**: Masquer les credentials côté client
 2. 🌐 **CORS**: Contourner les restrictions de partage de ressources
 3. 🎯 **Logique métier**: Centraliser la gestion des requêtes S3
@@ -173,6 +183,7 @@ Le proxy backend est essentiel pour:
 ## 🛠️ Technologies
 
 ### Frontend
+
 | Technologie | Version | Rôle |
 |-------------|---------|------|
 | React | 18.3 | Framework UI |
@@ -184,6 +195,7 @@ Le proxy backend est essentiel pour:
 | Lucide React | Latest | Bibliothèque d'icônes |
 
 ### Backend
+
 | Technologie | Version | Rôle |
 |-------------|---------|------|
 | Node.js | 20+ | Runtime JavaScript |
@@ -209,6 +221,7 @@ npm install
 ### Scripts disponibles
 
 **Frontend:**
+
 ```bash
 npm run dev          # Démarrer en mode développement
 npm run build        # Build de production
@@ -217,6 +230,7 @@ npm run lint         # Linter le code
 ```
 
 **Backend:**
+
 ```bash
 npm start           # Démarrer le serveur proxy
 npm run dev         # Mode développement avec nodemon (si configuré)
@@ -247,13 +261,14 @@ outscale-s3-explorer/
 
 ### Le frontend ne démarre pas
 
-**Erreur**: `Port 5173 already in use`
+**Erreur**: `Port 8080 already in use`
 
 **Solution**:
+
 ```bash
 # Trouver le processus
-lsof -ti:5173 | xargs kill -9  # Mac/Linux
-netstat -ano | findstr :5173   # Windows
+lsof -ti:8080 | xargs kill -9  # Mac/Linux
+netstat -ano | findstr :8080   # Windows
 
 # Ou modifier le port dans vite.config.ts
 ```
@@ -263,6 +278,7 @@ netstat -ano | findstr :5173   # Windows
 **Erreur**: `Network error` ou `Unable to connect`
 
 **Solutions**:
+
 1. Vérifiez vos credentials (Access Key, Secret Key)
 2. Vérifiez la région sélectionnée
 3. Testez la connectivité: `ping oos.eu-west-2.outscale.com`
@@ -273,6 +289,7 @@ netstat -ano | findstr :5173   # Windows
 **Erreur**: `CORS policy: No 'Access-Control-Allow-Origin'`
 
 **Solution**: Le proxy devrait gérer CORS automatiquement. Si l'erreur persiste:
+
 ```bash
 cd proxy-server
 npm install cors
@@ -282,6 +299,7 @@ npm install cors
 ### Performance lente
 
 **Solutions**:
+
 1. Vider le cache du navigateur
 2. Vérifier la latence réseau vers Outscale
 3. Réduire le nombre d'objets affichés simultanément
@@ -298,6 +316,7 @@ Ce projet est sous licence MIT.
 ## 🤝 Contribution
 
 Les contributions sont les bienvenues! N'hésitez pas à:
+
 - 🐛 Signaler des bugs
 - 💡 Proposer des fonctionnalités
 - 🔧 Soumettre des pull requests
