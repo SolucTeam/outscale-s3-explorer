@@ -4,23 +4,30 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useActionHistoryStore } from '../stores/actionHistoryStore';
+import { useActiveOperationsStore } from '../stores/activeOperationsStore';
 import { useS3Store } from '../hooks/useS3Store';
-import { Activity, Clock, CheckCircle, XCircle, AlertCircle, Filter, Trash2, User, Settings, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Activity, Clock, CheckCircle, XCircle, AlertCircle, Filter, Trash2, User, Settings, ChevronLeft, ChevronRight, X, Loader2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { useToast } from '@/hooks/use-toast';
 
 type FilterType = 'all' | 'success' | 'error' | 'info';
 
 export const ActionHistory = () => {
   const { credentials } = useS3Store();
+  const { toast } = useToast();
   const { 
     getCurrentUserEntries, 
     clearHistory, 
     setCurrentUser, 
     currentUserId,
     userHistories,
-    toggleLogging
+    toggleLogging,
+    updateEntry
   } = useActionHistoryStore();
+  
+  const { getAllOperations, cancelOperation } = useActiveOperationsStore();
+  const activeOperations = getAllOperations();
   
   const [filter, setFilter] = useState<FilterType>('all');
   const [isExpanded, setIsExpanded] = useState(false);
@@ -111,6 +118,8 @@ export const ActionHistory = () => {
         return 'Réussi';
       case 'error':
         return 'Échec';
+      case 'cancelled':
+        return 'Annulé';
       case 'started':
         return 'Démarré';
       case 'progress':
@@ -118,6 +127,28 @@ export const ActionHistory = () => {
       default:
         return status;
     }
+  };
+
+  const handleCancelOperation = (entryId: string, operationName: string) => {
+    // Chercher l'opération active correspondante
+    const activeOp = activeOperations.find(op => op.id === entryId);
+    if (activeOp) {
+      cancelOperation(entryId);
+      updateEntry(entryId, {
+        status: 'error',
+        userFriendlyMessage: `${operationName} - Annulé`,
+        logLevel: 'warning'
+      });
+      toast({
+        title: "Opération annulée",
+        description: operationName,
+      });
+    }
+  };
+
+  // Vérifier si une entrée a une opération active correspondante
+  const isEntryActive = (entryId: string): boolean => {
+    return activeOperations.some(op => op.id === entryId);
   };
 
   return (
@@ -226,7 +257,11 @@ export const ActionHistory = () => {
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center space-x-3 min-w-0 flex-1">
                       <div className="flex-shrink-0">
-                        {getStatusIcon(entry.status)}
+                        {(entry.status === 'started' || entry.status === 'progress') && isEntryActive(entry.id) ? (
+                          <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 text-blue-500 animate-spin" />
+                        ) : (
+                          getStatusIcon(entry.status)
+                        )}
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium text-gray-900 truncate">
@@ -248,12 +283,26 @@ export const ActionHistory = () => {
                         )}
                       </div>
                     </div>
-                    <Badge
-                      variant="secondary"
-                      className={`text-xs flex-shrink-0 border ${getStatusColor(entry.status)}`}
-                    >
-                      {getStatusLabel(entry.status)}
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      {/* Bouton d'annulation pour les opérations en cours */}
+                      {(entry.status === 'started' || entry.status === 'progress') && isEntryActive(entry.id) && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleCancelOperation(entry.id, entry.userFriendlyMessage)}
+                          className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                          title="Annuler l'opération"
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      )}
+                      <Badge
+                        variant="secondary"
+                        className={`text-xs flex-shrink-0 border ${getStatusColor(entry.status)}`}
+                      >
+                        {getStatusLabel(entry.status)}
+                      </Badge>
+                    </div>
                   </div>
                   
                   {entry.details && (
