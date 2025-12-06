@@ -21,6 +21,7 @@ import { CopyObjectDialog } from './CopyObjectDialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import { useActionHistoryStore } from '../stores/actionHistoryStore';
+import { useActiveOperationsStore } from '../stores/activeOperationsStore';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,7 +36,8 @@ import {
 export const ObjectList = () => {
   const { currentBucket, currentPath, objects, loading, setCurrentPath, buckets } = useS3Store();
   const { fetchObjects, deleteObject, downloadObject } = useEnhancedDirectS3();
-  const { addEntry } = useActionHistoryStore();
+  const { addEntry, updateEntry } = useActionHistoryStore();
+  const { startOperation, completeOperation, isOperationActive } = useActiveOperationsStore();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [showUpload, setShowUpload] = useState(false);
@@ -113,21 +115,34 @@ export const ObjectList = () => {
 
   // Bulk delete handler
   const handleBulkDelete = async () => {
+    const operationId = `bulk-delete-${Date.now()}`;
     setIsBulkDeleting(true);
     let successCount = 0;
     let errorCount = 0;
+    let cancelled = false;
 
+    const abortController = startOperation(operationId, 'bulk_delete', `Suppression de ${selectedObjects.size} objet(s)`);
+    
     addEntry({
+      id: operationId,
       operationType: 'bulk_delete',
       status: 'started',
       bucketName: currentBucket!,
       logLevel: 'info',
       userFriendlyMessage: `Suppression groupée de ${selectedObjects.size} objet(s)`,
       details: `Bucket: ${currentBucket}`
-    });
+    } as any);
 
     try {
-      for (const objectKey of selectedObjects) {
+      const objectsArray = Array.from(selectedObjects);
+      for (let i = 0; i < objectsArray.length; i++) {
+        // Vérifier si l'opération a été annulée
+        if (abortController.signal.aborted) {
+          cancelled = true;
+          break;
+        }
+
+        const objectKey = objectsArray[i];
         const object = objects.find(o => o.key === objectKey);
         if (!object) continue;
 
@@ -147,16 +162,24 @@ export const ObjectList = () => {
         }
       }
 
-      if (successCount > 0) {
-        addEntry({
-          operationType: 'bulk_delete',
-          status: errorCount > 0 ? 'error' : 'success',
-          bucketName: currentBucket!,
-          logLevel: errorCount > 0 ? 'warning' : 'info',
-          userFriendlyMessage: `${successCount} objet(s) supprimé(s)${errorCount > 0 ? `, ${errorCount} erreur(s)` : ''}`,
-          details: `Bucket: ${currentBucket}`
-        });
+      completeOperation(operationId);
 
+      if (cancelled) {
+        updateEntry(operationId, {
+          status: 'error',
+          userFriendlyMessage: `Suppression annulée: ${successCount} supprimé(s)`,
+          logLevel: 'warning'
+        });
+        toast({
+          title: "Opération annulée",
+          description: `${successCount} objet(s) supprimé(s) avant annulation`,
+        });
+      } else if (successCount > 0) {
+        updateEntry(operationId, {
+          status: errorCount > 0 ? 'error' : 'success',
+          userFriendlyMessage: `${successCount} objet(s) supprimé(s)${errorCount > 0 ? `, ${errorCount} erreur(s)` : ''}`,
+          logLevel: errorCount > 0 ? 'warning' : 'info'
+        });
         toast({
           title: "Suppression terminée",
           description: `${successCount} objet(s) supprimé(s)${errorCount > 0 ? `, ${errorCount} erreur(s)` : ''}`,
@@ -169,13 +192,11 @@ export const ObjectList = () => {
       loadObjects();
     } catch (error) {
       console.error('Bulk delete error:', error);
-      addEntry({
-        operationType: 'bulk_delete',
+      completeOperation(operationId);
+      updateEntry(operationId, {
         status: 'error',
-        bucketName: currentBucket!,
-        logLevel: 'error',
         userFriendlyMessage: 'Erreur lors de la suppression groupée',
-        details: String(error)
+        logLevel: 'error'
       });
       toast({
         title: "Erreur",
@@ -189,21 +210,33 @@ export const ObjectList = () => {
 
   // Bulk download handler
   const handleBulkDownload = async () => {
+    const operationId = `bulk-download-${Date.now()}`;
     const filesToDownload = Array.from(selectedObjects)
       .map(key => objects.find(o => o.key === key))
       .filter(obj => obj && !obj.isFolder);
 
+    const abortController = startOperation(operationId, 'bulk_download', `Téléchargement de ${filesToDownload.length} fichier(s)`);
+
     addEntry({
+      id: operationId,
       operationType: 'bulk_download',
       status: 'started',
       bucketName: currentBucket!,
       logLevel: 'info',
       userFriendlyMessage: `Téléchargement groupé de ${filesToDownload.length} fichier(s)`,
       details: `Bucket: ${currentBucket}`
-    });
+    } as any);
 
     let successCount = 0;
+    let cancelled = false;
+
     for (const obj of filesToDownload) {
+      // Vérifier si l'opération a été annulée
+      if (abortController.signal.aborted) {
+        cancelled = true;
+        break;
+      }
+
       if (obj) {
         try {
           const fullKey = currentPath ? `${currentPath}/${obj.key}` : obj.key;
@@ -216,19 +249,29 @@ export const ObjectList = () => {
       }
     }
 
-    addEntry({
-      operationType: 'bulk_download',
-      status: 'success',
-      bucketName: currentBucket!,
-      logLevel: 'info',
-      userFriendlyMessage: `${successCount} fichier(s) téléchargé(s)`,
-      details: `Bucket: ${currentBucket}`
-    });
+    completeOperation(operationId);
 
-    toast({
-      title: "Téléchargement",
-      description: `${filesToDownload.length} fichier(s) téléchargé(s)`
-    });
+    if (cancelled) {
+      updateEntry(operationId, {
+        status: 'error',
+        userFriendlyMessage: `Téléchargement annulé: ${successCount} fichier(s) téléchargé(s)`,
+        logLevel: 'warning'
+      });
+      toast({
+        title: "Opération annulée",
+        description: `${successCount} fichier(s) téléchargé(s) avant annulation`,
+      });
+    } else {
+      updateEntry(operationId, {
+        status: 'success',
+        userFriendlyMessage: `${successCount} fichier(s) téléchargé(s)`,
+        logLevel: 'info'
+      });
+      toast({
+        title: "Téléchargement",
+        description: `${filesToDownload.length} fichier(s) téléchargé(s)`
+      });
+    }
   };
 
   useEffect(() => {
