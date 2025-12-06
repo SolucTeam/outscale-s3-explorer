@@ -1,6 +1,6 @@
-# 🔒 Guide de Sécurité NumS3
+# 🔒 Guide de Sécurité Outscale S3 Explorer
 
-Ce document détaille les mesures de sécurité implémentées dans NumS3 et les bonnes pratiques à suivre.
+Ce document détaille les mesures de sécurité implémentées dans Outscale S3 Explorer et les bonnes pratiques à suivre.
 
 ---
 
@@ -235,7 +235,7 @@ Tous les headers de sécurité sont automatiquement ajoutés par le proxy:
 
 ### ✅ Avant de déployer en production
 
-#### Frontend (NumS3 Console)
+#### Frontend (Outscale S3 Explorer)
 
 - [ ] Variables d'environnement configurées dans ConfigMap
 - [ ] `VITE_LOG_LEVEL=info` ou `warn` (pas `debug`)

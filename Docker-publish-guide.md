@@ -1,6 +1,6 @@
 # 🐳 Guide de Publication Docker sur GitHub Container Registry (ghcr.io)
 
-Ce guide explique comment utiliser le workflow GitHub Actions existant pour construire et publier automatiquement votre image Docker NumS3 Console sur ghcr.io.
+Ce guide explique comment utiliser le workflow GitHub Actions existant pour construire et publier automatiquement votre image Docker Outscale S3 Explorer sur ghcr.io.
 
 ## 📋 Table des Matières
 

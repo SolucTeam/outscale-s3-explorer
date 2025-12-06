@@ -1,5 +1,5 @@
 # ============================================
-# 🐳 Dockerfile Multi-Stage pour NumS3 Console
+# 🐳 Dockerfile Multi-Stage pour Outscale S3 Explorer
 # ============================================
 # Ce Dockerfile contient Frontend + Backend dans une seule image
 # Utilise Nginx pour servir le frontend et Node.js pour le proxy
@@ -153,7 +153,7 @@ COPY <<'EOF' /app/start.sh
 #!/bin/sh
 set -e
 
-echo "🚀 Démarrage de NumS3 Console..."
+echo "🚀 Démarrage de Outscale S3 Explorer..."
 
 # Démarrer le proxy backend en arrière-plan
 echo "🔧 Démarrage du proxy backend..."

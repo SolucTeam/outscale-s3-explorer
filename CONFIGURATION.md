@@ -1,6 +1,6 @@
-# Guide de Configuration NUMS3 Console
+# Guide de Configuration Outscale S3 Explorer
 
-Ce document explique comment configurer l'application NUMS3 Console pour différents environnements sans avoir à rebuilder.
+Ce document explique comment configurer l'application Outscale S3 Explorer pour différents environnements sans avoir à rebuilder.
 
 ## 📋 Table des Matières
 
