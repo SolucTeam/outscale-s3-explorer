@@ -195,17 +195,22 @@ export const Breadcrumb = () => {
                   </Button>
                   {/* Menu déroulant au survol */}
                   <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-50 min-w-[200px] hidden group-hover:block">
-                    {hiddenItems.map((item, idx) => {
+                    {hiddenItems.map((hiddenItem, idx) => {
+                      // Créer une copie avec le chemin correct pour éviter les problèmes de closure
+                      const itemToNavigate = { ...hiddenItem };
                       return (
                         <Button
-                          key={`hidden-${idx}-${item.path}`}
+                          key={`hidden-${idx}-${hiddenItem.path}`}
                           variant="ghost"
                           size="sm"
                           className="w-full justify-start h-auto px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 hover:text-blue-600"
-                          onClick={() => handleBreadcrumbClick(item)}
+                          onClick={() => {
+                            console.log('🔍 Hidden item click:', itemToNavigate);
+                            handleBreadcrumbClick(itemToNavigate);
+                          }}
                         >
                           <Folder className="w-4 h-4 mr-2 flex-shrink-0" />
-                          <span className="truncate">{truncateSegment(item.name, 30)}</span>
+                          <span className="truncate">{truncateSegment(hiddenItem.name, 30)}</span>
                         </Button>
                       );
                     })}
