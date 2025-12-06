@@ -16,18 +16,21 @@ export const OperationStatusIndicator: React.FC = () => {
   const { activeOperations, hasActiveOperations, operationCount } = useOperationProgress();
   const { cancelOperation, isOperationActive } = useActiveOperationsStore();
   const { updateEntry } = useActionHistoryStore();
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const handleCancelOperation = (operationId: string, operationMessage: string) => {
+    // Essayer d'annuler via activeOperationsStore si l'opération y est enregistrée
     if (isOperationActive(operationId)) {
       cancelOperation(operationId);
-      updateEntry(operationId, { 
-        status: 'error', 
-        userFriendlyMessage: 'Opération annulée par l\'utilisateur',
-        logLevel: 'warning'
-      });
-      toast.warning(`Annulation: ${operationMessage}`);
     }
+    
+    // Toujours mettre à jour l'historique des actions
+    updateEntry(operationId, { 
+      status: 'error', 
+      userFriendlyMessage: 'Opération annulée par l\'utilisateur',
+      logLevel: 'warning'
+    });
+    toast.warning(`Annulation: ${operationMessage}`);
   };
 
   if (!hasActiveOperations) {
