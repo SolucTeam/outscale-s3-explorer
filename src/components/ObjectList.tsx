@@ -475,17 +475,7 @@ export const ObjectList = () => {
 
   const handleCopyObject = (object: any) => {
     const fullKey = currentPath ? `${currentPath}/${object.key}` : object.key;
-    
-    addEntry({
-      operationType: 'object_copy',
-      status: 'started',
-      bucketName: currentBucket!,
-      objectName: object.key,
-      logLevel: 'info',
-      userFriendlyMessage: `Copie de: ${object.key}`,
-      details: `Bucket source: ${currentBucket}`
-    });
-    
+    // Note: Le log 'started' est fait dans CopyObjectDialog lors de la confirmation
     setCopyDialog({ open: true, objectKey: fullKey });
   };
 

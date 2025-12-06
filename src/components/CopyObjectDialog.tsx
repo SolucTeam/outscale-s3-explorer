@@ -18,6 +18,7 @@ import { Copy, Loader2, Lock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { proxyS3Service } from '@/services/proxyS3Service';
 import { useS3Store } from '@/hooks/useS3Store';
+import { useActionHistoryStore } from '@/stores/actionHistoryStore';
 
 interface CopyObjectDialogProps {
   open: boolean;
@@ -36,6 +37,7 @@ export const CopyObjectDialog: React.FC<CopyObjectDialogProps> = ({
 }) => {
   const { toast } = useToast();
   const { buckets } = useS3Store();
+  const { addEntry } = useActionHistoryStore();
   const [isCopying, setIsCopying] = useState(false);
   
   // Basic options
@@ -113,6 +115,17 @@ export const CopyObjectDialog: React.FC<CopyObjectDialogProps> = ({
       return;
     }
 
+    // Log started uniquement quand l'utilisateur confirme la copie
+    addEntry({
+      operationType: 'object_copy',
+      status: 'started',
+      bucketName: sourceBucket,
+      objectName: sourceKey,
+      logLevel: 'info',
+      userFriendlyMessage: `Copie de: ${sourceKey}`,
+      details: `Bucket source: ${sourceBucket} → Destination: ${destBucket}/${destKey}`
+    });
+
     setIsCopying(true);
     try {
       // Build copy options
@@ -173,6 +186,15 @@ export const CopyObjectDialog: React.FC<CopyObjectDialogProps> = ({
       const response = await proxyS3Service.copyObject(sourceBucket, sourceKey, destBucket, destKey, copyOptions);
 
       if (response.success) {
+        addEntry({
+          operationType: 'object_copy',
+          status: 'success',
+          bucketName: sourceBucket,
+          objectName: sourceKey,
+          logLevel: 'info',
+          userFriendlyMessage: `Objet copié: ${sourceKey} → ${destBucket}/${destKey}`,
+          details: `Copie réussie`
+        });
         toast({
           title: "Succès",
           description: `Objet copié vers "${destBucket}/${destKey}"`
@@ -180,6 +202,15 @@ export const CopyObjectDialog: React.FC<CopyObjectDialogProps> = ({
         onOpenChange(false);
         onCopyComplete?.();
       } else {
+        addEntry({
+          operationType: 'object_copy',
+          status: 'error',
+          bucketName: sourceBucket,
+          objectName: sourceKey,
+          logLevel: 'error',
+          userFriendlyMessage: `Échec de la copie: ${sourceKey}`,
+          details: response.error || "Erreur lors de la copie"
+        });
         toast({
           title: "Erreur",
           description: response.error || "Erreur lors de la copie",
@@ -188,6 +219,15 @@ export const CopyObjectDialog: React.FC<CopyObjectDialogProps> = ({
       }
     } catch (error) {
       console.error('Copy error:', error);
+      addEntry({
+        operationType: 'object_copy',
+        status: 'error',
+        bucketName: sourceBucket,
+        objectName: sourceKey,
+        logLevel: 'error',
+        userFriendlyMessage: `Erreur lors de la copie: ${sourceKey}`,
+        details: String(error)
+      });
       toast({
         title: "Erreur",
         description: "Erreur lors de la copie de l'objet",
