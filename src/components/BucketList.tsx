@@ -166,7 +166,7 @@ export const BucketList = () => {
                         <Folder className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <CardTitle className="text-sm sm:text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors truncate">
+                        <CardTitle className="text-sm sm:text-base font-semibold text-gray-900 group-hover:text-blue-600 transition-colors line-clamp-2 break-all" title={bucket.name}>
                           {bucket.name}
                         </CardTitle>
                         <div className="flex flex-wrap gap-1 mt-1 max-w-full">
