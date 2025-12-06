@@ -502,17 +502,7 @@ export const ObjectList = () => {
 
   const handleEditObject = (object: any) => {
     const fullKey = currentPath ? `${currentPath}/${object.key}` : object.key;
-    
-    addEntry({
-      operationType: 'metadata_update',
-      status: 'started',
-      bucketName: currentBucket!,
-      objectName: object.key,
-      logLevel: 'info',
-      userFriendlyMessage: `Modification de: ${object.key}`,
-      details: `Bucket: ${currentBucket}`
-    });
-    
+    // Note: Le log est fait dans ObjectEditDialog lors de la sauvegarde
     setEditDialog({ open: true, objectKey: fullKey, object });
   };
 
