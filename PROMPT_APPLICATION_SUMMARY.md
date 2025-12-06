@@ -1,7 +1,7 @@
-# NumS3 Console - Application S3 Management pour Outscale
+# Outscale S3 Explorer - Application S3 Management pour Outscale
 
 ## Description Générale
-NumS3 Console est une application web moderne de gestion complète des buckets et objets S3 Outscale. Elle offre une interface intuitive et sécurisée pour administrer vos espaces de stockage cloud avec des fonctionnalités avancées de monitoring et de journalisation.
+Outscale S3 Explorer est une application web moderne de gestion complète des buckets et objets S3 Outscale. Elle offre une interface intuitive et sécurisée pour administrer vos espaces de stockage cloud avec des fonctionnalités avancées de monitoring et de journalisation.
 
 ## Architecture Technique
 - **Frontend**: React 18 + TypeScript + Vite + Tailwind CSS
