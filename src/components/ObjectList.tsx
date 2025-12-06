@@ -652,12 +652,12 @@ export const ObjectList = () => {
               <h3 className="text-lg font-medium text-gray-900">Aucun objet trouvé</h3>
               <p className="text-gray-600">Ce dossier est vide. Commencez par uploader des fichiers ou créer des dossiers.</p>
             </div>
-            <div className="flex items-center justify-center space-x-2">
+            <div className="flex items-center justify-center gap-3">
               <Button onClick={() => setShowCreateFolder(true)} variant="outline">
                 <FolderPlus className="w-4 h-4 mr-2" />
                 Créer un dossier
               </Button>
-              <Button onClick={() => setShowUpload(true)} className="mt-4">
+              <Button onClick={() => setShowUpload(true)}>
                 <Plus className="w-4 h-4 mr-2" />
                 Ajouter des fichiers
               </Button>
