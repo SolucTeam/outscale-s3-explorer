@@ -1,3 +1,4 @@
+// BucketSecurityDialog - Gestion de la sécurité des buckets S3 Outscale
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Dialog,
@@ -26,6 +27,7 @@ import { s3LoggingService } from '@/services/s3LoggingService';
 import { S3Client, ListBucketsCommand } from '@aws-sdk/client-s3';
 import { OutscaleConfig } from '@/services/outscaleConfig';
 import { OUTSCALE_REGIONS } from '@/data/regions';
+
 
 interface BucketSecurityDialogProps {
   open: boolean;
