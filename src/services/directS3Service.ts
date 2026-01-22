@@ -79,7 +79,7 @@ class DirectS3Service {
           httpsAgent: undefined
         },
         // Headers CORS personnalisés
-        customUserAgent: 'nums3-console/1.0',
+        customUserAgent: 'outscale-s3-explorer/1.0',
         // Désactiver les checks HTTPS pour dev
         tls: false
       });

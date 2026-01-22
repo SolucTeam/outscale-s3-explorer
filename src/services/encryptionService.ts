@@ -6,8 +6,8 @@
 import CryptoJS from 'crypto-js';
 
 export class EncryptionService {
-  private static readonly ENCRYPTION_KEY = 'nums3-secure-key-2024';
-  private static readonly STORAGE_KEY = 'nums3_encrypted_session';
+  private static readonly ENCRYPTION_KEY = 'outscale-s3-explorer-secure-key-2024';
+  private static readonly STORAGE_KEY = 'outscale_s3_explorer_encrypted_session';
 
   /**
    * Chiffre les credentials avec AES

@@ -1,4 +1,4 @@
-# NumS3 Proxy Server
+# Outscale S3 Explorer Proxy Server
 
 Serveur proxy CORS minimal pour contourner les restrictions navigateur avec l'API Outscale S3.
 
