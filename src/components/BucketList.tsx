@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useS3Store } from '../hooks/useS3Store';
 import { useEnhancedDirectS3 } from '../hooks/useEnhancedDirectS3';
-import { Folder, Calendar, HardDrive, ChevronRight, RefreshCw, Plus, Trash2, Cloud, GitBranch, Lock, Settings, Shield, LayoutGrid, List, Wrench } from 'lucide-react';
+import { Folder, Calendar, HardDrive, ChevronRight, RefreshCw, Plus, Trash2, Cloud, GitBranch, Lock, Settings, Shield, LayoutGrid, List, Wrench, Share2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { CreateBucketDialog } from './CreateBucketDialog';
@@ -14,6 +14,7 @@ import { ForceDeleteBucketDialog } from './ForceDeleteBucketDialog';
 import { BucketSettingsDialog } from './BucketSettingsDialog';
 import { BucketSecurityDialog } from './BucketSecurityDialog';
 import { BucketAdvancedSettingsDialog } from './BucketAdvancedSettingsDialog';
+import { BucketShareDialog } from './BucketShareDialog';
 import { SearchFilter } from './SearchFilter';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { S3Bucket } from '../types/s3';
@@ -29,10 +30,12 @@ export const BucketList = () => {
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
   const [showSecurityDialog, setShowSecurityDialog] = useState(false);
   const [showAdvancedDialog, setShowAdvancedDialog] = useState(false);
+  const [showShareDialog, setShowShareDialog] = useState(false);
   const [bucketToDelete, setBucketToDelete] = useState<string>('');
   const [bucketToEdit, setBucketToEdit] = useState<S3Bucket | null>(null);
   const [bucketToView, setBucketToView] = useState<S3Bucket | null>(null);
   const [bucketToAdvanced, setBucketToAdvanced] = useState<S3Bucket | null>(null);
+  const [bucketToShare, setBucketToShare] = useState<S3Bucket | null>(null);
   const [hasInitiallyLoaded, setHasInitiallyLoaded] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('list');
@@ -104,6 +107,12 @@ export const BucketList = () => {
     event.stopPropagation();
     setBucketToAdvanced(bucket);
     setShowAdvancedDialog(true);
+  };
+
+  const handleShareBucket = (bucket: S3Bucket, event: React.MouseEvent) => {
+    event.stopPropagation();
+    setBucketToShare(bucket);
+    setShowShareDialog(true);
   };
 
   const handleRefresh = async () => {
@@ -223,6 +232,15 @@ export const BucketList = () => {
                         title="Paramètres avancés"
                       >
                         <Wrench className="w-3 h-3 sm:w-4 sm:h-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={(e) => handleShareBucket(bucket, e)}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity text-green-600 hover:text-green-700 hover:bg-green-50 h-8 w-8 p-0"
+                        title="Partager le bucket"
+                      >
+                        <Share2 className="w-3 h-3 sm:w-4 sm:h-4" />
                       </Button>
                       <Button
                         size="sm"
@@ -355,6 +373,15 @@ export const BucketList = () => {
                         title="Paramètres avancés"
                       >
                         <Wrench className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={(e) => handleShareBucket(bucket, e)}
+                        className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                        title="Partager"
+                      >
+                        <Share2 className="w-4 h-4" />
                       </Button>
                       <Button
                         size="sm"
@@ -506,6 +533,14 @@ export const BucketList = () => {
           onOpenChange={setShowAdvancedDialog}
           bucket={bucketToAdvanced}
           onSettingsUpdated={handleSettingsUpdated}
+        />
+      )}
+
+      {bucketToShare && (
+        <BucketShareDialog
+          open={showShareDialog}
+          onOpenChange={setShowShareDialog}
+          bucket={bucketToShare}
         />
       )}
     </div>
