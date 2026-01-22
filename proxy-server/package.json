@@ -1,7 +1,7 @@
 {
-  "name": "nums3-proxy",
+  "name": "outscale-s3-explorer-proxy",
   "version": "1.0.0",
-  "description": "Proxy CORS minimal pour NumS3 Console",
+  "description": "Proxy CORS minimal pour Outscale S3 Explorer",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

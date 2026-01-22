@@ -174,7 +174,7 @@ const extractCredentials = (req, res, next) => {
 
 // Route de test
 app.get('/health', (req, res) => {
-  res.json({ status: 'OK', message: 'Proxy CORS NumS3 opérationnel' });
+  res.json({ status: 'OK', message: 'Proxy CORS Outscale S3 Explorer opérationnel' });
 });
 
 // Fonction utilitaire pour obtenir une estimation rapide des objets (1 seule requête)
@@ -1741,7 +1741,7 @@ app.use((error, req, res, next) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 Proxy CORS NumS3 démarré sur le port ${PORT}`);
+  console.log(`🚀 Proxy CORS Outscale S3 Explorer démarré sur le port ${PORT}`);
   console.log(`📡 Endpoints disponibles:`);
   console.log(`   GET    /health`);
   console.log(`   GET    /api/buckets`);
