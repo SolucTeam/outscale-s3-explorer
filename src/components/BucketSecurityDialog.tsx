@@ -17,12 +17,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useEnhancedDirectS3 } from '../hooks/useEnhancedDirectS3';
 import { S3Bucket, BucketAcl, BucketPolicy } from '../types/s3';
-import { Shield, Users, FileText, Loader2, AlertCircle, Save, Trash2, Eye, CheckCircle, XCircle, RefreshCw, Share2, Edit, UserMinus, Pencil } from 'lucide-react';
+import { Shield, Users, FileText, Loader2, AlertCircle, Save, Trash2, Eye, CheckCircle, XCircle, RefreshCw, Share2, Edit, UserMinus, Pencil, Key } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { s3LoggingService } from '@/services/s3LoggingService';
+import { S3Client, ListBucketsCommand } from '@aws-sdk/client-s3';
+import { OutscaleConfig } from '@/services/outscaleConfig';
+import { OUTSCALE_REGIONS } from '@/data/regions';
 
 interface BucketSecurityDialogProps {
   open: boolean;
@@ -101,7 +104,7 @@ interface EffectivePermission {
 type AccessLevel = 'read-only' | 'read-write' | 'read-write-delete';
 
 interface CrossAccountShare {
-  accountId: string;
+  canonicalUserId: string;
   sid: string;
   accessLevel: AccessLevel;
   actions: string[];
@@ -121,21 +124,21 @@ const ACCESS_LEVELS: AccessLevelOption[] = [
     label: 'Lecture seule',
     description: 'Permet uniquement de lire et télécharger les objets',
     icon: <Eye className="w-4 h-4" />,
-    actions: ['s3:GetObject', 's3:GetObjectVersion', 's3:ListBucket']
+    actions: ['s3:ListBucket', 's3:GetObject', 's3:GetBucketLocation', 's3:ListBucketMultipartUploads']
   },
   {
     value: 'read-write',
     label: 'Lecture / Écriture',
     description: 'Permet de lire, écrire et modifier les objets',
     icon: <Edit className="w-4 h-4" />,
-    actions: ['s3:GetObject', 's3:GetObjectVersion', 's3:ListBucket', 's3:PutObject', 's3:PutObjectAcl']
+    actions: ['s3:ListBucket', 's3:GetObject', 's3:PutObject', 's3:GetBucketLocation', 's3:ListBucketMultipartUploads', 's3:AbortMultipartUpload', 's3:ListMultipartUploadParts']
   },
   {
     value: 'read-write-delete',
     label: 'Lecture / Écriture / Suppression',
     description: 'Accès complet aux objets (lecture, écriture, suppression)',
     icon: <Trash2 className="w-4 h-4" />,
-    actions: ['s3:GetObject', 's3:GetObjectVersion', 's3:ListBucket', 's3:PutObject', 's3:PutObjectAcl', 's3:DeleteObject', 's3:DeleteObjectVersion']
+    actions: ['s3:ListBucket', 's3:GetObject', 's3:PutObject', 's3:DeleteObject', 's3:GetBucketLocation', 's3:ListBucketMultipartUploads', 's3:AbortMultipartUpload', 's3:ListMultipartUploadParts']
   }
 ];
 
@@ -149,7 +152,7 @@ const detectAccessLevel = (actions: string[]): AccessLevel => {
   return 'read-only';
 };
 
-// Fonction pour extraire les partages cross-account de la policy
+// Fonction pour extraire les partages cross-account de la policy (supporte CanonicalUser et AWS ARN)
 const extractCrossAccountShares = (policyText: string): CrossAccountShare[] => {
   if (!policyText) return [];
   
@@ -159,33 +162,35 @@ const extractCrossAccountShares = (policyText: string): CrossAccountShare[] => {
     
     if (policy.Statement) {
       policy.Statement.forEach((stmt: any) => {
-        // Vérifier si c'est un partage cross-account (Principal avec ARN iam)
         if (stmt.Effect === 'Allow' && stmt.Principal) {
-          let principalArn: string | null = null;
+          let canonicalUserId: string | null = null;
           
-          if (typeof stmt.Principal === 'string' && stmt.Principal.includes('arn:aws:iam::')) {
-            principalArn = stmt.Principal;
-          } else if (stmt.Principal.AWS) {
+          // Support CanonicalUser (Outscale style)
+          if (stmt.Principal.CanonicalUser) {
+            canonicalUserId = Array.isArray(stmt.Principal.CanonicalUser) 
+              ? stmt.Principal.CanonicalUser[0] 
+              : stmt.Principal.CanonicalUser;
+          }
+          // Support legacy AWS ARN style
+          else if (stmt.Principal.AWS) {
             const awsPrincipal = Array.isArray(stmt.Principal.AWS) ? stmt.Principal.AWS[0] : stmt.Principal.AWS;
             if (awsPrincipal && awsPrincipal.includes('arn:aws:iam::')) {
-              principalArn = awsPrincipal;
+              const match = awsPrincipal.match(/arn:aws:iam::(\d{12})/);
+              if (match) {
+                canonicalUserId = match[1]; // Use account ID as fallback
+              }
             }
           }
           
-          if (principalArn) {
-            // Extraire l'ID du compte de l'ARN
-            const match = principalArn.match(/arn:aws:iam::(\d{12})/);
-            if (match) {
-              const accountId = match[1];
-              const actions = Array.isArray(stmt.Action) ? stmt.Action : [stmt.Action];
-              
-              shares.push({
-                accountId,
-                sid: stmt.Sid || `CrossAccountAccess-${accountId}`,
-                accessLevel: detectAccessLevel(actions),
-                actions
-              });
-            }
+          if (canonicalUserId) {
+            const actions = Array.isArray(stmt.Action) ? stmt.Action : [stmt.Action];
+            
+            shares.push({
+              canonicalUserId,
+              sid: stmt.Sid || `CrossAccountAccess-${canonicalUserId.substring(0, 12)}`,
+              accessLevel: detectAccessLevel(actions),
+              actions
+            });
           }
         }
       });
@@ -225,9 +230,14 @@ export const BucketSecurityDialog: React.FC<BucketSecurityDialogProps> = ({
 
   // États pour le partage
   const [crossAccountShares, setCrossAccountShares] = useState<CrossAccountShare[]>([]);
-  const [newAccountId, setNewAccountId] = useState('');
+  const [beneficiaryAccessKey, setBeneficiaryAccessKey] = useState('');
+  const [beneficiarySecretKey, setBeneficiarySecretKey] = useState('');
+  const [beneficiaryRegion, setBeneficiaryRegion] = useState('eu-west-2');
   const [newAccessLevel, setNewAccessLevel] = useState<AccessLevel>('read-only');
   const [isAddingShare, setIsAddingShare] = useState(false);
+  const [isVerifyingCredentials, setIsVerifyingCredentials] = useState(false);
+  const [verifiedCanonicalUserId, setVerifiedCanonicalUserId] = useState<string | null>(null);
+  const [credentialsError, setCredentialsError] = useState<string | null>(null);
   const [revokingShareId, setRevokingShareId] = useState<string | null>(null);
   const [editingShare, setEditingShare] = useState<CrossAccountShare | null>(null);
   const [editAccessLevel, setEditAccessLevel] = useState<AccessLevel>('read-only');
@@ -455,36 +465,71 @@ export const BucketSecurityDialog: React.FC<BucketSecurityDialogProps> = ({
     validatePolicy(policyWithBucket);
   };
 
-  // Validation de l'ID de compte AWS (12 chiffres)
-  const validateAccountId = (accountId: string): boolean => {
-    const cleanId = accountId.replace(/[-\s]/g, '');
-    return /^\d{12}$/.test(cleanId);
+  // Vérifier les credentials du bénéficiaire et obtenir le CanonicalUser ID
+  const verifyBeneficiaryCredentials = async () => {
+    if (!beneficiaryAccessKey.trim() || !beneficiarySecretKey.trim()) {
+      setCredentialsError('Veuillez saisir les clés d\'accès du compte bénéficiaire');
+      return;
+    }
+
+    setIsVerifyingCredentials(true);
+    setCredentialsError(null);
+    setVerifiedCanonicalUserId(null);
+
+    try {
+      // Créer un client S3 temporaire avec les credentials du bénéficiaire
+      const tempClient = new S3Client({
+        region: beneficiaryRegion,
+        endpoint: OutscaleConfig.getEndpoint(beneficiaryRegion),
+        credentials: {
+          accessKeyId: beneficiaryAccessKey.trim(),
+          secretAccessKey: beneficiarySecretKey.trim(),
+        },
+        forcePathStyle: true,
+      });
+
+      // Appeler list-buckets pour obtenir le Owner.ID (CanonicalUser)
+      const response = await tempClient.send(new ListBucketsCommand({}));
+      
+      if (response.Owner?.ID) {
+        setVerifiedCanonicalUserId(response.Owner.ID);
+        toast({
+          title: 'Compte vérifié',
+          description: `ID canonique récupéré: ${response.Owner.ID.substring(0, 16)}...`,
+        });
+      } else {
+        setCredentialsError('Impossible de récupérer l\'ID du compte. Vérifiez les credentials.');
+      }
+    } catch (err: any) {
+      console.error('Credential verification error:', err);
+      setCredentialsError(err.message || 'Credentials invalides ou problème de connexion');
+    } finally {
+      setIsVerifyingCredentials(false);
+    }
+  };
+
+  // Réinitialiser la vérification si les credentials changent
+  const handleBeneficiaryCredentialsChange = (field: 'ak' | 'sk' | 'region', value: string) => {
+    setVerifiedCanonicalUserId(null);
+    setCredentialsError(null);
+    if (field === 'ak') setBeneficiaryAccessKey(value);
+    else if (field === 'sk') setBeneficiarySecretKey(value);
+    else setBeneficiaryRegion(value);
   };
 
   // Ajouter un nouveau partage cross-account
   const handleAddShare = async () => {
-    if (!newAccountId.trim()) {
+    if (!verifiedCanonicalUserId) {
       toast({
         title: 'Erreur',
-        description: 'Veuillez saisir l\'ID du compte bénéficiaire',
+        description: 'Veuillez d\'abord vérifier les credentials du compte bénéficiaire',
         variant: 'destructive'
       });
       return;
     }
-
-    if (!validateAccountId(newAccountId)) {
-      toast({
-        title: 'Erreur',
-        description: 'L\'ID du compte AWS doit contenir exactement 12 chiffres',
-        variant: 'destructive'
-      });
-      return;
-    }
-
-    const cleanAccountId = newAccountId.replace(/[-\s]/g, '');
     
     // Vérifier si ce compte est déjà partagé
-    if (crossAccountShares.some(s => s.accountId === cleanAccountId)) {
+    if (crossAccountShares.some(s => s.canonicalUserId === verifiedCanonicalUserId)) {
       toast({
         title: 'Erreur',
         description: 'Ce compte a déjà accès au bucket',
@@ -494,15 +539,16 @@ export const BucketSecurityDialog: React.FC<BucketSecurityDialogProps> = ({
     }
 
     setIsAddingShare(true);
-    const entryId = s3LoggingService.logOperationStart('share_add', bucket.name, undefined, `Compte: ${cleanAccountId}`);
+    const shortId = verifiedCanonicalUserId.substring(0, 16);
+    const entryId = s3LoggingService.logOperationStart('share_add', bucket.name, undefined, `Compte: ${shortId}...`);
 
     try {
       const selectedLevel = ACCESS_LEVELS.find(l => l.value === newAccessLevel)!;
       const newStatement = {
-        Sid: `CrossAccountAccess-${cleanAccountId}`,
+        Sid: `CrossAccountAccess-${shortId}`,
         Effect: 'Allow',
         Principal: {
-          AWS: `arn:aws:iam::${cleanAccountId}:root`
+          CanonicalUser: verifiedCanonicalUserId
         },
         Action: selectedLevel.actions,
         Resource: [
@@ -526,12 +572,15 @@ export const BucketSecurityDialog: React.FC<BucketSecurityDialogProps> = ({
       const success = await setBucketPolicy(bucket.name, JSON.stringify(newPolicy));
 
       if (success) {
-        s3LoggingService.logOperationSuccess(entryId, 'share_add', bucket.name, undefined, `Accès ${selectedLevel.label} accordé au compte ${cleanAccountId}`);
+        s3LoggingService.logOperationSuccess(entryId, 'share_add', bucket.name, undefined, `Accès ${selectedLevel.label} accordé au compte ${shortId}...`);
         toast({
           title: 'Partage ajouté',
-          description: `Le bucket a été partagé avec le compte ${cleanAccountId}`,
+          description: `Le bucket a été partagé avec le compte Outscale`,
         });
-        setNewAccountId('');
+        // Réinitialiser le formulaire
+        setBeneficiaryAccessKey('');
+        setBeneficiarySecretKey('');
+        setVerifiedCanonicalUserId(null);
         setNewAccessLevel('read-only');
         await loadPolicy();
       } else {
@@ -554,7 +603,8 @@ export const BucketSecurityDialog: React.FC<BucketSecurityDialogProps> = ({
     if (!editingShare) return;
 
     setIsUpdatingShare(true);
-    const entryId = s3LoggingService.logOperationStart('share_update', bucket.name, undefined, `Compte: ${editingShare.accountId}`);
+    const shortId = editingShare.canonicalUserId.substring(0, 16);
+    const entryId = s3LoggingService.logOperationStart('share_update', bucket.name, undefined, `Compte: ${shortId}...`);
 
     try {
       if (!policy?.policy) return;
@@ -564,18 +614,24 @@ export const BucketSecurityDialog: React.FC<BucketSecurityDialogProps> = ({
       
       // Trouver et mettre à jour le statement existant
       currentPolicy.Statement = currentPolicy.Statement.map((stmt: any) => {
-        let principalArn: string | null = null;
-        if (typeof stmt.Principal === 'string') {
-          principalArn = stmt.Principal;
-        } else if (stmt.Principal?.AWS) {
-          principalArn = Array.isArray(stmt.Principal.AWS) ? stmt.Principal.AWS[0] : stmt.Principal.AWS;
-        }
-        
-        if (principalArn && principalArn.includes(editingShare.accountId)) {
+        // Matcher par CanonicalUser
+        if (stmt.Principal?.CanonicalUser === editingShare.canonicalUserId) {
           return {
             ...stmt,
             Action: selectedLevel.actions,
-            Sid: `CrossAccountAccess-${editingShare.accountId}`
+            Sid: `CrossAccountAccess-${shortId}`
+          };
+        }
+        // Support legacy AWS ARN
+        let principalArn: string | null = null;
+        if (stmt.Principal?.AWS) {
+          principalArn = Array.isArray(stmt.Principal.AWS) ? stmt.Principal.AWS[0] : stmt.Principal.AWS;
+        }
+        if (principalArn && principalArn.includes(editingShare.canonicalUserId)) {
+          return {
+            ...stmt,
+            Action: selectedLevel.actions,
+            Sid: `CrossAccountAccess-${shortId}`
           };
         }
         return stmt;
@@ -590,11 +646,11 @@ export const BucketSecurityDialog: React.FC<BucketSecurityDialogProps> = ({
           'share_update', 
           bucket.name, 
           undefined, 
-          `Compte ${editingShare.accountId}: ${previousLevel?.label} → ${selectedLevel.label}`
+          `Compte ${shortId}...: ${previousLevel?.label} → ${selectedLevel.label}`
         );
         toast({
           title: 'Partage modifié',
-          description: `L'accès du compte ${editingShare.accountId} a été mis à jour vers ${selectedLevel.label}`,
+          description: `L'accès a été mis à jour vers ${selectedLevel.label}`,
         });
         setEditingShare(null);
         await loadPolicy();
@@ -627,8 +683,9 @@ export const BucketSecurityDialog: React.FC<BucketSecurityDialogProps> = ({
 
   // Révoquer un partage cross-account
   const handleRevokeShare = async (share: CrossAccountShare) => {
-    setRevokingShareId(share.accountId);
-    const entryId = s3LoggingService.logOperationStart('share_revoke', bucket.name, undefined, `Compte: ${share.accountId}`);
+    setRevokingShareId(share.canonicalUserId);
+    const shortId = share.canonicalUserId.substring(0, 16);
+    const entryId = s3LoggingService.logOperationStart('share_revoke', bucket.name, undefined, `Compte: ${shortId}...`);
 
     try {
       if (!policy?.policy) return;
@@ -637,18 +694,16 @@ export const BucketSecurityDialog: React.FC<BucketSecurityDialogProps> = ({
       
       // Filtrer pour retirer le statement de ce compte
       currentPolicy.Statement = currentPolicy.Statement.filter((stmt: any) => {
-        // Identifier le statement par le Sid ou par le Principal
+        // Identifier par Sid
         if (stmt.Sid === share.sid) return false;
         
-        if (stmt.Principal) {
-          let principalArn: string | null = null;
-          if (typeof stmt.Principal === 'string') {
-            principalArn = stmt.Principal;
-          } else if (stmt.Principal.AWS) {
-            principalArn = Array.isArray(stmt.Principal.AWS) ? stmt.Principal.AWS[0] : stmt.Principal.AWS;
-          }
-          
-          if (principalArn && principalArn.includes(share.accountId)) {
+        // Identifier par CanonicalUser
+        if (stmt.Principal?.CanonicalUser === share.canonicalUserId) return false;
+        
+        // Support legacy AWS ARN
+        if (stmt.Principal?.AWS) {
+          const awsPrincipal = Array.isArray(stmt.Principal.AWS) ? stmt.Principal.AWS[0] : stmt.Principal.AWS;
+          if (awsPrincipal && awsPrincipal.includes(share.canonicalUserId)) {
             return false;
           }
         }
@@ -662,10 +717,10 @@ export const BucketSecurityDialog: React.FC<BucketSecurityDialogProps> = ({
       if (currentPolicy.Statement.length === 0) {
         const success = await deleteBucketPolicy(bucket.name);
         if (success) {
-          s3LoggingService.logOperationSuccess(entryId, 'share_revoke', bucket.name, undefined, `Accès ${accessLevel?.label} révoqué pour le compte ${share.accountId}`);
+          s3LoggingService.logOperationSuccess(entryId, 'share_revoke', bucket.name, undefined, `Accès ${accessLevel?.label} révoqué pour ${shortId}...`);
           toast({
             title: 'Accès révoqué',
-            description: `L'accès du compte ${share.accountId} a été supprimé`,
+            description: `L'accès a été supprimé`,
           });
           await loadPolicy();
         } else {
@@ -674,10 +729,10 @@ export const BucketSecurityDialog: React.FC<BucketSecurityDialogProps> = ({
       } else {
         const success = await setBucketPolicy(bucket.name, JSON.stringify(currentPolicy));
         if (success) {
-          s3LoggingService.logOperationSuccess(entryId, 'share_revoke', bucket.name, undefined, `Accès ${accessLevel?.label} révoqué pour le compte ${share.accountId}`);
+          s3LoggingService.logOperationSuccess(entryId, 'share_revoke', bucket.name, undefined, `Accès ${accessLevel?.label} révoqué pour ${shortId}...`);
           toast({
             title: 'Accès révoqué',
-            description: `L'accès du compte ${share.accountId} a été supprimé`,
+            description: `L'accès a été supprimé`,
           });
           await loadPolicy();
         } else {
@@ -986,27 +1041,91 @@ export const BucketSecurityDialog: React.FC<BucketSecurityDialogProps> = ({
                   <CardHeader>
                     <CardTitle className="text-sm flex items-center gap-2">
                       <Share2 className="w-4 h-4" />
-                      Partager avec un compte AWS
+                      Partager avec un compte Outscale
                     </CardTitle>
                     <CardDescription>
-                      Accorder l'accès à ce bucket à un autre compte AWS/Outscale
+                      Accorder l'accès à ce bucket à un autre compte Outscale
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="accountId">ID du compte AWS bénéficiaire</Label>
-                      <Input
-                        id="accountId"
-                        placeholder="123456789012"
-                        value={newAccountId}
-                        onChange={(e) => setNewAccountId(e.target.value)}
-                        maxLength={14}
-                        className="font-mono"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        L'identifiant AWS du compte qui recevra l'accès (12 chiffres)
-                      </p>
+                    {/* Credentials du bénéficiaire */}
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <Key className="w-4 h-4 text-muted-foreground" />
+                        <Label className="font-medium">Credentials du compte bénéficiaire</Label>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="beneficiaryAk" className="text-xs">Access Key</Label>
+                        <Input
+                          id="beneficiaryAk"
+                          placeholder="AKIAXXXXXXXXXXXXXXXX"
+                          value={beneficiaryAccessKey}
+                          onChange={(e) => handleBeneficiaryCredentialsChange('ak', e.target.value)}
+                          className="font-mono text-sm"
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="beneficiarySk" className="text-xs">Secret Key</Label>
+                        <Input
+                          id="beneficiarySk"
+                          type="password"
+                          placeholder="••••••••••••••••••••••••••"
+                          value={beneficiarySecretKey}
+                          onChange={(e) => handleBeneficiaryCredentialsChange('sk', e.target.value)}
+                          className="font-mono text-sm"
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="beneficiaryRegion" className="text-xs">Région</Label>
+                        <Select value={beneficiaryRegion} onValueChange={(v) => handleBeneficiaryCredentialsChange('region', v)}>
+                          <SelectTrigger id="beneficiaryRegion">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {OUTSCALE_REGIONS.map((region) => (
+                              <SelectItem key={region.id} value={region.id}>
+                                {region.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {credentialsError && (
+                        <Alert variant="destructive" className="py-2">
+                          <AlertCircle className="h-4 w-4" />
+                          <AlertDescription className="text-xs">{credentialsError}</AlertDescription>
+                        </Alert>
+                      )}
+
+                      {verifiedCanonicalUserId && (
+                        <Alert className="bg-green-50 border-green-200 py-2">
+                          <CheckCircle className="h-4 w-4 text-green-600" />
+                          <AlertDescription className="text-xs text-green-800">
+                            Compte vérifié - ID: {verifiedCanonicalUserId.substring(0, 20)}...
+                          </AlertDescription>
+                        </Alert>
+                      )}
+
+                      <Button 
+                        variant="outline" 
+                        onClick={verifyBeneficiaryCredentials}
+                        disabled={isVerifyingCredentials || !beneficiaryAccessKey.trim() || !beneficiarySecretKey.trim()}
+                        className="w-full"
+                      >
+                        {isVerifyingCredentials ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <Key className="w-4 h-4 mr-2" />
+                        )}
+                        Vérifier les credentials
+                      </Button>
                     </div>
+
+                    <Separator />
 
                     <div className="space-y-3">
                       <Label>Niveau d'accès</Label>
@@ -1034,7 +1153,7 @@ export const BucketSecurityDialog: React.FC<BucketSecurityDialogProps> = ({
 
                     <Button 
                       onClick={handleAddShare} 
-                      disabled={isAddingShare || !newAccountId.trim()}
+                      disabled={isAddingShare || !verifiedCanonicalUserId}
                       className="w-full"
                     >
                       {isAddingShare ? (
@@ -1077,14 +1196,16 @@ export const BucketSecurityDialog: React.FC<BucketSecurityDialogProps> = ({
                       <div className="space-y-3">
                         {crossAccountShares.map((share) => (
                           <div 
-                            key={share.accountId}
+                            key={share.canonicalUserId}
                             className="p-3 bg-muted/50 rounded-lg space-y-3"
                           >
-                            {editingShare?.accountId === share.accountId ? (
+                            {editingShare?.canonicalUserId === share.canonicalUserId ? (
                               // Mode édition
                               <div className="space-y-3">
                                 <div className="flex items-center gap-2">
-                                  <span className="font-mono text-sm font-medium">{share.accountId}</span>
+                                  <span className="font-mono text-xs font-medium truncate max-w-[200px]" title={share.canonicalUserId}>
+                                    {share.canonicalUserId.substring(0, 20)}...
+                                  </span>
                                   <Badge variant="outline" className="text-xs">En cours de modification</Badge>
                                 </div>
                                 
@@ -1097,9 +1218,9 @@ export const BucketSecurityDialog: React.FC<BucketSecurityDialogProps> = ({
                                   >
                                     {ACCESS_LEVELS.map((level) => (
                                       <div key={level.value} className="flex items-center space-x-2">
-                                        <RadioGroupItem value={level.value} id={`edit-${share.accountId}-${level.value}`} />
+                                        <RadioGroupItem value={level.value} id={`edit-${share.canonicalUserId.substring(0, 12)}-${level.value}`} />
                                         <Label 
-                                          htmlFor={`edit-${share.accountId}-${level.value}`} 
+                                          htmlFor={`edit-${share.canonicalUserId.substring(0, 12)}-${level.value}`} 
                                           className="flex items-center gap-2 cursor-pointer text-sm"
                                         >
                                           {level.icon}
@@ -1141,7 +1262,9 @@ export const BucketSecurityDialog: React.FC<BucketSecurityDialogProps> = ({
                               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                                 <div className="space-y-1">
                                   <div className="flex items-center gap-2">
-                                    <span className="font-mono text-sm font-medium">{share.accountId}</span>
+                                    <span className="font-mono text-xs font-medium truncate max-w-[200px]" title={share.canonicalUserId}>
+                                      {share.canonicalUserId.substring(0, 24)}...
+                                    </span>
                                     {getAccessLevelBadge(share.accessLevel)}
                                   </div>
                                   <div className="flex flex-wrap gap-1">
@@ -1162,7 +1285,7 @@ export const BucketSecurityDialog: React.FC<BucketSecurityDialogProps> = ({
                                     variant="outline"
                                     size="sm"
                                     onClick={() => startEditShare(share)}
-                                    disabled={revokingShareId === share.accountId || editingShare !== null}
+                                    disabled={revokingShareId === share.canonicalUserId || editingShare !== null}
                                     className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                                   >
                                     <Pencil className="w-4 h-4 mr-1" />
@@ -1172,10 +1295,10 @@ export const BucketSecurityDialog: React.FC<BucketSecurityDialogProps> = ({
                                     variant="outline"
                                     size="sm"
                                     onClick={() => handleRevokeShare(share)}
-                                    disabled={revokingShareId === share.accountId || editingShare !== null}
+                                    disabled={revokingShareId === share.canonicalUserId || editingShare !== null}
                                     className="text-red-600 hover:text-red-700 hover:bg-red-50"
                                   >
-                                    {revokingShareId === share.accountId ? (
+                                    {revokingShareId === share.canonicalUserId ? (
                                       <Loader2 className="w-4 h-4 animate-spin" />
                                     ) : (
                                       <>
