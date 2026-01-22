@@ -56,6 +56,11 @@ export type OperationType =
   | 'policy_update'
   | 'cors_update'
   
+  // Cross-Account Sharing
+  | 'share_add'
+  | 'share_update'
+  | 'share_revoke'
+  
   // Lifecycle
   | 'lifecycle_add_rule'
   | 'lifecycle_update_rule'

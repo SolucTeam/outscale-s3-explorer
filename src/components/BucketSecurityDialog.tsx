@@ -17,11 +17,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useEnhancedDirectS3 } from '../hooks/useEnhancedDirectS3';
 import { S3Bucket, BucketAcl, BucketPolicy } from '../types/s3';
-import { Shield, Users, FileText, Loader2, AlertCircle, Save, Trash2, Eye, CheckCircle, XCircle, RefreshCw, Share2, Edit, UserMinus } from 'lucide-react';
+import { Shield, Users, FileText, Loader2, AlertCircle, Save, Trash2, Eye, CheckCircle, XCircle, RefreshCw, Share2, Edit, UserMinus, Pencil } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
+import { s3LoggingService } from '@/services/s3LoggingService';
 
 interface BucketSecurityDialogProps {
   open: boolean;
@@ -228,6 +229,9 @@ export const BucketSecurityDialog: React.FC<BucketSecurityDialogProps> = ({
   const [newAccessLevel, setNewAccessLevel] = useState<AccessLevel>('read-only');
   const [isAddingShare, setIsAddingShare] = useState(false);
   const [revokingShareId, setRevokingShareId] = useState<string | null>(null);
+  const [editingShare, setEditingShare] = useState<CrossAccountShare | null>(null);
+  const [editAccessLevel, setEditAccessLevel] = useState<AccessLevel>('read-only');
+  const [isUpdatingShare, setIsUpdatingShare] = useState(false);
 
   const loadAcl = useCallback(async () => {
     setLoadingAcl(true);
@@ -490,6 +494,7 @@ export const BucketSecurityDialog: React.FC<BucketSecurityDialogProps> = ({
     }
 
     setIsAddingShare(true);
+    const entryId = s3LoggingService.logOperationStart('share_add', bucket.name, undefined, `Compte: ${cleanAccountId}`);
 
     try {
       const selectedLevel = ACCESS_LEVELS.find(l => l.value === newAccessLevel)!;
@@ -521,6 +526,7 @@ export const BucketSecurityDialog: React.FC<BucketSecurityDialogProps> = ({
       const success = await setBucketPolicy(bucket.name, JSON.stringify(newPolicy));
 
       if (success) {
+        s3LoggingService.logOperationSuccess(entryId, 'share_add', bucket.name, undefined, `Accès ${selectedLevel.label} accordé au compte ${cleanAccountId}`);
         toast({
           title: 'Partage ajouté',
           description: `Le bucket a été partagé avec le compte ${cleanAccountId}`,
@@ -528,8 +534,11 @@ export const BucketSecurityDialog: React.FC<BucketSecurityDialogProps> = ({
         setNewAccountId('');
         setNewAccessLevel('read-only');
         await loadPolicy();
+      } else {
+        s3LoggingService.logOperationError(entryId, 'share_add', 'Échec de l\'ajout du partage', bucket.name);
       }
     } catch (err) {
+      s3LoggingService.logOperationError(entryId, 'share_add', 'Erreur lors de l\'ajout du partage', bucket.name);
       toast({
         title: 'Erreur',
         description: 'Une erreur est survenue lors de l\'ajout du partage',
@@ -540,9 +549,86 @@ export const BucketSecurityDialog: React.FC<BucketSecurityDialogProps> = ({
     }
   };
 
+  // Modifier le niveau d'accès d'un partage existant
+  const handleUpdateShare = async () => {
+    if (!editingShare) return;
+
+    setIsUpdatingShare(true);
+    const entryId = s3LoggingService.logOperationStart('share_update', bucket.name, undefined, `Compte: ${editingShare.accountId}`);
+
+    try {
+      if (!policy?.policy) return;
+
+      const currentPolicy = JSON.parse(policy.policy);
+      const selectedLevel = ACCESS_LEVELS.find(l => l.value === editAccessLevel)!;
+      
+      // Trouver et mettre à jour le statement existant
+      currentPolicy.Statement = currentPolicy.Statement.map((stmt: any) => {
+        let principalArn: string | null = null;
+        if (typeof stmt.Principal === 'string') {
+          principalArn = stmt.Principal;
+        } else if (stmt.Principal?.AWS) {
+          principalArn = Array.isArray(stmt.Principal.AWS) ? stmt.Principal.AWS[0] : stmt.Principal.AWS;
+        }
+        
+        if (principalArn && principalArn.includes(editingShare.accountId)) {
+          return {
+            ...stmt,
+            Action: selectedLevel.actions,
+            Sid: `CrossAccountAccess-${editingShare.accountId}`
+          };
+        }
+        return stmt;
+      });
+
+      const success = await setBucketPolicy(bucket.name, JSON.stringify(currentPolicy));
+
+      if (success) {
+        const previousLevel = ACCESS_LEVELS.find(l => l.value === editingShare.accessLevel);
+        s3LoggingService.logOperationSuccess(
+          entryId, 
+          'share_update', 
+          bucket.name, 
+          undefined, 
+          `Compte ${editingShare.accountId}: ${previousLevel?.label} → ${selectedLevel.label}`
+        );
+        toast({
+          title: 'Partage modifié',
+          description: `L'accès du compte ${editingShare.accountId} a été mis à jour vers ${selectedLevel.label}`,
+        });
+        setEditingShare(null);
+        await loadPolicy();
+      } else {
+        s3LoggingService.logOperationError(entryId, 'share_update', 'Échec de la modification du partage', bucket.name);
+      }
+    } catch (err) {
+      s3LoggingService.logOperationError(entryId, 'share_update', 'Erreur lors de la modification du partage', bucket.name);
+      toast({
+        title: 'Erreur',
+        description: 'Une erreur est survenue lors de la modification du partage',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsUpdatingShare(false);
+    }
+  };
+
+  // Démarrer l'édition d'un partage
+  const startEditShare = (share: CrossAccountShare) => {
+    setEditingShare(share);
+    setEditAccessLevel(share.accessLevel);
+  };
+
+  // Annuler l'édition
+  const cancelEditShare = () => {
+    setEditingShare(null);
+    setEditAccessLevel('read-only');
+  };
+
   // Révoquer un partage cross-account
   const handleRevokeShare = async (share: CrossAccountShare) => {
     setRevokingShareId(share.accountId);
+    const entryId = s3LoggingService.logOperationStart('share_revoke', bucket.name, undefined, `Compte: ${share.accountId}`);
 
     try {
       if (!policy?.policy) return;
@@ -570,27 +656,36 @@ export const BucketSecurityDialog: React.FC<BucketSecurityDialogProps> = ({
         return true;
       });
 
+      const accessLevel = ACCESS_LEVELS.find(l => l.value === share.accessLevel);
+
       // Si plus aucun statement, supprimer la policy entière
       if (currentPolicy.Statement.length === 0) {
         const success = await deleteBucketPolicy(bucket.name);
         if (success) {
+          s3LoggingService.logOperationSuccess(entryId, 'share_revoke', bucket.name, undefined, `Accès ${accessLevel?.label} révoqué pour le compte ${share.accountId}`);
           toast({
             title: 'Accès révoqué',
             description: `L'accès du compte ${share.accountId} a été supprimé`,
           });
           await loadPolicy();
+        } else {
+          s3LoggingService.logOperationError(entryId, 'share_revoke', 'Échec de la révocation', bucket.name);
         }
       } else {
         const success = await setBucketPolicy(bucket.name, JSON.stringify(currentPolicy));
         if (success) {
+          s3LoggingService.logOperationSuccess(entryId, 'share_revoke', bucket.name, undefined, `Accès ${accessLevel?.label} révoqué pour le compte ${share.accountId}`);
           toast({
             title: 'Accès révoqué',
             description: `L'accès du compte ${share.accountId} a été supprimé`,
           });
           await loadPolicy();
+        } else {
+          s3LoggingService.logOperationError(entryId, 'share_revoke', 'Échec de la révocation', bucket.name);
         }
       }
     } catch (err) {
+      s3LoggingService.logOperationError(entryId, 'share_revoke', 'Erreur lors de la révocation de l\'accès', bucket.name);
       toast({
         title: 'Erreur',
         description: 'Une erreur est survenue lors de la révocation de l\'accès',
@@ -983,42 +1078,115 @@ export const BucketSecurityDialog: React.FC<BucketSecurityDialogProps> = ({
                         {crossAccountShares.map((share) => (
                           <div 
                             key={share.accountId}
-                            className="p-3 bg-muted/50 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+                            className="p-3 bg-muted/50 rounded-lg space-y-3"
                           >
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-2">
-                                <span className="font-mono text-sm font-medium">{share.accountId}</span>
-                                {getAccessLevelBadge(share.accessLevel)}
+                            {editingShare?.accountId === share.accountId ? (
+                              // Mode édition
+                              <div className="space-y-3">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-mono text-sm font-medium">{share.accountId}</span>
+                                  <Badge variant="outline" className="text-xs">En cours de modification</Badge>
+                                </div>
+                                
+                                <div className="space-y-2">
+                                  <Label className="text-xs">Nouveau niveau d'accès</Label>
+                                  <RadioGroup
+                                    value={editAccessLevel}
+                                    onValueChange={(value) => setEditAccessLevel(value as AccessLevel)}
+                                    className="space-y-1"
+                                  >
+                                    {ACCESS_LEVELS.map((level) => (
+                                      <div key={level.value} className="flex items-center space-x-2">
+                                        <RadioGroupItem value={level.value} id={`edit-${share.accountId}-${level.value}`} />
+                                        <Label 
+                                          htmlFor={`edit-${share.accountId}-${level.value}`} 
+                                          className="flex items-center gap-2 cursor-pointer text-sm"
+                                        >
+                                          {level.icon}
+                                          <span>{level.label}</span>
+                                        </Label>
+                                      </div>
+                                    ))}
+                                  </RadioGroup>
+                                </div>
+                                
+                                <div className="flex gap-2">
+                                  <Button
+                                    size="sm"
+                                    onClick={handleUpdateShare}
+                                    disabled={isUpdatingShare || editAccessLevel === share.accessLevel}
+                                    className="flex-1"
+                                  >
+                                    {isUpdatingShare ? (
+                                      <Loader2 className="w-4 h-4 animate-spin" />
+                                    ) : (
+                                      <>
+                                        <Save className="w-4 h-4 mr-1" />
+                                        Enregistrer
+                                      </>
+                                    )}
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={cancelEditShare}
+                                    disabled={isUpdatingShare}
+                                  >
+                                    Annuler
+                                  </Button>
+                                </div>
                               </div>
-                              <div className="flex flex-wrap gap-1">
-                                {share.actions.slice(0, 3).map((action) => (
-                                  <span key={action} className="text-xs text-muted-foreground font-mono bg-background px-1.5 py-0.5 rounded">
-                                    {action.replace('s3:', '')}
-                                  </span>
-                                ))}
-                                {share.actions.length > 3 && (
-                                  <span className="text-xs text-muted-foreground">
-                                    +{share.actions.length - 3} autres
-                                  </span>
-                                )}
+                            ) : (
+                              // Mode affichage
+                              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                <div className="space-y-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-mono text-sm font-medium">{share.accountId}</span>
+                                    {getAccessLevelBadge(share.accessLevel)}
+                                  </div>
+                                  <div className="flex flex-wrap gap-1">
+                                    {share.actions.slice(0, 3).map((action) => (
+                                      <span key={action} className="text-xs text-muted-foreground font-mono bg-background px-1.5 py-0.5 rounded">
+                                        {action.replace('s3:', '')}
+                                      </span>
+                                    ))}
+                                    {share.actions.length > 3 && (
+                                      <span className="text-xs text-muted-foreground">
+                                        +{share.actions.length - 3} autres
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="flex gap-2 self-start sm:self-auto">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => startEditShare(share)}
+                                    disabled={revokingShareId === share.accountId || editingShare !== null}
+                                    className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                  >
+                                    <Pencil className="w-4 h-4 mr-1" />
+                                    Modifier
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleRevokeShare(share)}
+                                    disabled={revokingShareId === share.accountId || editingShare !== null}
+                                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                  >
+                                    {revokingShareId === share.accountId ? (
+                                      <Loader2 className="w-4 h-4 animate-spin" />
+                                    ) : (
+                                      <>
+                                        <UserMinus className="w-4 h-4 mr-1" />
+                                        Révoquer
+                                      </>
+                                    )}
+                                  </Button>
+                                </div>
                               </div>
-                            </div>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleRevokeShare(share)}
-                              disabled={revokingShareId === share.accountId}
-                              className="text-red-600 hover:text-red-700 hover:bg-red-50 self-start sm:self-auto"
-                            >
-                              {revokingShareId === share.accountId ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <>
-                                  <UserMinus className="w-4 h-4 mr-1" />
-                                  Révoquer
-                                </>
-                              )}
-                            </Button>
+                            )}
                           </div>
                         ))}
                       </div>
