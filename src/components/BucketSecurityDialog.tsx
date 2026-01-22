@@ -11,11 +11,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useEnhancedDirectS3 } from '../hooks/useEnhancedDirectS3';
 import { S3Bucket, BucketAcl, BucketPolicy } from '../types/s3';
-import { Shield, Users, FileText, Loader2, AlertCircle, Save, Trash2, Eye, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
+import { Shield, Users, FileText, Loader2, AlertCircle, Save, Trash2, Eye, CheckCircle, XCircle, RefreshCw, Share2, Edit, UserMinus } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
@@ -94,6 +96,106 @@ interface EffectivePermission {
   details: string;
 }
 
+// Types pour le partage cross-account
+type AccessLevel = 'read-only' | 'read-write' | 'read-write-delete';
+
+interface CrossAccountShare {
+  accountId: string;
+  sid: string;
+  accessLevel: AccessLevel;
+  actions: string[];
+}
+
+interface AccessLevelOption {
+  value: AccessLevel;
+  label: string;
+  description: string;
+  icon: React.ReactNode;
+  actions: string[];
+}
+
+const ACCESS_LEVELS: AccessLevelOption[] = [
+  {
+    value: 'read-only',
+    label: 'Lecture seule',
+    description: 'Permet uniquement de lire et télécharger les objets',
+    icon: <Eye className="w-4 h-4" />,
+    actions: ['s3:GetObject', 's3:GetObjectVersion', 's3:ListBucket']
+  },
+  {
+    value: 'read-write',
+    label: 'Lecture / Écriture',
+    description: 'Permet de lire, écrire et modifier les objets',
+    icon: <Edit className="w-4 h-4" />,
+    actions: ['s3:GetObject', 's3:GetObjectVersion', 's3:ListBucket', 's3:PutObject', 's3:PutObjectAcl']
+  },
+  {
+    value: 'read-write-delete',
+    label: 'Lecture / Écriture / Suppression',
+    description: 'Accès complet aux objets (lecture, écriture, suppression)',
+    icon: <Trash2 className="w-4 h-4" />,
+    actions: ['s3:GetObject', 's3:GetObjectVersion', 's3:ListBucket', 's3:PutObject', 's3:PutObjectAcl', 's3:DeleteObject', 's3:DeleteObjectVersion']
+  }
+];
+
+// Fonction pour déterminer le niveau d'accès à partir des actions
+const detectAccessLevel = (actions: string[]): AccessLevel => {
+  const hasDelete = actions.some(a => a.includes('Delete'));
+  const hasWrite = actions.some(a => a.includes('Put'));
+  
+  if (hasDelete) return 'read-write-delete';
+  if (hasWrite) return 'read-write';
+  return 'read-only';
+};
+
+// Fonction pour extraire les partages cross-account de la policy
+const extractCrossAccountShares = (policyText: string): CrossAccountShare[] => {
+  if (!policyText) return [];
+  
+  try {
+    const policy = JSON.parse(policyText);
+    const shares: CrossAccountShare[] = [];
+    
+    if (policy.Statement) {
+      policy.Statement.forEach((stmt: any) => {
+        // Vérifier si c'est un partage cross-account (Principal avec ARN iam)
+        if (stmt.Effect === 'Allow' && stmt.Principal) {
+          let principalArn: string | null = null;
+          
+          if (typeof stmt.Principal === 'string' && stmt.Principal.includes('arn:aws:iam::')) {
+            principalArn = stmt.Principal;
+          } else if (stmt.Principal.AWS) {
+            const awsPrincipal = Array.isArray(stmt.Principal.AWS) ? stmt.Principal.AWS[0] : stmt.Principal.AWS;
+            if (awsPrincipal && awsPrincipal.includes('arn:aws:iam::')) {
+              principalArn = awsPrincipal;
+            }
+          }
+          
+          if (principalArn) {
+            // Extraire l'ID du compte de l'ARN
+            const match = principalArn.match(/arn:aws:iam::(\d{12})/);
+            if (match) {
+              const accountId = match[1];
+              const actions = Array.isArray(stmt.Action) ? stmt.Action : [stmt.Action];
+              
+              shares.push({
+                accountId,
+                sid: stmt.Sid || `CrossAccountAccess-${accountId}`,
+                accessLevel: detectAccessLevel(actions),
+                actions
+              });
+            }
+          }
+        }
+      });
+    }
+    
+    return shares;
+  } catch (e) {
+    return [];
+  }
+};
+
 export const BucketSecurityDialog: React.FC<BucketSecurityDialogProps> = ({
   open,
   onOpenChange,
@@ -109,7 +211,7 @@ export const BucketSecurityDialog: React.FC<BucketSecurityDialogProps> = ({
   const [errorAcl, setErrorAcl] = useState<string | null>(null);
   const [errorPolicy, setErrorPolicy] = useState<string | null>(null);
   
-  // États pour l'édition
+  // États pour l'édition ACL
   const [selectedAcl, setSelectedAcl] = useState<string>('private');
   const [policyText, setPolicyText] = useState<string>('');
   const [savingAcl, setSavingAcl] = useState(false);
@@ -119,6 +221,13 @@ export const BucketSecurityDialog: React.FC<BucketSecurityDialogProps> = ({
   
   // Permissions effectives calculées
   const [effectivePermissions, setEffectivePermissions] = useState<EffectivePermission[]>([]);
+
+  // États pour le partage
+  const [crossAccountShares, setCrossAccountShares] = useState<CrossAccountShare[]>([]);
+  const [newAccountId, setNewAccountId] = useState('');
+  const [newAccessLevel, setNewAccessLevel] = useState<AccessLevel>('read-only');
+  const [isAddingShare, setIsAddingShare] = useState(false);
+  const [revokingShareId, setRevokingShareId] = useState<string | null>(null);
 
   const loadAcl = useCallback(async () => {
     setLoadingAcl(true);
@@ -146,10 +255,16 @@ export const BucketSecurityDialog: React.FC<BucketSecurityDialogProps> = ({
       const result = await getBucketPolicy(bucket.name);
       if (result) {
         setPolicy(result);
-        setPolicyText(result.policy ? formatJson(result.policy) : '');
+        const formattedPolicy = result.policy ? formatJson(result.policy) : '';
+        setPolicyText(formattedPolicy);
+        
+        // Extraire les partages cross-account
+        const shares = extractCrossAccountShares(result.policy || '');
+        setCrossAccountShares(shares);
       } else {
         setPolicy({ policy: undefined });
         setPolicyText('');
+        setCrossAccountShares([]);
       }
     } catch (error) {
       setErrorPolicy('Erreur lors du chargement de la policy');
@@ -322,6 +437,7 @@ export const BucketSecurityDialog: React.FC<BucketSecurityDialogProps> = ({
       if (success) {
         setPolicy({ policy: undefined });
         setPolicyText('');
+        setCrossAccountShares([]);
       }
     } finally {
       setDeletingPolicy(false);
@@ -333,6 +449,156 @@ export const BucketSecurityDialog: React.FC<BucketSecurityDialogProps> = ({
       .replace(/BUCKET_NAME/g, bucket.name);
     setPolicyText(policyWithBucket);
     validatePolicy(policyWithBucket);
+  };
+
+  // Validation de l'ID de compte AWS (12 chiffres)
+  const validateAccountId = (accountId: string): boolean => {
+    const cleanId = accountId.replace(/[-\s]/g, '');
+    return /^\d{12}$/.test(cleanId);
+  };
+
+  // Ajouter un nouveau partage cross-account
+  const handleAddShare = async () => {
+    if (!newAccountId.trim()) {
+      toast({
+        title: 'Erreur',
+        description: 'Veuillez saisir l\'ID du compte bénéficiaire',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    if (!validateAccountId(newAccountId)) {
+      toast({
+        title: 'Erreur',
+        description: 'L\'ID du compte AWS doit contenir exactement 12 chiffres',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    const cleanAccountId = newAccountId.replace(/[-\s]/g, '');
+    
+    // Vérifier si ce compte est déjà partagé
+    if (crossAccountShares.some(s => s.accountId === cleanAccountId)) {
+      toast({
+        title: 'Erreur',
+        description: 'Ce compte a déjà accès au bucket',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    setIsAddingShare(true);
+
+    try {
+      const selectedLevel = ACCESS_LEVELS.find(l => l.value === newAccessLevel)!;
+      const newStatement = {
+        Sid: `CrossAccountAccess-${cleanAccountId}`,
+        Effect: 'Allow',
+        Principal: {
+          AWS: `arn:aws:iam::${cleanAccountId}:root`
+        },
+        Action: selectedLevel.actions,
+        Resource: [
+          `arn:aws:s3:::${bucket.name}`,
+          `arn:aws:s3:::${bucket.name}/*`
+        ]
+      };
+
+      let newPolicy: any;
+      
+      if (policy?.policy) {
+        newPolicy = JSON.parse(policy.policy);
+        newPolicy.Statement.push(newStatement);
+      } else {
+        newPolicy = {
+          Version: '2012-10-17',
+          Statement: [newStatement]
+        };
+      }
+
+      const success = await setBucketPolicy(bucket.name, JSON.stringify(newPolicy));
+
+      if (success) {
+        toast({
+          title: 'Partage ajouté',
+          description: `Le bucket a été partagé avec le compte ${cleanAccountId}`,
+        });
+        setNewAccountId('');
+        setNewAccessLevel('read-only');
+        await loadPolicy();
+      }
+    } catch (err) {
+      toast({
+        title: 'Erreur',
+        description: 'Une erreur est survenue lors de l\'ajout du partage',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsAddingShare(false);
+    }
+  };
+
+  // Révoquer un partage cross-account
+  const handleRevokeShare = async (share: CrossAccountShare) => {
+    setRevokingShareId(share.accountId);
+
+    try {
+      if (!policy?.policy) return;
+
+      const currentPolicy = JSON.parse(policy.policy);
+      
+      // Filtrer pour retirer le statement de ce compte
+      currentPolicy.Statement = currentPolicy.Statement.filter((stmt: any) => {
+        // Identifier le statement par le Sid ou par le Principal
+        if (stmt.Sid === share.sid) return false;
+        
+        if (stmt.Principal) {
+          let principalArn: string | null = null;
+          if (typeof stmt.Principal === 'string') {
+            principalArn = stmt.Principal;
+          } else if (stmt.Principal.AWS) {
+            principalArn = Array.isArray(stmt.Principal.AWS) ? stmt.Principal.AWS[0] : stmt.Principal.AWS;
+          }
+          
+          if (principalArn && principalArn.includes(share.accountId)) {
+            return false;
+          }
+        }
+        
+        return true;
+      });
+
+      // Si plus aucun statement, supprimer la policy entière
+      if (currentPolicy.Statement.length === 0) {
+        const success = await deleteBucketPolicy(bucket.name);
+        if (success) {
+          toast({
+            title: 'Accès révoqué',
+            description: `L'accès du compte ${share.accountId} a été supprimé`,
+          });
+          await loadPolicy();
+        }
+      } else {
+        const success = await setBucketPolicy(bucket.name, JSON.stringify(currentPolicy));
+        if (success) {
+          toast({
+            title: 'Accès révoqué',
+            description: `L'accès du compte ${share.accountId} a été supprimé`,
+          });
+          await loadPolicy();
+        }
+      }
+    } catch (err) {
+      toast({
+        title: 'Erreur',
+        description: 'Une erreur est survenue lors de la révocation de l\'accès',
+        variant: 'destructive'
+      });
+    } finally {
+      setRevokingShareId(null);
+    }
   };
 
   const getPermissionIcon = (permission: string) => {
@@ -352,6 +618,17 @@ export const BucketSecurityDialog: React.FC<BucketSecurityDialogProps> = ({
     }
   };
 
+  const getAccessLevelBadge = (level: AccessLevel) => {
+    switch (level) {
+      case 'read-only':
+        return <Badge variant="secondary" className="flex items-center gap-1"><Eye className="w-3 h-3" />Lecture</Badge>;
+      case 'read-write':
+        return <Badge variant="default" className="flex items-center gap-1"><Edit className="w-3 h-3" />Lecture/Écriture</Badge>;
+      case 'read-write-delete':
+        return <Badge variant="destructive" className="flex items-center gap-1"><Trash2 className="w-3 h-3" />Accès complet</Badge>;
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
@@ -361,12 +638,12 @@ export const BucketSecurityDialog: React.FC<BucketSecurityDialogProps> = ({
             <span className="truncate">Gestion de la sécurité</span>
           </DialogTitle>
           <DialogDescription className="truncate">
-            ACL, policies et permissions pour <strong className="break-all">{bucket.name}</strong>
+            ACL, policies, partage et permissions pour <strong className="break-all">{bucket.name}</strong>
           </DialogDescription>
         </DialogHeader>
 
         <Tabs defaultValue="acl" className="flex-1 flex flex-col overflow-hidden">
-          <TabsList className="grid w-full grid-cols-3 flex-shrink-0">
+          <TabsList className="grid w-full grid-cols-4 flex-shrink-0">
             <TabsTrigger value="acl" className="flex items-center justify-center gap-1 sm:gap-2 text-xs sm:text-sm px-1 sm:px-3">
               <Users className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
               <span className="hidden xs:inline sm:inline">ACL</span>
@@ -374,6 +651,10 @@ export const BucketSecurityDialog: React.FC<BucketSecurityDialogProps> = ({
             <TabsTrigger value="policy" className="flex items-center justify-center gap-1 sm:gap-2 text-xs sm:text-sm px-1 sm:px-3">
               <FileText className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
               <span className="hidden xs:inline sm:inline">Policy</span>
+            </TabsTrigger>
+            <TabsTrigger value="share" className="flex items-center justify-center gap-1 sm:gap-2 text-xs sm:text-sm px-1 sm:px-3">
+              <Share2 className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+              <span className="hidden xs:inline sm:inline">Partage</span>
             </TabsTrigger>
             <TabsTrigger value="preview" className="flex items-center justify-center gap-1 sm:gap-2 text-xs sm:text-sm px-1 sm:px-3">
               <Eye className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
@@ -471,7 +752,7 @@ export const BucketSecurityDialog: React.FC<BucketSecurityDialogProps> = ({
                             <div key={index} className="p-2 sm:p-3 bg-muted/50 rounded-lg space-y-2">
                               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                                 <span className="text-xs sm:text-sm font-medium break-all">
-                                  {grant.grantee.displayName || 
+                                   {grant.grantee.displayName || 
                                    (grant.grantee.uri?.includes('AllUsers') ? '🌍 Tout le monde' : 
                                     grant.grantee.uri?.includes('AuthenticatedUsers') ? '🔐 Utilisateurs authentifiés' :
                                     grant.grantee.emailAddress || 
@@ -599,6 +880,162 @@ export const BucketSecurityDialog: React.FC<BucketSecurityDialogProps> = ({
               </div>
               </ScrollArea>
             )}
+          </TabsContent>
+
+          {/* Share Tab */}
+          <TabsContent value="share" className="flex-1 overflow-auto mt-4">
+            <ScrollArea className="h-[calc(90vh-200px)] max-h-[500px] pr-2 sm:pr-4">
+              <div className="space-y-4">
+                {/* Ajouter un partage */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <Share2 className="w-4 h-4" />
+                      Partager avec un compte AWS
+                    </CardTitle>
+                    <CardDescription>
+                      Accorder l'accès à ce bucket à un autre compte AWS/Outscale
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="accountId">ID du compte AWS bénéficiaire</Label>
+                      <Input
+                        id="accountId"
+                        placeholder="123456789012"
+                        value={newAccountId}
+                        onChange={(e) => setNewAccountId(e.target.value)}
+                        maxLength={14}
+                        className="font-mono"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        L'identifiant AWS du compte qui recevra l'accès (12 chiffres)
+                      </p>
+                    </div>
+
+                    <div className="space-y-3">
+                      <Label>Niveau d'accès</Label>
+                      <RadioGroup
+                        value={newAccessLevel}
+                        onValueChange={(value) => setNewAccessLevel(value as AccessLevel)}
+                        className="space-y-2"
+                      >
+                        {ACCESS_LEVELS.map((level) => (
+                          <div key={level.value} className="flex items-start space-x-3">
+                            <RadioGroupItem value={level.value} id={`new-${level.value}`} className="mt-1" />
+                            <div className="flex-1">
+                              <Label htmlFor={`new-${level.value}`} className="flex items-center gap-2 cursor-pointer">
+                                {level.icon}
+                                <span className="font-medium text-sm">{level.label}</span>
+                              </Label>
+                              <p className="text-xs text-muted-foreground">
+                                {level.description}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </RadioGroup>
+                    </div>
+
+                    <Button 
+                      onClick={handleAddShare} 
+                      disabled={isAddingShare || !newAccountId.trim()}
+                      className="w-full"
+                    >
+                      {isAddingShare ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Share2 className="w-4 h-4 mr-2" />
+                      )}
+                      Ajouter le partage
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                <Separator />
+
+                {/* Liste des partages existants */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <Users className="w-4 h-4" />
+                      Partages existants
+                    </CardTitle>
+                    <CardDescription>
+                      {crossAccountShares.length === 0 
+                        ? 'Aucun partage cross-account configuré'
+                        : `${crossAccountShares.length} compte${crossAccountShares.length > 1 ? 's' : ''} avec accès`
+                      }
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {loadingPolicy ? (
+                      <div className="flex items-center justify-center py-4">
+                        <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                      </div>
+                    ) : crossAccountShares.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Share2 className="w-10 h-10 mx-auto mb-2 opacity-20" />
+                        <p className="text-sm">Ce bucket n'est partagé avec aucun autre compte</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {crossAccountShares.map((share) => (
+                          <div 
+                            key={share.accountId}
+                            className="p-3 bg-muted/50 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+                          >
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono text-sm font-medium">{share.accountId}</span>
+                                {getAccessLevelBadge(share.accessLevel)}
+                              </div>
+                              <div className="flex flex-wrap gap-1">
+                                {share.actions.slice(0, 3).map((action) => (
+                                  <span key={action} className="text-xs text-muted-foreground font-mono bg-background px-1.5 py-0.5 rounded">
+                                    {action.replace('s3:', '')}
+                                  </span>
+                                ))}
+                                {share.actions.length > 3 && (
+                                  <span className="text-xs text-muted-foreground">
+                                    +{share.actions.length - 3} autres
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleRevokeShare(share)}
+                              disabled={revokingShareId === share.accountId}
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50 self-start sm:self-auto"
+                            >
+                              {revokingShareId === share.accountId ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <>
+                                  <UserMinus className="w-4 h-4 mr-1" />
+                                  Révoquer
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Information */}
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription className="text-sm">
+                    <strong>Note :</strong> Les partages sont gérés via la bucket policy. 
+                    Toute modification dans l'onglet Policy peut affecter les partages configurés ici.
+                  </AlertDescription>
+                </Alert>
+              </div>
+            </ScrollArea>
           </TabsContent>
 
           {/* Permissions Preview Tab */}
