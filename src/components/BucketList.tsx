@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useS3Store } from '../hooks/useS3Store';
 import { useEnhancedDirectS3 } from '../hooks/useEnhancedDirectS3';
-import { Folder, Calendar, HardDrive, ChevronRight, RefreshCw, Plus, Trash2, Cloud, GitBranch, Lock, Settings, Shield, LayoutGrid, List, Wrench, Share2, Users } from 'lucide-react';
+import { Folder, Calendar, HardDrive, ChevronRight, RefreshCw, Plus, Trash2, Cloud, GitBranch, Lock, Settings, Shield, LayoutGrid, List, Wrench, UserPlus, Users } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { CreateBucketDialog } from './CreateBucketDialog';
@@ -250,7 +250,7 @@ export const BucketList = () => {
                         className="opacity-0 group-hover:opacity-100 transition-opacity text-green-600 hover:text-green-700 hover:bg-green-50 h-8 w-8 p-0"
                         title="Accès Cross-Account"
                       >
-                        <Share2 className="w-3 h-3 sm:w-4 sm:h-4" />
+                        <UserPlus className="w-3 h-3 sm:w-4 sm:h-4" />
                       </Button>
                       <Button
                         size="sm"
@@ -400,7 +400,7 @@ export const BucketList = () => {
                         className="text-green-600 hover:text-green-700 hover:bg-green-50"
                         title="Cross-Account"
                       >
-                        <Share2 className="w-4 h-4" />
+                        <UserPlus className="w-4 h-4" />
                       </Button>
                       <Button
                         size="sm"
