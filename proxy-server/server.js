@@ -284,6 +284,40 @@ app.get('/api/buckets', extractCredentials, async (req, res) => {
           // Encryption not configured
         }
 
+        // Détecter les accès cross-account via la bucket policy
+        let hasCrossAccountAccess = false;
+        let crossAccountCount = 0;
+        try {
+          const policyCmd = new GetBucketPolicyCommand({ Bucket: bucket.Name });
+          const policyResponse = await req.s3Client.send(policyCmd);
+          if (policyResponse.Policy) {
+            const policy = JSON.parse(policyResponse.Policy);
+            if (policy.Statement) {
+              policy.Statement.forEach((stmt) => {
+                if (stmt.Effect === 'Allow' && stmt.Principal) {
+                  // Détecter CanonicalUser (Outscale style)
+                  if (stmt.Principal.CanonicalUser) {
+                    hasCrossAccountAccess = true;
+                    crossAccountCount++;
+                  }
+                  // Détecter AWS ARN style (legacy)
+                  else if (stmt.Principal.AWS && stmt.Principal.AWS !== '*') {
+                    const awsPrincipal = Array.isArray(stmt.Principal.AWS) ? stmt.Principal.AWS : [stmt.Principal.AWS];
+                    awsPrincipal.forEach((p) => {
+                      if (p.includes('arn:aws:iam::')) {
+                        hasCrossAccountAccess = true;
+                        crossAccountCount++;
+                      }
+                    });
+                  }
+                }
+              });
+            }
+          }
+        } catch (error) {
+          // Policy n'existe pas ou erreur
+        }
+
         return {
           name: bucket.Name || '',
           creationDate: bucket.CreationDate || new Date(),
@@ -294,7 +328,9 @@ app.get('/api/buckets', extractCredentials, async (req, res) => {
           hasMoreObjects: hasMore,
           versioningEnabled,
           objectLockEnabled,
-          encryptionEnabled
+          encryptionEnabled,
+          hasCrossAccountAccess,
+          crossAccountCount
         };
       } catch (statsError) {
         console.warn(`Impossible de récupérer les stats pour ${bucket.Name}:`, statsError.message);
@@ -307,7 +343,9 @@ app.get('/api/buckets', extractCredentials, async (req, res) => {
           size: 0,
           versioningEnabled: false,
           objectLockEnabled: false,
-          encryptionEnabled: false
+          encryptionEnabled: false,
+          hasCrossAccountAccess: false,
+          crossAccountCount: 0
         };
       }
     }));

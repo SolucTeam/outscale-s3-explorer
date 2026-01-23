@@ -22,6 +22,8 @@ export interface S3Bucket {
   versioningEnabled?: boolean;
   objectLockEnabled?: boolean;
   encryptionEnabled?: boolean;
+  hasCrossAccountAccess?: boolean;
+  crossAccountCount?: number;
 }
 
 export interface S3Object {
