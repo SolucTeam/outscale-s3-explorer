@@ -14,7 +14,7 @@ import { ForceDeleteBucketDialog } from './ForceDeleteBucketDialog';
 import { BucketSettingsDialog } from './BucketSettingsDialog';
 import { BucketSecurityDialog } from './BucketSecurityDialog';
 import { BucketAdvancedSettingsDialog } from './BucketAdvancedSettingsDialog';
-import { BucketShareDialog } from './BucketShareDialog';
+
 import { SearchFilter } from './SearchFilter';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { S3Bucket } from '../types/s3';
@@ -30,12 +30,12 @@ export const BucketList = () => {
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
   const [showSecurityDialog, setShowSecurityDialog] = useState(false);
   const [showAdvancedDialog, setShowAdvancedDialog] = useState(false);
-  const [showShareDialog, setShowShareDialog] = useState(false);
+  
   const [bucketToDelete, setBucketToDelete] = useState<string>('');
   const [bucketToEdit, setBucketToEdit] = useState<S3Bucket | null>(null);
   const [bucketToView, setBucketToView] = useState<S3Bucket | null>(null);
   const [bucketToAdvanced, setBucketToAdvanced] = useState<S3Bucket | null>(null);
-  const [bucketToShare, setBucketToShare] = useState<S3Bucket | null>(null);
+  
   const [hasInitiallyLoaded, setHasInitiallyLoaded] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('list');
@@ -111,8 +111,8 @@ export const BucketList = () => {
 
   const handleShareBucket = (bucket: S3Bucket, event: React.MouseEvent) => {
     event.stopPropagation();
-    setBucketToShare(bucket);
-    setShowShareDialog(true);
+    setBucketToView(bucket);
+    setShowSecurityDialog(true);
   };
 
   const handleRefresh = async () => {
@@ -536,13 +536,6 @@ export const BucketList = () => {
         />
       )}
 
-      {bucketToShare && (
-        <BucketShareDialog
-          open={showShareDialog}
-          onOpenChange={setShowShareDialog}
-          bucket={bucketToShare}
-        />
-      )}
     </div>
   );
 };
