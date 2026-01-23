@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
 const rateLimit = require('express-rate-limit');
+const { getHistoryStorage } = require('./historyStorage');
 const {
   S3Client,
   ListBucketsCommand,
@@ -1769,6 +1770,253 @@ app.put('/api/buckets/:bucket/object-lock', strictLimiter, extractCredentials, a
   }
 });
 
+// ============================================================
+// API HISTORIQUE DES ACTIONS
+// ============================================================
+
+// Extraire l'ID utilisateur depuis les headers (hash de l'access key)
+const extractUserId = (req) => {
+  const accessKey = req.headers['x-access-key'];
+  if (!accessKey) return null;
+  // Utiliser un hash simple de l'access key comme ID utilisateur
+  const crypto = require('crypto');
+  return crypto.createHash('sha256').update(accessKey).digest('hex').substring(0, 32);
+};
+
+// Middleware pour l'authentification des routes d'historique
+const requireUserId = (req, res, next) => {
+  const userId = extractUserId(req);
+  if (!userId) {
+    return res.status(401).json({
+      success: false,
+      error: 'Authentification requise'
+    });
+  }
+  req.userId = userId;
+  next();
+};
+
+// Récupérer l'historique de l'utilisateur
+app.get('/api/history', requireUserId, (req, res) => {
+  try {
+    const historyStorage = getHistoryStorage();
+    const { limit = 100, offset = 0, operationType, status, startDate, endDate, search } = req.query;
+    
+    const entries = historyStorage.getEntries(req.userId, {
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+      operationType,
+      status,
+      startDate,
+      endDate,
+      search
+    });
+    
+    const total = historyStorage.countEntries(req.userId, {
+      operationType,
+      status,
+      startDate,
+      endDate,
+      search
+    });
+    
+    res.json({
+      success: true,
+      data: entries,
+      total,
+      limit: parseInt(limit),
+      offset: parseInt(offset)
+    });
+  } catch (error) {
+    console.error('Erreur récupération historique:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur lors de la récupération de l\'historique',
+      message: error.message
+    });
+  }
+});
+
+// Ajouter une entrée à l'historique
+app.post('/api/history', requireUserId, (req, res) => {
+  try {
+    const historyStorage = getHistoryStorage();
+    const entry = {
+      ...req.body,
+      userId: req.userId
+    };
+    
+    const result = historyStorage.addEntry(entry);
+    
+    if (result.success) {
+      res.json({ success: true, message: 'Entrée ajoutée' });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: result.error
+      });
+    }
+  } catch (error) {
+    console.error('Erreur ajout historique:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur lors de l\'ajout à l\'historique',
+      message: error.message
+    });
+  }
+});
+
+// Mettre à jour une entrée
+app.patch('/api/history/:id', requireUserId, (req, res) => {
+  try {
+    const historyStorage = getHistoryStorage();
+    const { id } = req.params;
+    
+    const result = historyStorage.updateEntry(id, req.userId, req.body);
+    
+    if (result.success) {
+      res.json({ success: true, message: 'Entrée mise à jour' });
+    } else {
+      res.status(404).json({
+        success: false,
+        error: 'Entrée non trouvée ou non modifiable'
+      });
+    }
+  } catch (error) {
+    console.error('Erreur mise à jour historique:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur lors de la mise à jour',
+      message: error.message
+    });
+  }
+});
+
+// Synchronisation en lot (import depuis localStorage)
+app.post('/api/history/sync', requireUserId, (req, res) => {
+  try {
+    const historyStorage = getHistoryStorage();
+    const { entries } = req.body;
+    
+    if (!Array.isArray(entries)) {
+      return res.status(400).json({
+        success: false,
+        error: 'entries doit être un tableau'
+      });
+    }
+    
+    // Ajouter l'userId à chaque entrée
+    const entriesWithUser = entries.map(entry => ({
+      ...entry,
+      userId: req.userId
+    }));
+    
+    const result = historyStorage.bulkInsert(entriesWithUser);
+    
+    res.json({
+      success: true,
+      message: `${result.insertedCount || 0} entrées synchronisées`
+    });
+  } catch (error) {
+    console.error('Erreur synchronisation historique:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur lors de la synchronisation',
+      message: error.message
+    });
+  }
+});
+
+// Supprimer l'historique de l'utilisateur
+app.delete('/api/history', requireUserId, (req, res) => {
+  try {
+    const historyStorage = getHistoryStorage();
+    const result = historyStorage.clearHistory(req.userId);
+    
+    if (result.success) {
+      res.json({
+        success: true,
+        message: `${result.deletedCount} entrées supprimées`
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: result.error
+      });
+    }
+  } catch (error) {
+    console.error('Erreur suppression historique:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur lors de la suppression',
+      message: error.message
+    });
+  }
+});
+
+// Statistiques de l'historique
+app.get('/api/history/stats', requireUserId, (req, res) => {
+  try {
+    const historyStorage = getHistoryStorage();
+    const stats = historyStorage.getStats(req.userId);
+    
+    if (stats) {
+      res.json({ success: true, data: stats });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: 'Erreur lors du calcul des statistiques'
+      });
+    }
+  } catch (error) {
+    console.error('Erreur statistiques historique:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur lors de la récupération des statistiques',
+      message: error.message
+    });
+  }
+});
+
+// Préférences utilisateur (logging activé/désactivé)
+app.get('/api/history/preferences', requireUserId, (req, res) => {
+  try {
+    const historyStorage = getHistoryStorage();
+    const preferences = historyStorage.getUserPreferences(req.userId);
+    res.json({ success: true, data: preferences });
+  } catch (error) {
+    console.error('Erreur préférences:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur lors de la récupération des préférences',
+      message: error.message
+    });
+  }
+});
+
+app.put('/api/history/preferences', requireUserId, (req, res) => {
+  try {
+    const historyStorage = getHistoryStorage();
+    const result = historyStorage.setUserPreferences(req.userId, req.body);
+    
+    if (result.success) {
+      res.json({ success: true, message: 'Préférences mises à jour' });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: result.error
+      });
+    }
+  } catch (error) {
+    console.error('Erreur mise à jour préférences:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur lors de la mise à jour des préférences',
+      message: error.message
+    });
+  }
+});
+
 // Gestion des erreurs
 app.use((error, req, res, next) => {
   console.error('Erreur serveur:', error);
@@ -1791,11 +2039,22 @@ app.listen(PORT, () => {
   console.log(`   POST   /api/buckets/:bucket/folders (rate limited)`);
   console.log(`   GET    /api/buckets/:bucket/objects/:key/download`);
   console.log('');
+  console.log('📜 API Historique:');
+  console.log(`   GET    /api/history`);
+  console.log(`   POST   /api/history`);
+  console.log(`   PATCH  /api/history/:id`);
+  console.log(`   DELETE /api/history`);
+  console.log(`   POST   /api/history/sync`);
+  console.log(`   GET    /api/history/stats`);
+  console.log(`   GET    /api/history/preferences`);
+  console.log(`   PUT    /api/history/preferences`);
+  console.log('');
   console.log('🔒 Sécurité:');
   console.log(`   ✓ Rate limiting activé (${process.env.RATE_LIMIT_MAX_REQUESTS || 100} req/15min)`);
   console.log(`   ✓ Rate limiting strict (${process.env.RATE_LIMIT_STRICT_MAX_REQUESTS || 20} req/5min pour écriture)`);
   console.log('   ✓ Headers de sécurité (CSP, HSTS, X-Frame-Options)');
   console.log('   ✓ Validation des credentials');
+  console.log('   ✓ Base de données SQLite pour historique');
   console.log('');
   if (process.env.NODE_ENV === 'production') {
     console.log('⚠️  PRODUCTION: Assurez-vous d\'utiliser HTTPS (reverse proxy Nginx/HAProxy)');

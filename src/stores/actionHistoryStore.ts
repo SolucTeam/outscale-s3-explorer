@@ -164,11 +164,15 @@ export interface ActionHistoryEntry {
 interface UserHistory {
   entries: ActionHistoryEntry[];
   isLoggingEnabled: boolean;
+  lastSyncedAt?: string;
+  pendingSync: ActionHistoryEntry[];
 }
 
 interface ActionHistoryStore {
   userHistories: Record<string, UserHistory>;
   currentUserId: string | null;
+  isSyncing: boolean;
+  syncEnabled: boolean;
   
   // Actions
   setCurrentUser: (userId: string) => void;
@@ -180,6 +184,16 @@ interface ActionHistoryStore {
   getEntriesByType: (operationType: OperationType) => ActionHistoryEntry[];
   getRecentEntries: (limit?: number) => ActionHistoryEntry[];
   getCurrentUserEntries: () => ActionHistoryEntry[];
+  
+  // Sync actions
+  setSyncEnabled: (enabled: boolean) => void;
+  setIsSyncing: (syncing: boolean) => void;
+  markEntriesAsSynced: (entryIds: string[]) => void;
+  addPendingEntry: (entry: ActionHistoryEntry) => void;
+  clearPendingEntries: () => void;
+  getPendingEntries: () => ActionHistoryEntry[];
+  mergeRemoteEntries: (entries: ActionHistoryEntry[]) => void;
+  setLastSyncedAt: (timestamp: string) => void;
 }
 
 export const useActionHistoryStore = create<ActionHistoryStore>()(
@@ -187,6 +201,8 @@ export const useActionHistoryStore = create<ActionHistoryStore>()(
     (set, get) => ({
       userHistories: {},
       currentUserId: null,
+      isSyncing: false,
+      syncEnabled: true,
       
       setCurrentUser: (userId) => {
         console.log('📝 Setting current user:', userId);
@@ -201,7 +217,8 @@ export const useActionHistoryStore = create<ActionHistoryStore>()(
               ...prev.userHistories,
               [userId]: {
                 entries: [],
-                isLoggingEnabled: true
+                isLoggingEnabled: true,
+                pendingSync: []
               }
             }
           }));
@@ -256,6 +273,10 @@ export const useActionHistoryStore = create<ActionHistoryStore>()(
         
         set(state => {
           const updatedEntries = [newEntry, ...(state.userHistories[userId]?.entries || [])].slice(0, 1000);
+          const updatedPending = state.syncEnabled 
+            ? [newEntry, ...(state.userHistories[userId]?.pendingSync || [])]
+            : state.userHistories[userId]?.pendingSync || [];
+          
           console.log('✅ Entry added. Total entries:', updatedEntries.length);
           
           return {
@@ -263,7 +284,8 @@ export const useActionHistoryStore = create<ActionHistoryStore>()(
               ...state.userHistories,
               [userId]: {
                 ...state.userHistories[userId],
-                entries: updatedEntries
+                entries: updatedEntries,
+                pendingSync: updatedPending
               }
             }
           };
@@ -324,7 +346,8 @@ export const useActionHistoryStore = create<ActionHistoryStore>()(
             ...state.userHistories,
             [userId]: {
               ...state.userHistories[userId],
-              entries: []
+              entries: [],
+              pendingSync: []
             }
           }
         }));
@@ -379,18 +402,142 @@ export const useActionHistoryStore = create<ActionHistoryStore>()(
         if (!userId || !state.userHistories[userId]) return [];
         
         return state.userHistories[userId].entries.slice(0, limit);
+      },
+      
+      // Sync actions
+      setSyncEnabled: (enabled) => {
+        set({ syncEnabled: enabled });
+      },
+      
+      setIsSyncing: (syncing) => {
+        set({ isSyncing: syncing });
+      },
+      
+      markEntriesAsSynced: (entryIds) => {
+        const state = get();
+        const userId = state.currentUserId;
+        if (!userId || !state.userHistories[userId]) return;
+        
+        set(state => ({
+          userHistories: {
+            ...state.userHistories,
+            [userId]: {
+              ...state.userHistories[userId],
+              pendingSync: state.userHistories[userId].pendingSync.filter(
+                entry => !entryIds.includes(entry.id)
+              )
+            }
+          }
+        }));
+      },
+      
+      addPendingEntry: (entry) => {
+        const state = get();
+        const userId = state.currentUserId;
+        if (!userId || !state.userHistories[userId]) return;
+        
+        set(state => ({
+          userHistories: {
+            ...state.userHistories,
+            [userId]: {
+              ...state.userHistories[userId],
+              pendingSync: [entry, ...(state.userHistories[userId].pendingSync || [])]
+            }
+          }
+        }));
+      },
+      
+      clearPendingEntries: () => {
+        const state = get();
+        const userId = state.currentUserId;
+        if (!userId || !state.userHistories[userId]) return;
+        
+        set(state => ({
+          userHistories: {
+            ...state.userHistories,
+            [userId]: {
+              ...state.userHistories[userId],
+              pendingSync: []
+            }
+          }
+        }));
+      },
+      
+      getPendingEntries: () => {
+        const state = get();
+        const userId = state.currentUserId;
+        if (!userId || !state.userHistories[userId]) return [];
+        return state.userHistories[userId].pendingSync || [];
+      },
+      
+      mergeRemoteEntries: (remoteEntries) => {
+        const state = get();
+        const userId = state.currentUserId;
+        if (!userId || !state.userHistories[userId]) return;
+        
+        const localEntries = state.userHistories[userId].entries;
+        const localIds = new Set(localEntries.map(e => e.id));
+        
+        // Ajouter les entrées distantes qui n'existent pas localement
+        const newEntries = remoteEntries.filter(e => !localIds.has(e.id));
+        
+        if (newEntries.length > 0) {
+          const mergedEntries = [...localEntries, ...newEntries]
+            .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+            .slice(0, 1000);
+          
+          set(state => ({
+            userHistories: {
+              ...state.userHistories,
+              [userId]: {
+                ...state.userHistories[userId],
+                entries: mergedEntries
+              }
+            }
+          }));
+          
+          console.log(`📥 Merged ${newEntries.length} remote entries`);
+        }
+      },
+      
+      setLastSyncedAt: (timestamp) => {
+        const state = get();
+        const userId = state.currentUserId;
+        if (!userId || !state.userHistories[userId]) return;
+        
+        set(state => ({
+          userHistories: {
+            ...state.userHistories,
+            [userId]: {
+              ...state.userHistories[userId],
+              lastSyncedAt: timestamp
+            }
+          }
+        }));
       }
     }),
     {
       name: 'action-history-storage',
-      version: 1,
+      version: 2,
       migrate: (persistedState: unknown, version: number) => {
         console.log('🔄 Migrating action history storage from version:', version);
-        return persistedState as ActionHistoryStore;
+        const state = persistedState as ActionHistoryStore;
+        
+        // Migration v1 -> v2: ajouter pendingSync
+        if (version < 2) {
+          Object.keys(state.userHistories || {}).forEach(userId => {
+            if (!state.userHistories[userId].pendingSync) {
+              state.userHistories[userId].pendingSync = [];
+            }
+          });
+        }
+        
+        return state;
       },
       partialize: (state) => ({
         userHistories: state.userHistories,
-        currentUserId: state.currentUserId
+        currentUserId: state.currentUserId,
+        syncEnabled: state.syncEnabled
       }),
       onRehydrateStorage: () => {
         console.log('💧 Rehydrating action history store...');
@@ -408,6 +555,11 @@ export const useActionHistoryStore = create<ActionHistoryStore>()(
                 ...entry,
                 timestamp: new Date(entry.timestamp)
               }));
+              
+              // S'assurer que pendingSync existe
+              if (!state.userHistories[userId].pendingSync) {
+                state.userHistories[userId].pendingSync = [];
+              }
             });
           }
         };
