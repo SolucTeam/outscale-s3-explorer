@@ -790,7 +790,7 @@ export const BucketSecurityDialog: React.FC<BucketSecurityDialogProps> = ({
             <span className="truncate">Gestion de la sécurité</span>
           </DialogTitle>
           <DialogDescription className="truncate">
-            ACL, policies, partage et permissions pour <strong className="break-all">{bucket.name}</strong>
+            ACL, policies, cross-account et permissions pour <strong className="break-all">{bucket.name}</strong>
           </DialogDescription>
         </DialogHeader>
 
@@ -804,9 +804,9 @@ export const BucketSecurityDialog: React.FC<BucketSecurityDialogProps> = ({
               <FileText className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
               <span className="hidden xs:inline sm:inline">Policy</span>
             </TabsTrigger>
-            <TabsTrigger value="share" className="flex items-center justify-center gap-1 sm:gap-2 text-xs sm:text-sm px-1 sm:px-3">
+            <TabsTrigger value="crossaccount" className="flex items-center justify-center gap-1 sm:gap-2 text-xs sm:text-sm px-1 sm:px-3">
               <Share2 className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
-              <span className="hidden xs:inline sm:inline">Partage</span>
+              <span className="hidden xs:inline sm:inline">Cross-Account</span>
             </TabsTrigger>
             <TabsTrigger value="preview" className="flex items-center justify-center gap-1 sm:gap-2 text-xs sm:text-sm px-1 sm:px-3">
               <Eye className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
@@ -1034,16 +1034,16 @@ export const BucketSecurityDialog: React.FC<BucketSecurityDialogProps> = ({
             )}
           </TabsContent>
 
-          {/* Share Tab */}
-          <TabsContent value="share" className="flex-1 overflow-auto mt-4">
+          {/* Cross-Account Tab */}
+          <TabsContent value="crossaccount" className="flex-1 overflow-auto mt-4">
             <ScrollArea className="h-[calc(90vh-200px)] max-h-[500px] pr-2 sm:pr-4">
               <div className="space-y-4">
-                {/* Ajouter un partage */}
+                {/* Ajouter un accès cross-account */}
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-sm flex items-center gap-2">
                       <Share2 className="w-4 h-4" />
-                      Partager avec un compte Outscale
+                      Accès Cross-Account
                     </CardTitle>
                     <CardDescription>
                       Accorder l'accès à ce bucket à un autre compte Outscale
@@ -1163,23 +1163,23 @@ export const BucketSecurityDialog: React.FC<BucketSecurityDialogProps> = ({
                       ) : (
                         <Share2 className="w-4 h-4 mr-2" />
                       )}
-                      Ajouter le partage
+                      Ajouter l'accès cross-account
                     </Button>
                   </CardContent>
                 </Card>
 
                 <Separator />
 
-                {/* Liste des partages existants */}
+                {/* Liste des accès cross-account existants */}
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-sm flex items-center gap-2">
                       <Users className="w-4 h-4" />
-                      Partages existants
+                      Accès Cross-Account existants
                     </CardTitle>
                     <CardDescription>
                       {crossAccountShares.length === 0 
-                        ? 'Aucun partage cross-account configuré'
+                        ? 'Aucun accès cross-account configuré'
                         : `${crossAccountShares.length} compte${crossAccountShares.length > 1 ? 's' : ''} avec accès`
                       }
                     </CardDescription>
@@ -1192,7 +1192,7 @@ export const BucketSecurityDialog: React.FC<BucketSecurityDialogProps> = ({
                     ) : crossAccountShares.length === 0 ? (
                       <div className="text-center py-8 text-muted-foreground">
                         <Share2 className="w-10 h-10 mx-auto mb-2 opacity-20" />
-                        <p className="text-sm">Ce bucket n'est partagé avec aucun autre compte</p>
+                        <p className="text-sm">Aucun accès cross-account configuré pour ce bucket</p>
                       </div>
                     ) : (
                       <div className="space-y-3">
