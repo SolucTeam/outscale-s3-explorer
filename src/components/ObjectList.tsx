@@ -715,14 +715,16 @@ export const ObjectList = () => {
                               </div>
                               <div className="flex items-center space-x-4 text-sm text-gray-600 mt-1">
                                 {!object.isFolder && (
-                                  <span>{formatBytes(object.size)}</span>
+                                  <>
+                                    <span>{formatBytes(object.size)}</span>
+                                    <span>
+                                      Modifié {formatDistanceToNow(object.lastModified, { 
+                                        addSuffix: true, 
+                                        locale: fr 
+                                      })}
+                                    </span>
+                                  </>
                                 )}
-                                <span>
-                                  Modifié {formatDistanceToNow(object.lastModified, { 
-                                    addSuffix: true, 
-                                    locale: fr 
-                                  })}
-                                </span>
                               </div>
                               {object.tags && Object.keys(object.tags).length > 0 && (
                                 <div className="flex items-center gap-2 mt-2 flex-wrap">
