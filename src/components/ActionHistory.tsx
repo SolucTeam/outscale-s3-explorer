@@ -1,18 +1,74 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useActionHistoryStore } from '../stores/actionHistoryStore';
+import { Input } from '@/components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useActionHistoryStore, OperationType } from '../stores/actionHistoryStore';
 import { useActiveOperationsStore } from '../stores/activeOperationsStore';
 import { useS3Store } from '../hooks/useS3Store';
 import { useHistorySync } from '../hooks/useHistorySync';
-import { Activity, Clock, CheckCircle, XCircle, AlertCircle, Filter, Trash2, User, Settings, ChevronLeft, ChevronRight, X, Loader2, Cloud, CloudOff, RefreshCw, Database } from 'lucide-react';
+import { 
+  Activity, Clock, CheckCircle, XCircle, AlertCircle, Filter, Trash2, User, 
+  Settings, ChevronLeft, ChevronRight, X, Loader2, Cloud, CloudOff, RefreshCw, 
+  Database, Search, CalendarIcon, ChevronDown, RotateCcw
+} from 'lucide-react';
+import { format, isAfter, isBefore, startOfDay, endOfDay } from 'date-fns';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 type FilterType = 'all' | 'success' | 'error' | 'info';
+
+// Catégories d'opérations pour le filtre
+const OPERATION_CATEGORIES = {
+  'Buckets': ['bucket_create', 'bucket_delete', 'bucket_list', 'bucket_empty', 'bucket_configure'],
+  'Objets': ['object_upload', 'object_delete', 'object_download', 'object_list', 'object_view', 'object_copy', 'object_move', 'object_rename', 'object_restore'],
+  'Dossiers': ['folder_create', 'folder_delete', 'folder_move', 'folder_copy'],
+  'Bulk': ['bulk_upload', 'bulk_delete', 'bulk_download', 'bulk_copy', 'bulk_move'],
+  'Tags/Metadata': ['tags_add', 'tags_update', 'tags_delete', 'metadata_update'],
+  'Versioning': ['version_list', 'version_restore', 'version_delete', 'versioning_enable', 'versioning_disable'],
+  'Sécurité': ['acl_update', 'policy_update', 'cors_update', 'share_add', 'share_update', 'share_revoke'],
+  'Encryption': ['encryption_enable', 'encryption_disable', 'encryption_update'],
+  'Lifecycle': ['lifecycle_add_rule', 'lifecycle_update_rule', 'lifecycle_delete_rule'],
+} as const;
+
+const getOperationLabel = (op: string): string => {
+  const labels: Record<string, string> = {
+    'bucket_create': 'Création bucket',
+    'bucket_delete': 'Suppression bucket',
+    'bucket_list': 'Liste buckets',
+    'bucket_empty': 'Vidage bucket',
+    'bucket_configure': 'Config bucket',
+    'object_upload': 'Upload',
+    'object_delete': 'Suppression objet',
+    'object_download': 'Téléchargement',
+    'object_list': 'Liste objets',
+    'object_view': 'Affichage objet',
+    'object_copy': 'Copie objet',
+    'object_move': 'Déplacement',
+    'object_rename': 'Renommage',
+    'folder_create': 'Création dossier',
+    'folder_delete': 'Suppression dossier',
+    'bulk_upload': 'Upload multiple',
+    'bulk_delete': 'Suppression multiple',
+    'bulk_download': 'Téléchargement multiple',
+    'tags_add': 'Ajout tags',
+    'tags_update': 'Mise à jour tags',
+    'share_add': 'Partage ajouté',
+    'share_revoke': 'Partage révoqué',
+    'versioning_enable': 'Versioning activé',
+    'versioning_disable': 'Versioning désactivé',
+    'encryption_enable': 'Encryption activée',
+    'acl_update': 'ACL modifié',
+    'policy_update': 'Policy modifiée',
+  };
+  return labels[op] || op.replace(/_/g, ' ');
+};
 
 export const ActionHistory = () => {
   const { credentials } = useS3Store();
@@ -40,12 +96,21 @@ export const ActionHistory = () => {
     getStats
   } = useHistorySync();
   
+  // Filtres de base
   const [filter, setFilter] = useState<FilterType>('all');
   const [isExpanded, setIsExpanded] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [stats, setStats] = useState<{ total: number; successCount: number; errorCount: number } | null>(null);
   const itemsPerPage = 10;
+
+  // Filtres avancés
+  const [searchText, setSearchText] = useState('');
+  const [startDate, setStartDate] = useState<Date | undefined>(undefined);
+  const [endDate, setEndDate] = useState<Date | undefined>(undefined);
+  const [selectedBucket, setSelectedBucket] = useState<string>('all');
+  const [selectedOperation, setSelectedOperation] = useState<string>('all');
 
   // Mettre à jour l'utilisateur courant quand les credentials changent
   useEffect(() => {
@@ -69,22 +134,98 @@ export const ActionHistory = () => {
   const currentUserHistory = currentUserId && userHistories[currentUserId];
   const isLoggingEnabled = currentUserHistory?.isLoggingEnabled ?? true;
 
-  const filteredActions = entries.filter(entry => {
-    if (filter === 'all') return true;
-    if (filter === 'success') return entry.status === 'success';
-    if (filter === 'error') return entry.status === 'error';
-    if (filter === 'info') return entry.status === 'started' || entry.status === 'progress';
-    return true;
-  });
+  // Extraire les buckets uniques des entrées
+  const uniqueBuckets = useMemo(() => {
+    const buckets = new Set<string>();
+    entries.forEach(entry => {
+      if (entry.bucketName) {
+        buckets.add(entry.bucketName);
+      }
+    });
+    return Array.from(buckets).sort();
+  }, [entries]);
+
+  // Extraire les types d'opérations uniques
+  const uniqueOperations = useMemo(() => {
+    const ops = new Set<string>();
+    entries.forEach(entry => {
+      ops.add(entry.operationType);
+    });
+    return Array.from(ops).sort();
+  }, [entries]);
+
+  // Filtrage avancé
+  const filteredActions = useMemo(() => {
+    return entries.filter(entry => {
+      // Filtre par statut
+      if (filter !== 'all') {
+        if (filter === 'success' && entry.status !== 'success') return false;
+        if (filter === 'error' && entry.status !== 'error') return false;
+        if (filter === 'info' && entry.status !== 'started' && entry.status !== 'progress') return false;
+      }
+
+      // Filtre par texte
+      if (searchText.trim()) {
+        const search = searchText.toLowerCase().trim();
+        const matchesMessage = entry.userFriendlyMessage?.toLowerCase().includes(search);
+        const matchesBucket = entry.bucketName?.toLowerCase().includes(search);
+        const matchesObject = entry.objectName?.toLowerCase().includes(search);
+        const matchesDetails = entry.details?.toLowerCase().includes(search);
+        if (!matchesMessage && !matchesBucket && !matchesObject && !matchesDetails) {
+          return false;
+        }
+      }
+
+      // Filtre par date de début
+      if (startDate) {
+        const entryDate = new Date(entry.timestamp);
+        if (isBefore(entryDate, startOfDay(startDate))) {
+          return false;
+        }
+      }
+
+      // Filtre par date de fin
+      if (endDate) {
+        const entryDate = new Date(entry.timestamp);
+        if (isAfter(entryDate, endOfDay(endDate))) {
+          return false;
+        }
+      }
+
+      // Filtre par bucket
+      if (selectedBucket !== 'all' && entry.bucketName !== selectedBucket) {
+        return false;
+      }
+
+      // Filtre par type d'opération
+      if (selectedOperation !== 'all' && entry.operationType !== selectedOperation) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [entries, filter, searchText, startDate, endDate, selectedBucket, selectedOperation]);
 
   const totalPages = Math.ceil(filteredActions.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const paginatedActions = filteredActions.slice(startIndex, endIndex);
 
+  // Reset page quand les filtres changent
   useEffect(() => {
     setCurrentPage(1);
-  }, [filter]);
+  }, [filter, searchText, startDate, endDate, selectedBucket, selectedOperation]);
+
+  const hasActiveFilters = searchText || startDate || endDate || selectedBucket !== 'all' || selectedOperation !== 'all';
+
+  const resetFilters = () => {
+    setSearchText('');
+    setStartDate(undefined);
+    setEndDate(undefined);
+    setSelectedBucket('all');
+    setSelectedOperation('all');
+    setFilter('all');
+  };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -209,7 +350,7 @@ export const ActionHistory = () => {
                 <User className="w-3 h-3 text-gray-500" />
                 <span className="text-xs text-gray-600">{getCurrentUserDisplay()}</span>
                 <Badge variant="secondary" className="text-xs h-5">
-                  {entries.length}
+                  {filteredActions.length}/{entries.length}
                 </Badge>
                 {/* Indicateur de sync */}
                 {syncEnabled ? (
@@ -243,6 +384,15 @@ export const ActionHistory = () => {
               <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin' : ''}`} />
             </Button>
             <Button
+              variant={showAdvancedFilters ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+              className="h-8 w-8 p-0"
+              title="Recherche avancée"
+            >
+              <Search className="w-3 h-3" />
+            </Button>
+            <Button
               variant="ghost"
               size="sm"
               onClick={() => setShowSettings(!showSettings)}
@@ -270,6 +420,147 @@ export const ActionHistory = () => {
             )}
           </div>
         </div>
+
+        {/* Recherche avancée */}
+        {showAdvancedFilters && (
+          <div className="mt-3 p-3 bg-white rounded-lg border border-gray-200 space-y-3">
+            {/* Barre de recherche textuelle */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Input
+                type="text"
+                placeholder="Rechercher dans l'historique..."
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+                className="pl-9 h-9 text-sm"
+              />
+              {searchText && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSearchText('')}
+                  className="absolute right-1 top-1/2 transform -translate-y-1/2 h-7 w-7 p-0"
+                >
+                  <X className="w-3 h-3" />
+                </Button>
+              )}
+            </div>
+
+            {/* Filtres par ligne */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+              {/* Date de début */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "h-9 justify-start text-left font-normal text-xs",
+                      !startDate && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-3 w-3" />
+                    {startDate ? format(startDate, "dd/MM/yyyy", { locale: fr }) : "Date début"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0 z-50 bg-white" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={startDate}
+                    onSelect={setStartDate}
+                    initialFocus
+                    className={cn("p-3 pointer-events-auto")}
+                    locale={fr}
+                  />
+                </PopoverContent>
+              </Popover>
+
+              {/* Date de fin */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "h-9 justify-start text-left font-normal text-xs",
+                      !endDate && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-3 w-3" />
+                    {endDate ? format(endDate, "dd/MM/yyyy", { locale: fr }) : "Date fin"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0 z-50 bg-white" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={endDate}
+                    onSelect={setEndDate}
+                    initialFocus
+                    className={cn("p-3 pointer-events-auto")}
+                    locale={fr}
+                  />
+                </PopoverContent>
+              </Popover>
+
+              {/* Filtre par bucket */}
+              <Select value={selectedBucket} onValueChange={setSelectedBucket}>
+                <SelectTrigger className="h-9 text-xs">
+                  <SelectValue placeholder="Tous les buckets" />
+                </SelectTrigger>
+                <SelectContent className="z-50 bg-white">
+                  <SelectItem value="all">Tous les buckets</SelectItem>
+                  {uniqueBuckets.map(bucket => (
+                    <SelectItem key={bucket} value={bucket}>
+                      📦 {bucket}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* Filtre par type d'opération */}
+              <Select value={selectedOperation} onValueChange={setSelectedOperation}>
+                <SelectTrigger className="h-9 text-xs">
+                  <SelectValue placeholder="Toutes les opérations" />
+                </SelectTrigger>
+                <SelectContent className="z-50 bg-white max-h-64">
+                  <SelectItem value="all">Toutes les opérations</SelectItem>
+                  {Object.entries(OPERATION_CATEGORIES).map(([category, ops]) => {
+                    const availableOps = ops.filter(op => uniqueOperations.includes(op));
+                    if (availableOps.length === 0) return null;
+                    return (
+                      <React.Fragment key={category}>
+                        <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 bg-gray-50">
+                          {category}
+                        </div>
+                        {availableOps.map(op => (
+                          <SelectItem key={op} value={op}>
+                            {getOperationLabel(op)}
+                          </SelectItem>
+                        ))}
+                      </React.Fragment>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Bouton reset si filtres actifs */}
+            {hasActiveFilters && (
+              <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                <span className="text-xs text-gray-500">
+                  {filteredActions.length} résultat(s) trouvé(s)
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={resetFilters}
+                  className="h-7 text-xs text-gray-600 hover:text-gray-900"
+                >
+                  <RotateCcw className="w-3 h-3 mr-1" />
+                  Réinitialiser
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
         
         {/* Paramètres */}
         {showSettings && (
@@ -312,7 +603,7 @@ export const ActionHistory = () => {
           </div>
         )}
         
-        {/* Filtres */}
+        {/* Filtres par statut */}
         <div className={`flex flex-wrap gap-1 mt-2 ${isExpanded ? 'block' : 'hidden xl:flex'}`}>
           {(['all', 'success', 'error', 'info'] as const).map((status) => (
             <Button
@@ -332,10 +623,29 @@ export const ActionHistory = () => {
         {filteredActions.length === 0 ? (
           <div className="p-6 text-center text-gray-500">
             <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
-              <Clock className="w-8 h-8 text-gray-400" />
+              {hasActiveFilters ? (
+                <Search className="w-8 h-8 text-gray-400" />
+              ) : (
+                <Clock className="w-8 h-8 text-gray-400" />
+              )}
             </div>
-            <p className="text-sm font-medium text-gray-900 mb-1">Aucune action enregistrée</p>
-            <p className="text-xs text-gray-500">Les actions S3 apparaîtront ici</p>
+            <p className="text-sm font-medium text-gray-900 mb-1">
+              {hasActiveFilters ? 'Aucun résultat' : 'Aucune action enregistrée'}
+            </p>
+            <p className="text-xs text-gray-500">
+              {hasActiveFilters ? 'Essayez de modifier vos filtres' : 'Les actions S3 apparaîtront ici'}
+            </p>
+            {hasActiveFilters && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={resetFilters}
+                className="mt-3 text-xs"
+              >
+                <RotateCcw className="w-3 h-3 mr-1" />
+                Réinitialiser les filtres
+              </Button>
+            )}
           </div>
         ) : (
           <>
