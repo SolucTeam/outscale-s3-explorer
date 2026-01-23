@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useS3Store } from '../hooks/useS3Store';
 import { useEnhancedDirectS3 } from '../hooks/useEnhancedDirectS3';
-import { Folder, Calendar, HardDrive, ChevronRight, RefreshCw, Plus, Trash2, Cloud, GitBranch, Lock, Settings, Shield, LayoutGrid, List, Wrench, Share2 } from 'lucide-react';
+import { Folder, Calendar, HardDrive, ChevronRight, RefreshCw, Plus, Trash2, Cloud, GitBranch, Lock, Settings, Shield, LayoutGrid, List, Wrench, Share2, Users } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { CreateBucketDialog } from './CreateBucketDialog';
@@ -202,6 +202,16 @@ export const BucketList = () => {
                               <span className="sm:hidden">Enc</span>
                             </Badge>
                           )}
+                          {bucket.hasCrossAccountAccess && (
+                            <Badge variant="outline" className="text-xs flex items-center gap-1 whitespace-nowrap text-green-600 border-green-300 bg-green-50">
+                              <Users className="w-3 h-3" />
+                              <span className="hidden sm:inline">Cross-Account</span>
+                              <span className="sm:hidden">CA</span>
+                              {bucket.crossAccountCount && bucket.crossAccountCount > 1 && (
+                                <span className="ml-0.5">({bucket.crossAccountCount})</span>
+                              )}
+                            </Badge>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -335,6 +345,15 @@ export const BucketList = () => {
                             <Badge variant="encryption" className="text-xs flex items-center gap-1">
                               <Lock className="w-3 h-3" />
                               Encryption
+                            </Badge>
+                          )}
+                          {bucket.hasCrossAccountAccess && (
+                            <Badge variant="outline" className="text-xs flex items-center gap-1 text-green-600 border-green-300 bg-green-50">
+                              <Users className="w-3 h-3" />
+                              Cross-Account
+                              {bucket.crossAccountCount && bucket.crossAccountCount > 1 && (
+                                <span className="ml-0.5">({bucket.crossAccountCount})</span>
+                              )}
                             </Badge>
                           )}
                         </div>

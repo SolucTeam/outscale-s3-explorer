@@ -237,6 +237,40 @@ class DirectS3Service {
             // Encryption n'est pas configurée
           }
           
+          // Détecter les accès cross-account via la bucket policy
+          let hasCrossAccountAccess = false;
+          let crossAccountCount = 0;
+          try {
+            const policyCmd = new GetBucketPolicyCommand({ Bucket: bucketName });
+            const policyResponse = await this.client!.send(policyCmd);
+            if (policyResponse.Policy) {
+              const policy = JSON.parse(policyResponse.Policy);
+              if (policy.Statement) {
+                policy.Statement.forEach((stmt: any) => {
+                  if (stmt.Effect === 'Allow' && stmt.Principal) {
+                    // Détecter CanonicalUser (Outscale style)
+                    if (stmt.Principal.CanonicalUser) {
+                      hasCrossAccountAccess = true;
+                      crossAccountCount++;
+                    }
+                    // Détecter AWS ARN style (legacy)
+                    else if (stmt.Principal.AWS && stmt.Principal.AWS !== '*') {
+                      const awsPrincipal = Array.isArray(stmt.Principal.AWS) ? stmt.Principal.AWS : [stmt.Principal.AWS];
+                      awsPrincipal.forEach((p: string) => {
+                        if (p.includes('arn:aws:iam::')) {
+                          hasCrossAccountAccess = true;
+                          crossAccountCount++;
+                        }
+                      });
+                    }
+                  }
+                });
+              }
+            }
+          } catch (error) {
+            // Policy n'existe pas ou erreur
+          }
+          
           // 🎯 COMPTAGE COMPLET avec pagination
           const countResult = await this.countAllObjects(bucketName);
           const objectCount = countResult.success ? countResult.data!.count : 0;
@@ -251,7 +285,9 @@ class DirectS3Service {
             size,        // ✅ Taille totale correcte
             versioningEnabled,
             objectLockEnabled,
-            encryptionEnabled
+            encryptionEnabled,
+            hasCrossAccountAccess,
+            crossAccountCount
           };
         })
       );
