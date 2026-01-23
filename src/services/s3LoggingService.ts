@@ -93,10 +93,10 @@ class S3LoggingService {
       policy_update: 'Mise à jour de la policy',
       cors_update: 'Mise à jour du CORS',
       
-      // Cross-Account Sharing
-      share_add: 'Ajout de partage cross-account',
-      share_update: 'Modification de partage cross-account',
-      share_revoke: 'Révocation de partage cross-account',
+      // Cross-Account Access
+      share_add: 'Ajout d\'accès cross-account',
+      share_update: 'Modification d\'accès cross-account',
+      share_revoke: 'Révocation d\'accès cross-account',
       
       // Lifecycle
       lifecycle_add_rule: 'Ajout de règle de lifecycle',

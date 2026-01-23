@@ -238,7 +238,7 @@ export const BucketList = () => {
                         variant="ghost"
                         onClick={(e) => handleShareBucket(bucket, e)}
                         className="opacity-0 group-hover:opacity-100 transition-opacity text-green-600 hover:text-green-700 hover:bg-green-50 h-8 w-8 p-0"
-                        title="Partager le bucket"
+                        title="Accès Cross-Account"
                       >
                         <Share2 className="w-3 h-3 sm:w-4 sm:h-4" />
                       </Button>
@@ -379,7 +379,7 @@ export const BucketList = () => {
                         variant="outline"
                         onClick={(e) => handleShareBucket(bucket, e)}
                         className="text-green-600 hover:text-green-700 hover:bg-green-50"
-                        title="Partager"
+                        title="Cross-Account"
                       >
                         <Share2 className="w-4 h-4" />
                       </Button>
