@@ -17,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useEnhancedDirectS3 } from '../hooks/useEnhancedDirectS3';
 import { useToast } from '@/hooks/use-toast';
 import { S3Bucket } from '../types/s3';
-import { Share2, Loader2, AlertCircle, Eye, Edit, Trash2, CheckCircle, Key } from 'lucide-react';
+import { Share2, Loader2, AlertCircle, Eye, Edit, Trash2, CheckCircle, Key, ShieldCheck, FileCode } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { S3Client, ListBucketsCommand } from '@aws-sdk/client-s3';
@@ -46,7 +46,7 @@ const ACCESS_LEVELS: AccessLevelOption[] = [
     label: 'Lecture seule',
     description: 'Permet uniquement de lire et télécharger les objets',
     icon: <Eye className="w-4 h-4" />,
-    actions: ['s3:ListBucket', 's3:GetObject', 's3:GetBucketLocation', 's3:ListBucketMultipartUploads']
+    actions: ['s3:ListBucket', 's3:GetObject', 's3:GetBucketLocation', 's3:ListBucketMultipartUploads', 's3:ListMultipartUploadParts']
   },
   {
     value: 'read-write',
@@ -82,6 +82,9 @@ export const BucketShareDialog: React.FC<BucketShareDialogProps> = ({
   const [verifiedCanonicalUserId, setVerifiedCanonicalUserId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [showPolicyPreview, setShowPolicyPreview] = useState(false);
+  const [generatedPolicy, setGeneratedPolicy] = useState<string | null>(null);
+  const [isDuplicate, setIsDuplicate] = useState(false);
 
   // Vérifier les credentials et obtenir le CanonicalUser ID
   const verifyCredentials = async () => {
@@ -109,9 +112,17 @@ export const BucketShareDialog: React.FC<BucketShareDialogProps> = ({
       
       if (response.Owner?.ID) {
         setVerifiedCanonicalUserId(response.Owner.ID);
+        
+        // Vérifier les doublons
+        const duplicate = await checkForDuplicate(response.Owner.ID);
+        setIsDuplicate(duplicate);
+        
         toast({
           title: 'Compte vérifié',
-          description: `ID canonique récupéré avec succès`,
+          description: duplicate 
+            ? 'Ce compte a déjà un partage sur ce bucket (sera mis à jour)'
+            : 'ID canonique récupéré avec succès',
+          variant: duplicate ? 'default' : 'default'
         });
       } else {
         setError('Impossible de récupérer l\'ID du compte');
@@ -127,9 +138,53 @@ export const BucketShareDialog: React.FC<BucketShareDialogProps> = ({
   const handleCredentialChange = (field: 'ak' | 'sk' | 'region', value: string) => {
     setVerifiedCanonicalUserId(null);
     setError(null);
+    setIsDuplicate(false);
+    setShowPolicyPreview(false);
+    setGeneratedPolicy(null);
     if (field === 'ak') setBeneficiaryAccessKey(value);
     else if (field === 'sk') setBeneficiarySecretKey(value);
     else setBeneficiaryRegion(value);
+  };
+
+  // Vérifier si ce compte a déjà un partage
+  const checkForDuplicate = async (canonicalId: string): Promise<boolean> => {
+    try {
+      const existingPolicy = await getBucketPolicy(bucket.name);
+      if (existingPolicy?.policy) {
+        const parsed = JSON.parse(existingPolicy.policy);
+        return parsed.Statement?.some((stmt: any) => 
+          stmt.Principal?.CanonicalUser === canonicalId
+        ) || false;
+      }
+    } catch {
+      // Pas de policy existante
+    }
+    return false;
+  };
+
+  // Générer la policy pour prévisualisation
+  const generatePolicyPreview = async () => {
+    if (!verifiedCanonicalUserId) return;
+    
+    const selectedLevel = ACCESS_LEVELS.find(l => l.value === accessLevel)!;
+    const shortId = verifiedCanonicalUserId.substring(0, 16);
+    
+    const newStatement = {
+      Sid: `CrossAccountAccess-${shortId}`,
+      Effect: 'Allow',
+      Principal: {
+        CanonicalUser: verifiedCanonicalUserId
+      },
+      Action: selectedLevel.actions,
+      Resource: [
+        `arn:aws:s3:::${bucket.name}`,
+        `arn:aws:s3:::${bucket.name}/*`
+      ]
+    };
+    
+    const finalPolicy = await mergeWithExistingPolicy(newStatement);
+    setGeneratedPolicy(JSON.stringify(JSON.parse(finalPolicy), null, 2));
+    setShowPolicyPreview(true);
   };
 
   // Fusionner avec policy existante
@@ -216,6 +271,9 @@ export const BucketShareDialog: React.FC<BucketShareDialogProps> = ({
     setAccessLevel('read-only');
     setError(null);
     setSuccess(false);
+    setShowPolicyPreview(false);
+    setGeneratedPolicy(null);
+    setIsDuplicate(false);
     onOpenChange(false);
   };
 
@@ -259,6 +317,15 @@ export const BucketShareDialog: React.FC<BucketShareDialogProps> = ({
                 <Label className="font-medium">Credentials du compte bénéficiaire</Label>
               </div>
               
+              {/* Warning sécurité */}
+              <Alert className="py-2 bg-blue-50 border-blue-200">
+                <ShieldCheck className="h-4 w-4 text-blue-600" />
+                <AlertDescription className="text-xs text-blue-800">
+                  Ces credentials sont utilisés <strong>uniquement localement</strong> pour récupérer l'ID du compte. 
+                  Ils ne sont ni stockés ni transmis à des serveurs externes.
+                </AlertDescription>
+              </Alert>
+              
               <div className="space-y-2">
                 <Label htmlFor="ak" className="text-xs">Access Key</Label>
                 <Input
@@ -299,10 +366,14 @@ export const BucketShareDialog: React.FC<BucketShareDialogProps> = ({
               </div>
 
               {verifiedCanonicalUserId && (
-                <Alert className="bg-green-50 border-green-200 py-2">
-                  <CheckCircle className="h-4 w-4 text-green-600" />
-                  <AlertDescription className="text-xs text-green-800">
-                    Compte vérifié - ID: {verifiedCanonicalUserId.substring(0, 20)}...
+                <Alert className={`py-2 ${isDuplicate ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200'}`}>
+                  <CheckCircle className={`h-4 w-4 ${isDuplicate ? 'text-amber-600' : 'text-green-600'}`} />
+                  <AlertDescription className={`text-xs ${isDuplicate ? 'text-amber-800' : 'text-green-800'}`}>
+                    {isDuplicate ? (
+                      <>Compte vérifié - <strong>Partage existant</strong> (sera mis à jour)</>
+                    ) : (
+                      <>Compte vérifié - ID: {verifiedCanonicalUserId.substring(0, 20)}...</>
+                    )}
                   </AlertDescription>
                 </Alert>
               )}
@@ -373,6 +444,40 @@ export const BucketShareDialog: React.FC<BucketShareDialogProps> = ({
               </CardContent>
             </Card>
 
+            {/* Prévisualisation de la policy */}
+            {verifiedCanonicalUserId && (
+              <Card>
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <FileCode className="w-4 h-4" />
+                      Prévisualisation de la policy
+                    </CardTitle>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={generatePolicyPreview}
+                      className="text-xs"
+                    >
+                      {showPolicyPreview ? 'Masquer' : 'Afficher'}
+                    </Button>
+                  </div>
+                  <CardDescription>
+                    Visualisez la policy JSON avant application
+                  </CardDescription>
+                </CardHeader>
+                {showPolicyPreview && generatedPolicy && (
+                  <CardContent>
+                    <ScrollArea className="h-48 w-full rounded border bg-muted/50 p-3">
+                      <pre className="text-xs font-mono whitespace-pre-wrap break-all">
+                        {generatedPolicy}
+                      </pre>
+                    </ScrollArea>
+                  </CardContent>
+                )}
+              </Card>
+            )}
+
             <Alert>
               <AlertCircle className="h-4 w-4" />
               <AlertDescription className="text-sm">
@@ -399,7 +504,7 @@ export const BucketShareDialog: React.FC<BucketShareDialogProps> = ({
             ) : (
               <>
                 <Share2 className="w-4 h-4 mr-2" />
-                Partager
+                {isDuplicate ? 'Mettre à jour' : 'Partager'}
               </>
             )}
           </Button>
