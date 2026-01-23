@@ -6,7 +6,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useActionHistoryStore } from '../stores/actionHistoryStore';
 import { useActiveOperationsStore } from '../stores/activeOperationsStore';
 import { useS3Store } from '../hooks/useS3Store';
-import { Activity, Clock, CheckCircle, XCircle, AlertCircle, Filter, Trash2, User, Settings, ChevronLeft, ChevronRight, X, Loader2 } from 'lucide-react';
+import { useHistorySync } from '../hooks/useHistorySync';
+import { Activity, Clock, CheckCircle, XCircle, AlertCircle, Filter, Trash2, User, Settings, ChevronLeft, ChevronRight, X, Loader2, Cloud, CloudOff, RefreshCw, Database } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
@@ -23,16 +24,27 @@ export const ActionHistory = () => {
     currentUserId,
     userHistories,
     toggleLogging,
-    updateEntry
+    updateEntry,
+    syncEnabled,
+    setSyncEnabled,
+    getPendingEntries
   } = useActionHistoryStore();
   
   const { getAllOperations, cancelOperation } = useActiveOperationsStore();
   const activeOperations = getAllOperations();
   
+  const { 
+    isSyncing, 
+    fullSync, 
+    clearAllHistory,
+    getStats
+  } = useHistorySync();
+  
   const [filter, setFilter] = useState<FilterType>('all');
   const [isExpanded, setIsExpanded] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [stats, setStats] = useState<{ total: number; successCount: number; errorCount: number } | null>(null);
   const itemsPerPage = 10;
 
   // Mettre à jour l'utilisateur courant quand les credentials changent
@@ -43,7 +55,17 @@ export const ActionHistory = () => {
     }
   }, [credentials, setCurrentUser]);
 
+  // Charger les statistiques
+  useEffect(() => {
+    if (credentials && showSettings) {
+      getStats().then(s => {
+        if (s) setStats(s);
+      });
+    }
+  }, [credentials, showSettings, getStats]);
+
   const entries = getCurrentUserEntries();
+  const pendingCount = getPendingEntries().length;
   const currentUserHistory = currentUserId && userHistories[currentUserId];
   const isLoggingEnabled = currentUserHistory?.isLoggingEnabled ?? true;
 
@@ -130,7 +152,6 @@ export const ActionHistory = () => {
   };
 
   const handleCancelOperation = (entryId: string, operationName: string) => {
-    // Chercher l'opération active correspondante
     const activeOp = activeOperations.find(op => op.id === entryId);
     if (activeOp) {
       cancelOperation(entryId);
@@ -146,7 +167,30 @@ export const ActionHistory = () => {
     }
   };
 
-  // Vérifier si une entrée a une opération active correspondante
+  const handleSync = async () => {
+    const result = await fullSync();
+    if (result.success) {
+      toast({
+        title: "Synchronisation réussie",
+        description: `${result.pushed || 0} envoyées, ${result.pulled || 0} récupérées`,
+      });
+    } else {
+      toast({
+        title: "Erreur de synchronisation",
+        description: "Vérifiez votre connexion",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleClearAll = async () => {
+    await clearAllHistory();
+    toast({
+      title: "Historique effacé",
+      description: "Local et distant",
+    });
+  };
+
   const isEntryActive = (entryId: string): boolean => {
     return activeOperations.some(op => op.id === entryId);
   };
@@ -167,11 +211,37 @@ export const ActionHistory = () => {
                 <Badge variant="secondary" className="text-xs h-5">
                   {entries.length}
                 </Badge>
+                {/* Indicateur de sync */}
+                {syncEnabled ? (
+                  <div className="flex items-center gap-1" title={pendingCount > 0 ? `${pendingCount} en attente de sync` : 'Synchronisé'}>
+                    {isSyncing ? (
+                      <Loader2 className="w-3 h-3 text-blue-500 animate-spin" />
+                    ) : pendingCount > 0 ? (
+                      <Cloud className="w-3 h-3 text-orange-500" />
+                    ) : (
+                      <Cloud className="w-3 h-3 text-green-500" />
+                    )}
+                  </div>
+                ) : (
+                  <span title="Sync désactivée">
+                    <CloudOff className="w-3 h-3 text-gray-400" />
+                  </span>
+                )}
               </div>
             </div>
           </div>
           
           <div className="flex items-center space-x-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleSync}
+              disabled={isSyncing || !credentials}
+              className="h-8 w-8 p-0 text-gray-600 hover:text-gray-900"
+              title="Synchroniser maintenant"
+            >
+              <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin' : ''}`} />
+            </Button>
             <Button
               variant="ghost"
               size="sm"
@@ -192,7 +262,7 @@ export const ActionHistory = () => {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={clearHistory}
+                onClick={handleClearAll}
                 className="text-red-600 hover:text-red-700 hover:bg-red-50 h-8 w-8 p-0"
               >
                 <Trash2 className="w-3 h-3" />
@@ -203,7 +273,7 @@ export const ActionHistory = () => {
         
         {/* Paramètres */}
         {showSettings && (
-          <div className="mt-3 p-3 bg-white rounded-lg border border-gray-200">
+          <div className="mt-3 p-3 bg-white rounded-lg border border-gray-200 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-700">Enregistrement automatique</span>
               <Button
@@ -215,6 +285,30 @@ export const ActionHistory = () => {
                 {isLoggingEnabled ? 'Activé' : 'Désactivé'}
               </Button>
             </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Database className="w-4 h-4 text-gray-500" />
+                <span className="text-sm text-gray-700">Synchronisation cloud</span>
+              </div>
+              <Button
+                variant={syncEnabled ? "default" : "outline"}
+                size="sm"
+                onClick={() => setSyncEnabled(!syncEnabled)}
+                className="h-7 text-xs"
+              >
+                {syncEnabled ? 'Activé' : 'Désactivé'}
+              </Button>
+            </div>
+            {stats && (
+              <div className="pt-2 border-t border-gray-100">
+                <p className="text-xs text-gray-500 mb-1">Statistiques serveur</p>
+                <div className="flex gap-3 text-xs">
+                  <span className="text-green-600">✓ {stats.successCount} succès</span>
+                  <span className="text-red-600">✗ {stats.errorCount} erreurs</span>
+                  <span className="text-gray-600">Total: {stats.total}</span>
+                </div>
+              </div>
+            )}
           </div>
         )}
         
@@ -284,7 +378,6 @@ export const ActionHistory = () => {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      {/* Bouton d'annulation pour les opérations en cours */}
                       {(entry.status === 'started' || entry.status === 'progress') && isEntryActive(entry.id) && (
                         <Button
                           variant="ghost"
