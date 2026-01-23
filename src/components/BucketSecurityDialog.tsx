@@ -18,7 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useEnhancedDirectS3 } from '../hooks/useEnhancedDirectS3';
 import { S3Bucket, BucketAcl, BucketPolicy } from '../types/s3';
-import { Shield, Users, FileText, Loader2, AlertCircle, Save, Trash2, Eye, CheckCircle, XCircle, RefreshCw, Share2, Edit, UserMinus, Pencil, Key } from 'lucide-react';
+import { Shield, Users, FileText, Loader2, AlertCircle, Save, Trash2, Eye, CheckCircle, XCircle, RefreshCw, UserPlus, Edit, UserMinus, Pencil, Key } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
@@ -805,7 +805,7 @@ export const BucketSecurityDialog: React.FC<BucketSecurityDialogProps> = ({
               <span className="hidden xs:inline sm:inline">Policy</span>
             </TabsTrigger>
             <TabsTrigger value="crossaccount" className="flex items-center justify-center gap-1 sm:gap-2 text-xs sm:text-sm px-1 sm:px-3">
-              <Share2 className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+              <UserPlus className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
               <span className="hidden xs:inline sm:inline">Cross-Account</span>
             </TabsTrigger>
             <TabsTrigger value="preview" className="flex items-center justify-center gap-1 sm:gap-2 text-xs sm:text-sm px-1 sm:px-3">
@@ -1042,7 +1042,7 @@ export const BucketSecurityDialog: React.FC<BucketSecurityDialogProps> = ({
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-sm flex items-center gap-2">
-                      <Share2 className="w-4 h-4" />
+                      <UserPlus className="w-4 h-4" />
                       Accès Cross-Account
                     </CardTitle>
                     <CardDescription>
@@ -1161,7 +1161,7 @@ export const BucketSecurityDialog: React.FC<BucketSecurityDialogProps> = ({
                       {isAddingShare ? (
                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                       ) : (
-                        <Share2 className="w-4 h-4 mr-2" />
+                        <UserPlus className="w-4 h-4 mr-2" />
                       )}
                       Ajouter l'accès cross-account
                     </Button>
@@ -1191,7 +1191,7 @@ export const BucketSecurityDialog: React.FC<BucketSecurityDialogProps> = ({
                       </div>
                     ) : crossAccountShares.length === 0 ? (
                       <div className="text-center py-8 text-muted-foreground">
-                        <Share2 className="w-10 h-10 mx-auto mb-2 opacity-20" />
+                        <UserPlus className="w-10 h-10 mx-auto mb-2 opacity-20" />
                         <p className="text-sm">Aucun accès cross-account configuré pour ce bucket</p>
                       </div>
                     ) : (
