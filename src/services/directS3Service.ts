@@ -408,19 +408,53 @@ class DirectS3Service {
       
       const objects: S3Object[] = [];
       
-      // Ajouter les dossiers
+      // Ajouter les dossiers avec vérification du contenu
       if (response.CommonPrefixes) {
-        response.CommonPrefixes.forEach(prefix => {
+        const folderPromises = response.CommonPrefixes.map(async (prefix) => {
           if (prefix.Prefix) {
-            objects.push({
-              key: prefix.Prefix,
-              lastModified: new Date(),
-              size: 0,
-              etag: '',
-              storageClass: 'STANDARD',
-              isFolder: true
-            });
+            // Vérifier si le dossier contient des éléments
+            try {
+              const checkCommand = new ListObjectsV2Command({
+                Bucket: bucket,
+                Prefix: prefix.Prefix,
+                Delimiter: '/',
+                MaxKeys: 10 // Limiter pour la performance
+              });
+              const checkResponse = await this.client!.send(checkCommand);
+              const folderCount = (checkResponse.CommonPrefixes?.length || 0);
+              const fileCount = (checkResponse.Contents?.filter(c => c.Key !== prefix.Prefix).length || 0);
+              const childCount = folderCount + fileCount;
+              
+              return {
+                key: prefix.Prefix,
+                lastModified: new Date(),
+                size: 0,
+                etag: '',
+                storageClass: 'STANDARD',
+                isFolder: true,
+                hasChildren: childCount > 0,
+                childCount: childCount
+              };
+            } catch (error) {
+              // En cas d'erreur, on assume que le dossier peut avoir du contenu
+              return {
+                key: prefix.Prefix,
+                lastModified: new Date(),
+                size: 0,
+                etag: '',
+                storageClass: 'STANDARD',
+                isFolder: true,
+                hasChildren: undefined, // Inconnu
+                childCount: undefined
+              };
+            }
           }
+          return null;
+        });
+        
+        const folderResults = await Promise.all(folderPromises);
+        folderResults.forEach(folder => {
+          if (folder) objects.push(folder);
         });
       }
       
