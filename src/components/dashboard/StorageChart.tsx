@@ -132,9 +132,23 @@ export const StorageChart = () => {
         </p>
       </CardHeader>
       <CardContent>
-        <div className="h-[250px] relative">
+        <div className="h-[250px]">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
+              {/* Inner fill (avoid white donut hole) */}
+              <Pie
+                data={[{ name: 'center', value: 1 }]}
+                dataKey="value"
+                cx="50%"
+                cy="50%"
+                innerRadius={0}
+                outerRadius={50}
+                fill="hsl(var(--muted))"
+                isAnimationActive={false}
+                stroke="none"
+                strokeWidth={0}
+              />
+
               <Pie
                 data={chartData}
                 cx="50%"
@@ -166,11 +180,6 @@ export const StorageChart = () => {
               />
             </PieChart>
           </ResponsiveContainer>
-
-          {/* Center fill (avoid white inner hole) */}
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="w-[104px] h-[104px] rounded-full bg-muted" />
-          </div>
         </div>
       </CardContent>
     </Card>
