@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useS3Store } from '../hooks/useS3Store';
 import { useEnhancedDirectS3 } from '../hooks/useEnhancedDirectS3';
-import { Upload, Download, Trash2, FolderOpen, File, RefreshCw, Plus, FolderPlus, Tag, Info, History, Edit, Copy, X, CheckSquare, Square } from 'lucide-react';
+import { Upload, Download, Trash2, FolderOpen, Folder, File, RefreshCw, Plus, FolderPlus, Tag, Info, History, Edit, Copy, X, CheckSquare, Square } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { FileUpload } from './FileUpload';
@@ -692,11 +692,17 @@ export const ObjectList = () => {
                           >
                             <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
                               object.isFolder 
-                                ? 'bg-blue-100 text-blue-600' 
+                                ? object.hasChildren === false
+                                  ? 'bg-gray-100 text-gray-400' // Dossier vide
+                                  : 'bg-blue-100 text-blue-600' // Dossier avec contenu
                                 : 'bg-gray-100 text-gray-600'
                             }`}>
                               {object.isFolder ? (
-                                <FolderOpen className="w-5 h-5" />
+                                object.hasChildren === false ? (
+                                  <Folder className="w-5 h-5" />
+                                ) : (
+                                  <FolderOpen className="w-5 h-5" />
+                                )
                               ) : (
                                 <File className="w-5 h-5" />
                               )}
@@ -710,7 +716,16 @@ export const ObjectList = () => {
                                     : object.key}
                                 </h4>
                                 {object.isFolder && (
-                                  <Badge variant="secondary" className="shrink-0">Dossier</Badge>
+                                  <Badge 
+                                    variant={object.hasChildren === false ? "outline" : "secondary"} 
+                                    className={`shrink-0 ${object.hasChildren === false ? 'text-gray-400 border-gray-300' : ''}`}
+                                  >
+                                    {object.hasChildren === false 
+                                      ? 'Vide' 
+                                      : object.childCount !== undefined 
+                                        ? `${object.childCount} élément${object.childCount > 1 ? 's' : ''}`
+                                        : 'Dossier'}
+                                  </Badge>
                                 )}
                               </div>
                               <div className="flex items-center space-x-4 text-sm text-gray-600 mt-1">

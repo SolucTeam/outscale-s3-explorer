@@ -36,6 +36,8 @@ export interface S3Object {
   tags?: Record<string, string>;
   versionId?: string;
   isLatest?: boolean;
+  hasChildren?: boolean; // Pour les dossiers: indique s'il contient des fichiers/sous-dossiers
+  childCount?: number; // Nombre d'éléments dans le dossier
 }
 
 export interface ObjectVersion {
