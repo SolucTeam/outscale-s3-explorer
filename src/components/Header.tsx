@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { useS3Store } from '../hooks/useS3Store';
 import { useEnhancedDirectS3 } from '../hooks/useEnhancedDirectS3';
 import { Cloud, LogOut, ArrowLeft } from 'lucide-react';
-import { ThemeToggle } from './ThemeToggle';
 
 export const Header = () => {
   const { credentials, currentBucket } = useS3Store();
@@ -21,17 +20,17 @@ export const Header = () => {
   };
 
   return (
-    <header className="bg-background border-b border-border shadow-sm">
+    <header className="bg-white border-b border-gray-200 shadow-sm">
       <div className="container mx-auto px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-gradient-to-br from-primary to-primary/80 rounded-lg flex items-center justify-center">
-                <Cloud className="w-5 h-5 text-primary-foreground" />
+              <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-blue-800 rounded-lg flex items-center justify-center">
+                <Cloud className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-foreground">Outscale S3 Explorer</h1>
-                <p className="text-sm text-muted-foreground">
+                <h1 className="text-xl font-bold text-gray-900">Outscale S3 Explorer</h1>
+                <p className="text-sm text-gray-600">
                   {credentials?.region} • {credentials?.accessKey}
                 </p>
               </div>
@@ -39,12 +38,12 @@ export const Header = () => {
             
             {currentBucket && (
               <>
-                <div className="h-6 w-px bg-border" />
+                <div className="h-6 w-px bg-gray-300" />
                 <Button
                   onClick={handleBackToDashboard}
                   variant="ghost"
                   size="sm"
-                  className="text-primary hover:text-primary/80"
+                  className="text-blue-600 hover:text-blue-700"
                 >
                   <ArrowLeft className="w-4 h-4 mr-1" />
                   Retour aux buckets
@@ -53,17 +52,14 @@ export const Header = () => {
             )}
           </div>
           
-          <div className="flex items-center gap-2">
-            <ThemeToggle />
-            <Button
-              onClick={handleLogout}
-              variant="outline"
-              size="sm"
-            >
-              <LogOut className="w-4 h-4 mr-2" />
-              Déconnexion
-            </Button>
-          </div>
+          <Button
+            onClick={handleLogout}
+            variant="outline"
+            size="sm"
+          >
+            <LogOut className="w-4 h-4 mr-2" />
+            Déconnexion
+          </Button>
         </div>
       </div>
     </header>
