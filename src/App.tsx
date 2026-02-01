@@ -7,6 +7,7 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { useSessionWarning } from "./hooks/useSessionWarning";
 import { useOnlineStatus } from "./hooks/useOnlineStatus";
+import { ThemeProvider } from "next-themes";
 import { lazy, Suspense } from "react";
 
 // Lazy loading des routes
@@ -26,9 +27,9 @@ const AppContent = () => {
   useOnlineStatus();
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-background">
       <ProtectedRoute>
-        <div className="w-full border-b bg-white">
+        <div className="w-full border-b border-border bg-background">
           <Header />
         </div>
       </ProtectedRoute>
@@ -86,17 +87,19 @@ const AppContent = () => {
 };
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <ErrorBoundary>
-        <BrowserRouter>
-          <AppContent />
-        </BrowserRouter>
-      </ErrorBoundary>
-    </TooltipProvider>
-  </QueryClientProvider>
+  <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <ErrorBoundary>
+          <BrowserRouter>
+            <AppContent />
+          </BrowserRouter>
+        </ErrorBoundary>
+      </TooltipProvider>
+    </QueryClientProvider>
+  </ThemeProvider>
 );
 
 export default App;
