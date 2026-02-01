@@ -14,6 +14,14 @@ const COLORS = [
   'hsl(199, 89%, 48%)',  // cyan
   'hsl(47, 96%, 53%)',   // yellow
   'hsl(280, 65%, 60%)',  // violet
+  'hsl(173, 80%, 40%)',  // teal
+  'hsl(340, 82%, 52%)',  // pink
+  'hsl(38, 92%, 50%)',   // amber
+  'hsl(271, 91%, 65%)',  // indigo
+  'hsl(160, 84%, 39%)',  // emerald
+  'hsl(12, 76%, 61%)',   // coral
+  'hsl(189, 94%, 43%)',  // sky
+  'hsl(83, 78%, 44%)',   // lime
 ];
 
 export const StorageChart = () => {
