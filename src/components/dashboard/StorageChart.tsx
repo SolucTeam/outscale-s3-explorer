@@ -14,6 +14,13 @@ const COLORS = [
   'hsl(199, 89%, 48%)',  // cyan
   'hsl(47, 96%, 53%)',   // yellow
   'hsl(280, 65%, 60%)',  // violet
+  'hsl(173, 80%, 40%)',  // teal
+  'hsl(330, 80%, 60%)',  // pink
+  'hsl(15, 90%, 55%)',   // coral
+  'hsl(190, 75%, 45%)',  // sky blue
+  'hsl(45, 85%, 50%)',   // amber
+  'hsl(300, 60%, 50%)',  // magenta
+  'hsl(160, 70%, 40%)',  // emerald
 ];
 
 export const StorageChart = () => {
@@ -114,7 +121,7 @@ export const StorageChart = () => {
   }
 
   return (
-    <Card className="border-0 shadow-sm animate-fade-in">
+    <Card className="border-0 shadow-sm animate-fade-in h-full">
       <CardHeader className="pb-2">
         <CardTitle className="text-base font-semibold flex items-center gap-2">
           <HardDrive className="w-5 h-5 text-purple-500" />
