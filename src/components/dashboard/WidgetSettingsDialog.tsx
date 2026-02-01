@@ -100,21 +100,27 @@ export const WidgetSettingsDialog: React.FC<WidgetSettingsDialogProps> = ({
                 onDragStart={() => handleDragStart(index)}
                 onDragOver={(e) => handleDragOver(e, index)}
                 onDragEnd={handleDragEnd}
-                className={`flex items-center gap-3 p-3 rounded-lg border bg-card transition-all duration-200 cursor-grab active:cursor-grabbing ${
+                className={`flex items-center gap-3 p-3 rounded-lg border bg-card cursor-grab active:cursor-grabbing animate-fade-in ${
                   draggedIndex === index
-                    ? 'opacity-50 scale-95 border-primary'
-                    : 'hover:border-primary/50 hover:shadow-sm'
-                } ${!widget.visible ? 'opacity-60' : ''}`}
+                    ? 'opacity-50 scale-95 border-primary shadow-lg'
+                    : 'hover:border-primary/50 hover:shadow-sm hover:scale-[1.02]'
+                } ${!widget.visible ? 'opacity-60 bg-muted/30' : ''}`}
+                style={{ 
+                  animationDelay: `${index * 50}ms`,
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                }}
               >
-                <GripVertical className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                <GripVertical className="w-4 h-4 text-muted-foreground flex-shrink-0 transition-transform duration-200 group-hover:scale-110" />
                 
                 <div className="flex-1 flex items-center gap-2">
-                  {widget.visible ? (
-                    <Eye className="w-4 h-4 text-emerald-500" />
-                  ) : (
-                    <EyeOff className="w-4 h-4 text-muted-foreground" />
-                  )}
-                  <Label htmlFor={`widget-${widget.id}`} className="cursor-pointer font-medium">
+                  <div className={`transition-all duration-300 ${widget.visible ? 'text-emerald-500' : 'text-muted-foreground'}`}>
+                    {widget.visible ? (
+                      <Eye className="w-4 h-4 animate-scale-in" />
+                    ) : (
+                      <EyeOff className="w-4 h-4 animate-scale-in" />
+                    )}
+                  </div>
+                  <Label htmlFor={`widget-${widget.id}`} className="cursor-pointer font-medium transition-colors duration-200">
                     {widget.label}
                   </Label>
                 </div>
