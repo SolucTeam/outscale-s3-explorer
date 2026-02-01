@@ -19,26 +19,27 @@ const Dashboard = () => {
           <StatsOverview />
         </div>
 
+        {/* Widgets row - 3 columns */}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 mb-6">
+          <StorageChart />
+          <SecurityAnalysis />
+          <PermissionsOverview />
+        </div>
+
+        {/* Operation Status */}
+        <div className="mb-6">
+          <OperationStatusIndicator />
+        </div>
+
+        {/* Main content with sidebar */}
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          {/* Main content - 2/3 width */}
-          <div className="xl:col-span-2 space-y-6">
-            <OperationStatusIndicator />
-            
-            {/* Widgets row */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <StorageChart />
-              <SecurityAnalysis />
-            </div>
-
-            {/* Permissions widget */}
-            <PermissionsOverview />
-
-            {/* Bucket List */}
+          {/* Bucket List - 2/3 width */}
+          <div className="xl:col-span-2">
             <BucketList />
           </div>
           
-          {/* Sidebar - 1/3 width */}
-          <div className="xl:col-span-1 space-y-4 pt-4">
+          {/* Action History Sidebar - 1/3 width */}
+          <div className="xl:col-span-1">
             <ActionHistory />
           </div>
         </div>
