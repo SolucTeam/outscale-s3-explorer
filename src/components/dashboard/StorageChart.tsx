@@ -132,7 +132,7 @@ export const StorageChart = () => {
         </p>
       </CardHeader>
       <CardContent>
-        <div className="h-[250px]">
+        <div className="h-[250px] relative">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
@@ -141,13 +141,21 @@ export const StorageChart = () => {
                 cy="50%"
                 innerRadius={50}
                 outerRadius={80}
-                paddingAngle={2}
+                paddingAngle={0}
+                minAngle={1}
                 dataKey="value"
                 animationBegin={0}
                 animationDuration={800}
+                stroke="none"
+                strokeWidth={0}
               >
                 {chartData.map((_, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  <Cell
+                    key={`cell-${index}`}
+                    fill={COLORS[index % COLORS.length]}
+                    stroke="none"
+                    strokeWidth={0}
+                  />
                 ))}
               </Pie>
               <Tooltip content={<CustomTooltip />} />
@@ -158,6 +166,11 @@ export const StorageChart = () => {
               />
             </PieChart>
           </ResponsiveContainer>
+
+          {/* Center fill (avoid white inner hole) */}
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="w-[104px] h-[104px] rounded-full bg-muted" />
+          </div>
         </div>
       </CardContent>
     </Card>
