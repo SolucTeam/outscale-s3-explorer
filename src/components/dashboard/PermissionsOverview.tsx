@@ -135,7 +135,7 @@ export const PermissionsOverview = () => {
   ];
 
   return (
-    <Card className="border-0 shadow-sm animate-fade-in">
+    <Card className="border-0 shadow-sm animate-fade-in h-full">
       <CardHeader className="pb-2">
         <CardTitle className="text-base font-semibold flex items-center gap-2">
           <Users className="w-5 h-5 text-indigo-500" />
