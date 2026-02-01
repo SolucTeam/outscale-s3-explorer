@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useS3Store } from '@/hooks/useS3Store';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { HardDrive } from 'lucide-react';
@@ -16,7 +17,7 @@ const COLORS = [
 ];
 
 export const StorageChart = () => {
-  const { buckets } = useS3Store();
+  const { buckets, loading } = useS3Store();
 
   const chartData = useMemo(() => {
     const bucketsWithSize = buckets
@@ -27,7 +28,7 @@ export const StorageChart = () => {
         formattedSize: formatBytes(b.size || 0)
       }))
       .sort((a, b) => b.value - a.value)
-      .slice(0, 8); // Top 8 buckets
+      .slice(0, 8);
 
     return bucketsWithSize;
   }, [buckets]);
@@ -47,7 +48,7 @@ export const StorageChart = () => {
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-background border rounded-lg shadow-lg p-3">
+        <div className="bg-background border rounded-lg shadow-lg p-3 animate-scale-in">
           <p className="font-medium">{payload[0].payload.name}</p>
           <p className="text-sm text-muted-foreground">
             {payload[0].payload.formattedSize}
@@ -61,9 +62,42 @@ export const StorageChart = () => {
     return null;
   };
 
+  // Skeleton loading state
+  if (loading && buckets.length === 0) {
+    return (
+      <Card className="border-0 shadow-sm animate-fade-in">
+        <CardHeader className="pb-2">
+          <div className="flex items-center gap-2">
+            <Skeleton className="w-5 h-5 rounded" />
+            <Skeleton className="h-5 w-40" />
+          </div>
+          <Skeleton className="h-4 w-24 mt-1" />
+        </CardHeader>
+        <CardContent>
+          <div className="h-[250px] flex items-center justify-center">
+            <div className="relative">
+              <Skeleton className="w-40 h-40 rounded-full" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Skeleton className="w-24 h-24 rounded-full bg-background" />
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-center gap-4 mt-4">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <Skeleton className="w-3 h-3 rounded" />
+                <Skeleton className="h-3 w-16" />
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   if (chartData.length === 0) {
     return (
-      <Card className="border-0 shadow-sm">
+      <Card className="border-0 shadow-sm animate-fade-in">
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-semibold flex items-center gap-2">
             <HardDrive className="w-5 h-5 text-purple-500" />
@@ -80,7 +114,7 @@ export const StorageChart = () => {
   }
 
   return (
-    <Card className="border-0 shadow-sm">
+    <Card className="border-0 shadow-sm animate-fade-in">
       <CardHeader className="pb-2">
         <CardTitle className="text-base font-semibold flex items-center gap-2">
           <HardDrive className="w-5 h-5 text-purple-500" />
@@ -102,6 +136,8 @@ export const StorageChart = () => {
                 outerRadius={80}
                 paddingAngle={2}
                 dataKey="value"
+                animationBegin={0}
+                animationDuration={800}
               >
                 {chartData.map((_, index) => (
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
