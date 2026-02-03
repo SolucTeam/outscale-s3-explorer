@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useActionHistoryStore, OperationType } from '../stores/actionHistoryStore';
 import { useActiveOperationsStore } from '../stores/activeOperationsStore';
 import { useS3Store } from '../hooks/useS3Store';
@@ -14,7 +15,7 @@ import { useHistorySync } from '../hooks/useHistorySync';
 import { 
   Activity, Clock, CheckCircle, XCircle, AlertCircle, Filter, Trash2, User, 
   Settings, ChevronLeft, ChevronRight, X, Loader2, Cloud, CloudOff, RefreshCw, 
-  Database, Search, CalendarIcon, ChevronDown, RotateCcw
+  Database, Search, CalendarIcon, ChevronDown, RotateCcw, ChevronsUpDown
 } from 'lucide-react';
 import { format, isAfter, isBefore, startOfDay, endOfDay } from 'date-fns';
 import { formatDistanceToNow } from 'date-fns';
@@ -103,6 +104,7 @@ export const ActionHistory = () => {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [stats, setStats] = useState<{ total: number; successCount: number; errorCount: number } | null>(null);
+  const [isPanelOpen, setIsPanelOpen] = useState(true);
   const itemsPerPage = 10;
 
   // Filtres avancés
@@ -337,89 +339,110 @@ export const ActionHistory = () => {
   };
 
   return (
-    <Card className="h-fit shadow-sm border-gray-200">
-      <CardHeader className="pb-3 bg-gradient-to-r from-blue-50 to-indigo-50 border-b">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <div className="p-1.5 bg-blue-100 rounded-lg">
-              <Activity className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
-            </div>
-            <div>
-              <CardTitle className="text-sm sm:text-base text-gray-900">Historique des actions</CardTitle>
-              <div className="flex items-center space-x-2 mt-1">
-                <User className="w-3 h-3 text-gray-500" />
-                <span className="text-xs text-gray-600">{getCurrentUserDisplay()}</span>
-                <Badge variant="secondary" className="text-xs h-5">
-                  {filteredActions.length}/{entries.length}
-                </Badge>
-                {/* Indicateur de sync */}
-                {syncEnabled ? (
-                  <div className="flex items-center gap-1" title={pendingCount > 0 ? `${pendingCount} en attente de sync` : 'Synchronisé'}>
-                    {isSyncing ? (
-                      <Loader2 className="w-3 h-3 text-blue-500 animate-spin" />
-                    ) : pendingCount > 0 ? (
-                      <Cloud className="w-3 h-3 text-orange-500" />
-                    ) : (
-                      <Cloud className="w-3 h-3 text-green-500" />
-                    )}
-                  </div>
-                ) : (
-                  <span title="Sync désactivée">
-                    <CloudOff className="w-3 h-3 text-gray-400" />
+    <Collapsible open={isPanelOpen} onOpenChange={setIsPanelOpen}>
+      <Card className="h-fit shadow-sm border-border">
+        <CardHeader className="pb-3 bg-gradient-to-r from-primary/5 to-accent/5 border-b">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2 min-w-0 flex-1">
+              <div className="p-1.5 bg-primary/10 rounded-lg flex-shrink-0">
+                <Activity className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <CardTitle className="text-sm sm:text-base text-foreground">Historique des actions</CardTitle>
+                <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                  <User className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+                  <span className="text-xs text-muted-foreground truncate max-w-[100px] sm:max-w-[150px]" title={getCurrentUserDisplay()}>
+                    {getCurrentUserDisplay()}
                   </span>
-                )}
+                  <Badge variant="secondary" className="text-xs h-5 flex-shrink-0">
+                    {filteredActions.length}/{entries.length}
+                  </Badge>
+                  {/* Indicateur de sync */}
+                  {syncEnabled ? (
+                    <div className="flex items-center gap-1 flex-shrink-0" title={pendingCount > 0 ? `${pendingCount} en attente de sync` : 'Synchronisé'}>
+                      {isSyncing ? (
+                        <Loader2 className="w-3 h-3 text-primary animate-spin" />
+                      ) : pendingCount > 0 ? (
+                        <Cloud className="w-3 h-3 text-warning" />
+                      ) : (
+                        <Cloud className="w-3 h-3 text-success" />
+                      )}
+                    </div>
+                  ) : (
+                    <span title="Sync désactivée" className="flex-shrink-0">
+                      <CloudOff className="w-3 h-3 text-muted-foreground" />
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-          
-          <div className="flex items-center space-x-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleSync}
-              disabled={isSyncing || !credentials}
-              className="h-8 w-8 p-0 text-gray-600 hover:text-gray-900"
-              title="Synchroniser maintenant"
-            >
-              <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin' : ''}`} />
-            </Button>
-            <Button
-              variant={showAdvancedFilters ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-              className="h-8 w-8 p-0"
-              title="Recherche avancée"
-            >
-              <Search className="w-3 h-3" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowSettings(!showSettings)}
-              className="h-8 w-8 p-0 text-gray-600 hover:text-gray-900"
-            >
-              <Settings className="w-3 h-3" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsExpanded(!isExpanded)}
-              className="xl:hidden h-8 w-8 p-0 text-gray-600 hover:text-gray-900"
-            >
-              <Filter className="w-3 h-3" />
-            </Button>
-            {entries.length > 0 && (
+            
+            <div className="flex items-center gap-0.5 flex-shrink-0">
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={handleClearAll}
-                className="text-red-600 hover:text-red-700 hover:bg-red-50 h-8 w-8 p-0"
+                onClick={handleSync}
+                disabled={isSyncing || !credentials}
+                className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                title="Synchroniser maintenant"
               >
-                <Trash2 className="w-3 h-3" />
+                <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin' : ''}`} />
               </Button>
-            )}
+              <Button
+                variant={showAdvancedFilters ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                className="h-8 w-8 p-0"
+                title="Recherche avancée"
+              >
+                <Search className="w-3 h-3" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowSettings(!showSettings)}
+                className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+              >
+                <Settings className="w-3 h-3" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="xl:hidden h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+              >
+                <Filter className="w-3 h-3" />
+              </Button>
+              
+              {/* Séparateur visuel avant l'icône suppression */}
+              {entries.length > 0 && (
+                <>
+                  <div className="w-px h-5 bg-border mx-1" />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleClearAll}
+                    className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                    title="Effacer l'historique"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </Button>
+                </>
+              )}
+              
+              {/* Toggle pour réduire/agrandir le panel */}
+              <CollapsibleTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground ml-1"
+                  title={isPanelOpen ? "Réduire le panel" : "Agrandir le panel"}
+                >
+                  <ChevronsUpDown className={cn("w-4 h-4 transition-transform", !isPanelOpen && "rotate-180")} />
+                </Button>
+              </CollapsibleTrigger>
+            </div>
           </div>
-        </div>
 
         {/* Recherche avancée */}
         {showAdvancedFilters && (
@@ -617,146 +640,153 @@ export const ActionHistory = () => {
             </Button>
           ))}
         </div>
-      </CardHeader>
-      
-      <CardContent className="p-0">
-        {filteredActions.length === 0 ? (
-          <div className="p-6 text-center text-gray-500">
-            <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
-              {hasActiveFilters ? (
-                <Search className="w-8 h-8 text-gray-400" />
-              ) : (
-                <Clock className="w-8 h-8 text-gray-400" />
-              )}
-            </div>
-            <p className="text-sm font-medium text-gray-900 mb-1">
-              {hasActiveFilters ? 'Aucun résultat' : 'Aucune action enregistrée'}
-            </p>
-            <p className="text-xs text-gray-500">
-              {hasActiveFilters ? 'Essayez de modifier vos filtres' : 'Les actions S3 apparaîtront ici'}
-            </p>
-            {hasActiveFilters && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={resetFilters}
-                className="mt-3 text-xs"
-              >
-                <RotateCcw className="w-3 h-3 mr-1" />
-                Réinitialiser les filtres
-              </Button>
-            )}
-          </div>
-        ) : (
-          <>
-            <ScrollArea className="h-64 xl:h-96">
-              <div className="p-4 space-y-3">
-                {paginatedActions.map((entry, index) => (
-                <div
-                  key={entry.id}
-                  className={`group relative p-3 rounded-lg border transition-all duration-200 hover:shadow-sm ${
-                    index === 0 ? 'bg-blue-50/50 border-blue-200' : 'bg-white border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center space-x-3 min-w-0 flex-1">
-                      <div className="flex-shrink-0">
-                        {(entry.status === 'started' || entry.status === 'progress') && isEntryActive(entry.id) ? (
-                          <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 text-blue-500 animate-spin" />
-                        ) : (
-                          getStatusIcon(entry.status)
-                        )}
+        </CardHeader>
+        
+        <CollapsibleContent>
+          <CardContent className="p-0">
+            {filteredActions.length === 0 ? (
+              <div className="p-6 text-center text-muted-foreground">
+                <div className="w-16 h-16 mx-auto mb-4 bg-muted rounded-full flex items-center justify-center">
+                  {hasActiveFilters ? (
+                    <Search className="w-8 h-8 text-muted-foreground" />
+                  ) : (
+                    <Clock className="w-8 h-8 text-muted-foreground" />
+                  )}
+                </div>
+                <p className="text-sm font-medium text-foreground mb-1">
+                  {hasActiveFilters ? 'Aucun résultat' : 'Aucune action enregistrée'}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {hasActiveFilters ? 'Essayez de modifier vos filtres' : 'Les actions S3 apparaîtront ici'}
+                </p>
+                {hasActiveFilters && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={resetFilters}
+                    className="mt-3 text-xs"
+                  >
+                    <RotateCcw className="w-3 h-3 mr-1" />
+                    Réinitialiser les filtres
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <>
+                <ScrollArea className="h-64 xl:h-96">
+                  <div className="p-4 space-y-3">
+                    {paginatedActions.map((entry, index) => (
+                    <div
+                      key={entry.id}
+                      className={`group relative p-3 rounded-lg border transition-all duration-200 hover:shadow-sm ${
+                        index === 0 ? 'bg-primary/5 border-primary/20' : 'bg-card border-border hover:border-primary/30'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <div className="flex-shrink-0">
+                            {(entry.status === 'started' || entry.status === 'progress') && isEntryActive(entry.id) ? (
+                              <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 text-primary animate-spin" />
+                            ) : (
+                              getStatusIcon(entry.status)
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium text-foreground line-clamp-2" title={entry.userFriendlyMessage}>
+                              {entry.userFriendlyMessage}
+                            </p>
+                            {(entry.bucketName || entry.objectName) && (
+                              <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                                {entry.bucketName && (
+                                  <span className="px-1.5 py-0.5 bg-muted rounded text-xs truncate max-w-[80px] sm:max-w-[120px]" title={entry.bucketName}>
+                                    📦 {entry.bucketName}
+                                  </span>
+                                )}
+                                {entry.objectName && (
+                                  <span className="px-1.5 py-0.5 bg-muted rounded text-xs truncate max-w-[80px] sm:max-w-[100px]" title={entry.objectName}>
+                                    📄 {entry.objectName}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          {(entry.status === 'started' || entry.status === 'progress') && isEntryActive(entry.id) && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleCancelOperation(entry.id, entry.userFriendlyMessage)}
+                              className="h-6 w-6 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                              title="Annuler l'opération"
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          )}
+                          <Badge
+                            variant="secondary"
+                            className={`text-xs flex-shrink-0 border ${getStatusColor(entry.status)}`}
+                          >
+                            {getStatusLabel(entry.status)}
+                          </Badge>
+                        </div>
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-gray-900 truncate">
-                          {entry.userFriendlyMessage}
+                      
+                      {entry.details && (
+                        <p className="text-xs text-muted-foreground mt-2 pl-5 sm:pl-7 line-clamp-2 bg-muted/50 p-2 rounded" title={entry.details}>
+                          {entry.details}
                         </p>
-                        {(entry.bucketName || entry.objectName) && (
-                          <div className="flex items-center space-x-2 mt-1 text-xs text-gray-600">
-                            {entry.bucketName && (
-                              <span className="px-2 py-1 bg-gray-100 rounded text-xs">
-                                📦 {entry.bucketName}
-                              </span>
-                            )}
-                            {entry.objectName && (
-                              <span className="px-2 py-1 bg-gray-100 rounded text-xs truncate max-w-32">
-                                📄 {entry.objectName}
-                              </span>
-                            )}
+                      )}
+                      
+                      <div className="flex items-center justify-between mt-2 pl-5 sm:pl-7">
+                        <p className="text-xs text-muted-foreground">
+                          {formatDistanceToNow(entry.timestamp, { addSuffix: true, locale: fr })}
+                        </p>
+                        {entry.progress !== undefined && (
+                          <div className="text-xs text-primary font-medium font-mono">
+                            {entry.progress}%
                           </div>
                         )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      {(entry.status === 'started' || entry.status === 'progress') && isEntryActive(entry.id) && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleCancelOperation(entry.id, entry.userFriendlyMessage)}
-                          className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
-                          title="Annuler l'opération"
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
-                      )}
-                      <Badge
-                        variant="secondary"
-                        className={`text-xs flex-shrink-0 border ${getStatusColor(entry.status)}`}
+                    ))}
+                  </div>
+                </ScrollArea>
+                
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between px-4 py-3 border-t">
+                    <div className="text-xs sm:text-sm text-muted-foreground">
+                      <span className="hidden sm:inline">Page {currentPage} sur {totalPages}</span>
+                      <span className="sm:hidden">{currentPage}/{totalPages}</span>
+                      <span className="hidden sm:inline"> ({filteredActions.length} actions)</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                        disabled={currentPage === 1}
+                        className="h-8 w-8 p-0"
                       >
-                        {getStatusLabel(entry.status)}
-                      </Badge>
+                        <ChevronLeft className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                        disabled={currentPage === totalPages}
+                        className="h-8 w-8 p-0"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </Button>
                     </div>
                   </div>
-                  
-                  {entry.details && (
-                    <p className="text-xs text-gray-600 mt-2 pl-7 truncate bg-gray-50 p-2 rounded">
-                      {entry.details}
-                    </p>
-                  )}
-                  
-                  <div className="flex items-center justify-between mt-2 pl-7">
-                    <p className="text-xs text-gray-500">
-                      {formatDistanceToNow(entry.timestamp, { addSuffix: true, locale: fr })}
-                    </p>
-                    {entry.progress !== undefined && (
-                      <div className="text-xs text-blue-600 font-medium">
-                        {entry.progress}%
-                      </div>
-                    )}
-                  </div>
-                </div>
-                ))}
-              </div>
-            </ScrollArea>
-            
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between px-4 py-3 border-t">
-                <div className="text-sm text-gray-600">
-                  Page {currentPage} sur {totalPages} ({filteredActions.length} actions)
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                    disabled={currentPage === 1}
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                    disabled={currentPage === totalPages}
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
+                )}
+              </>
             )}
-          </>
-        )}
-      </CardContent>
-    </Card>
+          </CardContent>
+        </CollapsibleContent>
+      </Card>
+    </Collapsible>
   );
 };
