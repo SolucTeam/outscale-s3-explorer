@@ -446,13 +446,13 @@ export const ActionHistory = () => {
 
         {/* Recherche avancée */}
         {showAdvancedFilters && (
-          <div className="mt-3 p-3 bg-white rounded-lg border border-gray-200 space-y-3">
+          <div className="mt-3 p-3 bg-card rounded-lg border border-border space-y-3">
             {/* Barre de recherche textuelle */}
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
                 type="text"
-                placeholder="Rechercher dans l'historique..."
+                placeholder="Rechercher..."
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
                 className="pl-9 h-9 text-sm"
@@ -469,23 +469,25 @@ export const ActionHistory = () => {
               )}
             </div>
 
-            {/* Filtres par ligne */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+            {/* Filtres par ligne - responsive */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {/* Date de début */}
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
                     className={cn(
-                      "h-9 justify-start text-left font-normal text-xs",
+                      "h-9 justify-start text-left font-normal text-xs w-full",
                       !startDate && "text-muted-foreground"
                     )}
                   >
-                    <CalendarIcon className="mr-2 h-3 w-3" />
-                    {startDate ? format(startDate, "dd/MM/yyyy", { locale: fr }) : "Date début"}
+                    <CalendarIcon className="mr-1.5 h-3 w-3 flex-shrink-0" />
+                    <span className="truncate">
+                      {startDate ? format(startDate, "dd/MM/yy", { locale: fr }) : "Début"}
+                    </span>
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0 z-50 bg-white" align="start">
+                <PopoverContent className="w-auto p-0 z-50 bg-card" align="start">
                   <Calendar
                     mode="single"
                     selected={startDate}
@@ -503,15 +505,17 @@ export const ActionHistory = () => {
                   <Button
                     variant="outline"
                     className={cn(
-                      "h-9 justify-start text-left font-normal text-xs",
+                      "h-9 justify-start text-left font-normal text-xs w-full",
                       !endDate && "text-muted-foreground"
                     )}
                   >
-                    <CalendarIcon className="mr-2 h-3 w-3" />
-                    {endDate ? format(endDate, "dd/MM/yyyy", { locale: fr }) : "Date fin"}
+                    <CalendarIcon className="mr-1.5 h-3 w-3 flex-shrink-0" />
+                    <span className="truncate">
+                      {endDate ? format(endDate, "dd/MM/yy", { locale: fr }) : "Fin"}
+                    </span>
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0 z-50 bg-white" align="start">
+                <PopoverContent className="w-auto p-0 z-50 bg-card" align="start">
                   <Calendar
                     mode="single"
                     selected={endDate}
@@ -525,14 +529,18 @@ export const ActionHistory = () => {
 
               {/* Filtre par bucket */}
               <Select value={selectedBucket} onValueChange={setSelectedBucket}>
-                <SelectTrigger className="h-9 text-xs">
-                  <SelectValue placeholder="Tous les buckets" />
+                <SelectTrigger className="h-9 text-xs w-full">
+                  <SelectValue placeholder="Buckets">
+                    <span className="truncate block">
+                      {selectedBucket === 'all' ? 'Buckets' : selectedBucket}
+                    </span>
+                  </SelectValue>
                 </SelectTrigger>
-                <SelectContent className="z-50 bg-white">
+                <SelectContent className="z-50 bg-card">
                   <SelectItem value="all">Tous les buckets</SelectItem>
                   {uniqueBuckets.map(bucket => (
                     <SelectItem key={bucket} value={bucket}>
-                      📦 {bucket}
+                      <span className="truncate">📦 {bucket}</span>
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -540,17 +548,21 @@ export const ActionHistory = () => {
 
               {/* Filtre par type d'opération */}
               <Select value={selectedOperation} onValueChange={setSelectedOperation}>
-                <SelectTrigger className="h-9 text-xs">
-                  <SelectValue placeholder="Toutes les opérations" />
+                <SelectTrigger className="h-9 text-xs w-full">
+                  <SelectValue placeholder="Opérations">
+                    <span className="truncate block">
+                      {selectedOperation === 'all' ? 'Opérations' : getOperationLabel(selectedOperation)}
+                    </span>
+                  </SelectValue>
                 </SelectTrigger>
-                <SelectContent className="z-50 bg-white max-h-64">
-                  <SelectItem value="all">Toutes les opérations</SelectItem>
+                <SelectContent className="z-50 bg-card max-h-64">
+                  <SelectItem value="all">Toutes</SelectItem>
                   {Object.entries(OPERATION_CATEGORIES).map(([category, ops]) => {
                     const availableOps = ops.filter(op => uniqueOperations.includes(op));
                     if (availableOps.length === 0) return null;
                     return (
                       <React.Fragment key={category}>
-                        <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 bg-gray-50">
+                        <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground bg-muted">
                           {category}
                         </div>
                         {availableOps.map(op => (

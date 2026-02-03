@@ -298,14 +298,21 @@ export const BucketList = () => {
     </div>
   );
 
-  // Helper function to get region badge class
+  // Helper function to get region badge class - more specific matching
   const getRegionBadgeClass = (region: string) => {
     const r = region.toLowerCase();
+    // Specific region matching
+    if (r === 'eu-west-2' || r.includes('paris')) return 'region-badge--eu-west-2';
+    if (r === 'eu-west-1' || r === 'eu-central-1' || r.includes('frankfurt') || r.includes('ireland')) return 'region-badge--eu-central';
+    if (r.includes('site1') || r.includes('site2') || r.includes('site3')) return 'region-badge--site';
+    if (r.includes('us-east')) return 'region-badge--us-east';
+    if (r.includes('us-west')) return 'region-badge--us-west';
+    if (r.includes('ap-') || r.includes('asia') || r.includes('tokyo')) return 'region-badge--ap';
+    if (r.includes('gov') || r.includes('cloudgouv')) return 'region-badge--gov';
+    // Fallback by continent
     if (r.includes('eu-') || r.includes('europe')) return 'region-badge--eu';
     if (r.includes('us-') || r.includes('america')) return 'region-badge--us';
-    if (r.includes('ap-') || r.includes('asia')) return 'region-badge--ap';
-    if (r.includes('gov') || r.includes('cloudgouv')) return 'region-badge--gov';
-    return '';
+    return 'region-badge--default';
   };
 
   const renderListView = () => (

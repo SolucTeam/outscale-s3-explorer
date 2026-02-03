@@ -115,6 +115,13 @@ class HistoryApiService {
         }
       );
 
+      // Check if response is JSON before parsing
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        console.warn('Histoire API: réponse non-JSON reçue, serveur proxy peut-être indisponible');
+        return { entries: [], total: 0 };
+      }
+
       const data: HistoryApiResponse = await response.json();
 
       if (data.success && data.data) {
@@ -127,7 +134,12 @@ class HistoryApiService {
 
       return { entries: [], total: 0 };
     } catch (error) {
-      console.error('Erreur récupération historique distant:', error);
+      // Silently fail if proxy server is not running
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        console.debug('Serveur proxy non disponible pour l\'historique');
+      } else {
+        console.warn('Erreur récupération historique distant:', error);
+      }
       return { entries: [], total: 0 };
     }
   }
