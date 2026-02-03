@@ -29,29 +29,25 @@ export const StatsOverview = () => {
       title: 'Total Buckets',
       value: stats.totalBuckets,
       icon: Database,
-      bgColor: 'bg-blue-50',
-      textColor: 'text-blue-600'
+      variant: 'buckets' as const
     },
     {
       title: 'Total Objets',
       value: stats.totalObjects.toLocaleString(),
       icon: FolderOpen,
-      bgColor: 'bg-emerald-50',
-      textColor: 'text-emerald-600'
+      variant: 'objects' as const
     },
     {
       title: 'Stockage Total',
       value: formatBytes(stats.totalSize),
       icon: HardDrive,
-      bgColor: 'bg-purple-50',
-      textColor: 'text-purple-600'
+      variant: 'storage' as const
     },
     {
       title: 'Moy. Objets/Bucket',
       value: stats.avgObjectsPerBucket.toLocaleString(),
       icon: TrendingUp,
-      bgColor: 'bg-amber-50',
-      textColor: 'text-amber-600'
+      variant: 'average' as const
     }
   ];
 
@@ -60,8 +56,8 @@ export const StatsOverview = () => {
     return (
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[...Array(4)].map((_, index) => (
-          <Card key={index} className="border-0 shadow-sm animate-fade-in" style={{ animationDelay: `${index * 100}ms` }}>
-            <CardContent className="p-4">
+          <Card key={index} className="metric-card animate-fade-in" style={{ animationDelay: `${index * 100}ms` }}>
+            <CardContent className="p-4 pl-5">
               <div className="flex items-center justify-between">
                 <div className="space-y-2 flex-1">
                   <Skeleton className="h-4 w-24" />
@@ -81,17 +77,17 @@ export const StatsOverview = () => {
       {statCards.map((stat, index) => (
         <Card 
           key={index} 
-          className="border-0 shadow-sm hover:shadow-md transition-all duration-300 animate-fade-in hover-scale"
+          className={`metric-card metric-card--${stat.variant} hover-lift animate-fade-in`}
           style={{ animationDelay: `${index * 100}ms` }}
         >
-          <CardContent className="p-4">
+          <CardContent className="p-4 pl-5">
             <div className="flex items-center justify-between">
               <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">{stat.title}</p>
-                <p className="text-2xl font-bold">{stat.value}</p>
+                <p className="text-sm text-muted-foreground font-medium">{stat.title}</p>
+                <p className="text-2xl font-bold font-mono tracking-tight">{stat.value}</p>
               </div>
-              <div className={`w-12 h-12 rounded-xl ${stat.bgColor} flex items-center justify-center transition-transform duration-200`}>
-                <stat.icon className={`w-6 h-6 ${stat.textColor}`} />
+              <div className={`metric-icon metric-icon--${stat.variant}`}>
+                <stat.icon className="w-6 h-6" />
               </div>
             </div>
           </CardContent>

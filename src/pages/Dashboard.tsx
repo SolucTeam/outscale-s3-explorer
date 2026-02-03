@@ -51,7 +51,7 @@ const Dashboard = () => {
   const rowWidgets = visibleWidgets.filter((w) => ['storage', 'security', 'permissions'].includes(w.id));
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-6">
         {/* Settings Button */}
         <div className="flex justify-end mb-4">

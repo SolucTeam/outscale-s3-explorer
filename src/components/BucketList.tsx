@@ -298,26 +298,43 @@ export const BucketList = () => {
     </div>
   );
 
+  // Helper function to get region badge class
+  const getRegionBadgeClass = (region: string) => {
+    const r = region.toLowerCase();
+    if (r.includes('eu-') || r.includes('europe')) return 'region-badge--eu';
+    if (r.includes('us-') || r.includes('america')) return 'region-badge--us';
+    if (r.includes('ap-') || r.includes('asia')) return 'region-badge--ap';
+    if (r.includes('gov') || r.includes('cloudgouv')) return 'region-badge--gov';
+    return '';
+  };
+
   const renderListView = () => (
     <div className="space-y-2">
-      {filteredBuckets.map((bucket) => (
+      {filteredBuckets.map((bucket, index) => (
         <TooltipProvider key={bucket.name}>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Card className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => handleBucketClick(bucket.name)}>
+              <Card 
+                className="bucket-row cursor-pointer border-0 shadow-soft animate-fade-in" 
+                onClick={() => handleBucketClick(bucket.name)}
+                style={{ animationDelay: `${index * 50}ms` }}
+              >
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-4 flex-1 min-w-0">
-                      <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <Folder className="w-5 h-5 text-blue-600" />
+                      <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-110">
+                        <Folder className="w-5 h-5 text-primary" />
                       </div>
                       
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center space-x-2 flex-wrap">
-                          <h4 className="font-medium text-gray-900 hover:text-blue-600 transition-colors truncate max-w-md">
+                          <h4 className="font-medium text-foreground hover:text-primary transition-colors truncate max-w-md">
                             {bucket.name}
                           </h4>
-                          <Badge variant="secondary" className="text-xs">
+                          <Badge 
+                            variant="secondary" 
+                            className={`text-xs font-medium ${getRegionBadgeClass(bucket.location || bucket.region)}`}
+                          >
                             {bucket.location || bucket.region}
                           </Badge>
                           {bucket.versioningEnabled && (
@@ -339,7 +356,7 @@ export const BucketList = () => {
                             </Badge>
                           )}
                           {bucket.hasCrossAccountAccess && (
-                            <Badge variant="outline" className="text-xs flex items-center gap-1 text-green-600 border-green-300 bg-green-50">
+                            <Badge variant="outline" className="text-xs flex items-center gap-1 text-success border-success/30 bg-success/10">
                               <Users className="w-3 h-3" />
                               Cross-Account
                               {bucket.crossAccountCount && bucket.crossAccountCount > 1 && (
@@ -348,9 +365,9 @@ export const BucketList = () => {
                             </Badge>
                           )}
                         </div>
-                        <div className="flex items-center space-x-4 text-sm text-gray-600 mt-1">
-                          <span>{bucket.hasMoreObjects ? '1000+' : (bucket.objectCount || 0)} objets</span>
-                          <span>{formatBytes(bucket.size || 0)}</span>
+                        <div className="flex items-center space-x-4 text-sm text-muted-foreground mt-1">
+                          <span className="font-mono">{bucket.hasMoreObjects ? '1000+' : (bucket.objectCount || 0)} objets</span>
+                          <span className="font-mono">{formatBytes(bucket.size || 0)}</span>
                           <span>
                             Créé {formatDistanceToNow(bucket.creationDate, { addSuffix: true, locale: fr })}
                           </span>
@@ -358,37 +375,39 @@ export const BucketList = () => {
                       </div>
                     </div>
                     
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-1.5">
                       <Button
                         size="sm"
-                        variant="outline"
+                        variant="ghost"
                         onClick={(e) => handleSecurityBucket(bucket, e)}
+                        className="h-8 w-8 p-0 text-primary hover:text-primary hover:bg-primary/10"
                         title="Sécurité et permissions"
                       >
                         <Shield className="w-4 h-4" />
                       </Button>
                       <Button
                         size="sm"
-                        variant="outline"
+                        variant="ghost"
                         onClick={(e) => handleSettingsBucket(bucket, e)}
+                        className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground hover:bg-accent"
                         title="Paramètres"
                       >
                         <Settings className="w-4 h-4" />
                       </Button>
                       <Button
                         size="sm"
-                        variant="outline"
+                        variant="ghost"
                         onClick={(e) => handleAdvancedBucket(bucket, e)}
-                        className="text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+                        className="h-8 w-8 p-0 text-info hover:text-info hover:bg-info/10"
                         title="Paramètres avancés"
                       >
                         <Wrench className="w-4 h-4" />
                       </Button>
                       <Button
                         size="sm"
-                        variant="outline"
+                        variant="ghost"
                         onClick={(e) => handleDeleteBucket(bucket.name, e)}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
                         title="Supprimer"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -411,11 +430,11 @@ export const BucketList = () => {
     <div className="space-y-4 sm:space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Mes Buckets S3</h2>
-          <p className="text-sm sm:text-base text-gray-600">Gérez vos espaces de stockage Outscale</p>
+          <h2 className="text-xl sm:text-2xl font-bold text-foreground">Mes Buckets S3</h2>
+          <p className="text-sm sm:text-base text-muted-foreground">Gérez vos espaces de stockage Outscale</p>
         </div>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-          <Button onClick={() => setShowCreateDialog(true)} className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto">
+          <Button onClick={() => setShowCreateDialog(true)} className="w-full sm:w-auto">
             <Plus className="w-4 h-4 mr-2" />
             Nouveau bucket
           </Button>
