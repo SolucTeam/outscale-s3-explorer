@@ -5,22 +5,13 @@ import { useS3Store } from '@/hooks/useS3Store';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { HardDrive } from 'lucide-react';
 
-const COLORS = [
-  'hsl(221, 83%, 53%)',  // blue
-  'hsl(142, 71%, 45%)',  // green
-  'hsl(262, 83%, 58%)',  // purple
-  'hsl(25, 95%, 53%)',   // orange
-  'hsl(346, 77%, 49%)',  // rose
-  'hsl(199, 89%, 48%)',  // cyan
-  'hsl(47, 96%, 53%)',   // yellow
-  'hsl(280, 65%, 60%)',  // violet
-  'hsl(173, 80%, 40%)',  // teal
-  'hsl(330, 80%, 60%)',  // pink
-  'hsl(15, 90%, 55%)',   // coral
-  'hsl(190, 75%, 45%)',  // sky blue
-  'hsl(45, 85%, 50%)',   // amber
-  'hsl(300, 60%, 50%)',  // magenta
-  'hsl(160, 70%, 40%)',  // emerald
+// Cohesive teal/cyan palette for cloud theme (5 main colors)
+const CHART_COLORS = [
+  'hsl(187, 80%, 42%)',  // Primary teal
+  'hsl(175, 70%, 45%)',  // Lighter teal
+  'hsl(195, 75%, 50%)',  // Cyan
+  'hsl(160, 65%, 45%)',  // Green-teal
+  'hsl(210, 70%, 55%)',  // Blue
 ];
 
 export const StorageChart = () => {
@@ -34,10 +25,25 @@ export const StorageChart = () => {
         value: b.size || 0,
         formattedSize: formatBytes(b.size || 0)
       }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 8);
+      .sort((a, b) => b.value - a.value);
 
-    return bucketsWithSize;
+    // Show top 4 buckets + "Autres" if more than 5
+    if (bucketsWithSize.length > 5) {
+      const top4 = bucketsWithSize.slice(0, 4);
+      const others = bucketsWithSize.slice(4);
+      const othersTotal = others.reduce((sum, b) => sum + b.value, 0);
+      
+      return [
+        ...top4,
+        {
+          name: `Autres (${others.length})`,
+          value: othersTotal,
+          formattedSize: formatBytes(othersTotal)
+        }
+      ];
+    }
+
+    return bucketsWithSize.slice(0, 5);
   }, [buckets]);
 
   const totalSize = useMemo(() => {
@@ -54,14 +60,15 @@ export const StorageChart = () => {
 
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
+      const percent = ((payload[0].value / totalSize) * 100).toFixed(1);
       return (
-        <div className="bg-background border rounded-lg shadow-lg p-3 animate-scale-in">
-          <p className="font-medium">{payload[0].payload.name}</p>
-          <p className="text-sm text-muted-foreground">
+        <div className="bg-card border border-border rounded-lg shadow-medium p-3 animate-scale-in">
+          <p className="font-medium text-foreground">{payload[0].payload.name}</p>
+          <p className="text-sm text-muted-foreground font-mono">
             {payload[0].payload.formattedSize}
           </p>
-          <p className="text-sm text-muted-foreground">
-            {((payload[0].value / totalSize) * 100).toFixed(1)}% du total
+          <p className="text-sm text-primary font-mono font-medium">
+            {percent}% du total
           </p>
         </div>
       );
@@ -72,7 +79,7 @@ export const StorageChart = () => {
   // Skeleton loading state
   if (loading && buckets.length === 0) {
     return (
-      <Card className="border-0 shadow-sm animate-fade-in">
+      <Card className="border-0 shadow-soft animate-fade-in h-full">
         <CardHeader className="pb-2">
           <div className="flex items-center gap-2">
             <Skeleton className="w-5 h-5 rounded" />
@@ -89,14 +96,6 @@ export const StorageChart = () => {
               </div>
             </div>
           </div>
-          <div className="flex justify-center gap-4 mt-4">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <Skeleton className="w-3 h-3 rounded" />
-                <Skeleton className="h-3 w-16" />
-              </div>
-            ))}
-          </div>
         </CardContent>
       </Card>
     );
@@ -104,10 +103,10 @@ export const StorageChart = () => {
 
   if (chartData.length === 0) {
     return (
-      <Card className="border-0 shadow-sm animate-fade-in">
+      <Card className="border-0 shadow-soft animate-fade-in h-full">
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-semibold flex items-center gap-2">
-            <HardDrive className="w-5 h-5 text-purple-500" />
+            <HardDrive className="w-5 h-5 text-primary" />
             Utilisation du Stockage
           </CardTitle>
         </CardHeader>
@@ -121,14 +120,14 @@ export const StorageChart = () => {
   }
 
   return (
-    <Card className="border-0 shadow-sm animate-fade-in h-full">
+    <Card className="border-0 shadow-soft animate-fade-in h-full">
       <CardHeader className="pb-2">
         <CardTitle className="text-base font-semibold flex items-center gap-2">
-          <HardDrive className="w-5 h-5 text-purple-500" />
+          <HardDrive className="w-5 h-5 text-primary" />
           Utilisation du Stockage
         </CardTitle>
         <p className="text-sm text-muted-foreground">
-          Total: {formatBytes(totalSize)}
+          Total: <span className="font-mono font-medium text-foreground">{formatBytes(totalSize)}</span>
         </p>
       </CardHeader>
       <CardContent>
@@ -166,7 +165,7 @@ export const StorageChart = () => {
                 {chartData.map((_, index) => (
                   <Cell
                     key={`cell-${index}`}
-                    fill={COLORS[index % COLORS.length]}
+                    fill={CHART_COLORS[index % CHART_COLORS.length]}
                     stroke="none"
                     strokeWidth={0}
                   />
@@ -175,7 +174,9 @@ export const StorageChart = () => {
               <Tooltip content={<CustomTooltip />} />
               <Legend 
                 formatter={(value) => (
-                  <span className="text-xs">{value.length > 15 ? value.slice(0, 15) + '...' : value}</span>
+                  <span className="text-xs text-foreground">
+                    {value.length > 15 ? value.slice(0, 15) + '...' : value}
+                  </span>
                 )}
               />
             </PieChart>
