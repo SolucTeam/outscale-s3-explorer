@@ -1,12 +1,12 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useS3Store } from '../hooks/useS3Store';
 import { useEnhancedDirectS3 } from '../hooks/useEnhancedDirectS3';
-import { Folder, Calendar, HardDrive, ChevronRight, RefreshCw, Plus, Trash2, Cloud, GitBranch, Lock, Settings, Shield, LayoutGrid, List, Wrench, Users } from 'lucide-react';
+import { Folder, ChevronRight, RefreshCw, Plus, Trash2, Cloud, GitBranch, Lock, Settings, Shield, Wrench, Users } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { CreateBucketDialog } from './CreateBucketDialog';
@@ -14,12 +14,14 @@ import { ForceDeleteBucketDialog } from './ForceDeleteBucketDialog';
 import { BucketSettingsDialog } from './BucketSettingsDialog';
 import { BucketSecurityDialog } from './BucketSecurityDialog';
 import { BucketAdvancedSettingsDialog } from './BucketAdvancedSettingsDialog';
-
 import { SearchFilter } from './SearchFilter';
+import { BucketFilters, BucketFiltersState, getDefaultFilters } from './BucketFilters';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { S3Bucket } from '../types/s3';
 
-type ViewMode = 'grid' | 'list';
+// Size thresholds in bytes
+const SIZE_1GB = 1024 * 1024 * 1024;
+const SIZE_10GB = 10 * SIZE_1GB;
 
 export const BucketList = () => {
   const { buckets, loading, setCurrentBucket, setCurrentPath, setObjects } = useS3Store();
@@ -38,18 +40,71 @@ export const BucketList = () => {
   
   const [hasInitiallyLoaded, setHasInitiallyLoaded] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const [filters, setFilters] = useState<BucketFiltersState>(getDefaultFilters());
 
-  // Filtrer les buckets selon la recherche
+  // Extract unique regions from buckets
+  const availableRegions = useMemo(() => {
+    const regions = new Set<string>();
+    buckets.forEach((bucket) => {
+      regions.add(bucket.location || bucket.region);
+    });
+    return Array.from(regions).sort();
+  }, [buckets]);
+
+  // Filter buckets based on search and advanced filters
   const filteredBuckets = useMemo(() => {
-    if (!searchQuery.trim()) return buckets;
-    const query = searchQuery.toLowerCase();
-    return buckets.filter(bucket => 
-      bucket.name.toLowerCase().includes(query) ||
-      bucket.location?.toLowerCase().includes(query) ||
-      bucket.region.toLowerCase().includes(query)
-    );
-  }, [buckets, searchQuery]);
+    return buckets.filter((bucket) => {
+      // Text search
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase();
+        const matchesSearch =
+          bucket.name.toLowerCase().includes(query) ||
+          bucket.location?.toLowerCase().includes(query) ||
+          bucket.region.toLowerCase().includes(query);
+        if (!matchesSearch) return false;
+      }
+
+      // Region filter
+      if (filters.regions.length > 0) {
+        const bucketRegion = bucket.location || bucket.region;
+        if (!filters.regions.includes(bucketRegion)) return false;
+      }
+
+      // Size filter
+      const size = bucket.size || 0;
+      switch (filters.sizeRange) {
+        case 'empty':
+          if (size > 0) return false;
+          break;
+        case 'small':
+          if (size >= SIZE_1GB) return false;
+          break;
+        case 'medium':
+          if (size < SIZE_1GB || size >= SIZE_10GB) return false;
+          break;
+        case 'large':
+          if (size < SIZE_10GB) return false;
+          break;
+      }
+
+      // Date filter
+      if (filters.dateFrom && bucket.creationDate < filters.dateFrom) return false;
+      if (filters.dateTo) {
+        const endOfDay = new Date(filters.dateTo);
+        endOfDay.setHours(23, 59, 59, 999);
+        if (bucket.creationDate > endOfDay) return false;
+      }
+
+      // Security filters
+      const { versioning, objectLock, encryption, crossAccount } = filters.securityStatus;
+      if (versioning !== null && bucket.versioningEnabled !== versioning) return false;
+      if (objectLock !== null && bucket.objectLockEnabled !== objectLock) return false;
+      if (encryption !== null && bucket.encryptionEnabled !== encryption) return false;
+      if (crossAccount !== null && bucket.hasCrossAccountAccess !== crossAccount) return false;
+
+      return true;
+    });
+  }, [buckets, searchQuery, filters]);
 
   useEffect(() => {
     if (!initialized) return;
@@ -161,147 +216,9 @@ export const BucketList = () => {
     );
   }
 
-  const renderGridView = () => (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
-      {filteredBuckets.map((bucket) => (
-        <TooltipProvider key={bucket.name}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Card className="hover:shadow-lg transition-all duration-200 cursor-pointer group" onClick={() => handleBucketClick(bucket.name)}>
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-start space-x-3 min-w-0 flex-1">
-                      <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-200 transition-colors flex-shrink-0">
-                        <Folder className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <CardTitle className="text-sm sm:text-base font-semibold text-gray-900 group-hover:text-blue-600 transition-colors line-clamp-2 break-all" title={bucket.name}>
-                          {bucket.name}
-                        </CardTitle>
-                        <div className="flex flex-wrap gap-1 mt-1 max-w-full">
-                          <Badge variant="secondary" className="text-xs whitespace-nowrap">
-                            {bucket.location || bucket.region}
-                          </Badge>
-                          {bucket.versioningEnabled && (
-                            <Badge variant="versioning" className="text-xs flex items-center gap-1 whitespace-nowrap">
-                              <GitBranch className="w-3 h-3" />
-                              <span className="hidden sm:inline">Versioning</span>
-                              <span className="sm:hidden">Ver</span>
-                            </Badge>
-                          )}
-                          {bucket.objectLockEnabled && (
-                            <Badge variant="lock" className="text-xs flex items-center gap-1 whitespace-nowrap">
-                              <Lock className="w-3 h-3" />
-                              <span>Lock</span>
-                            </Badge>
-                          )}
-                          {bucket.encryptionEnabled && (
-                            <Badge variant="encryption" className="text-xs flex items-center gap-1 whitespace-nowrap">
-                              <Lock className="w-3 h-3" />
-                              <span className="hidden sm:inline">Encryption</span>
-                              <span className="sm:hidden">Enc</span>
-                            </Badge>
-                          )}
-                          {bucket.hasCrossAccountAccess && (
-                            <Badge variant="outline" className="text-xs flex items-center gap-1 whitespace-nowrap text-green-600 border-green-300 bg-green-50">
-                              <Users className="w-3 h-3" />
-                              <span className="hidden sm:inline">Cross-Account</span>
-                              <span className="sm:hidden">CA</span>
-                              {bucket.crossAccountCount && bucket.crossAccountCount > 1 && (
-                                <span className="ml-0.5">({bucket.crossAccountCount})</span>
-                              )}
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-1 flex-shrink-0">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={(e) => handleSecurityBucket(bucket, e)}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity text-blue-600 hover:text-blue-700 hover:bg-blue-50 h-8 w-8 p-0"
-                        title="Sécurité et permissions"
-                      >
-                        <Shield className="w-3 h-3 sm:w-4 sm:h-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={(e) => handleSettingsBucket(bucket, e)}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-600 hover:text-gray-700 hover:bg-gray-100 h-8 w-8 p-0"
-                        title="Paramètres du bucket"
-                      >
-                        <Settings className="w-3 h-3 sm:w-4 sm:h-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={(e) => handleAdvancedBucket(bucket, e)}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity text-purple-600 hover:text-purple-700 hover:bg-purple-50 h-8 w-8 p-0"
-                        title="Paramètres avancés"
-                      >
-                        <Wrench className="w-3 h-3 sm:w-4 sm:h-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={(e) => handleDeleteBucket(bucket.name, e)}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity text-red-600 hover:text-red-700 hover:bg-red-50 h-8 w-8 p-0"
-                        title="Supprimer le bucket et son contenu"
-                      >
-                        <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
-                      </Button>
-                      <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 group-hover:text-blue-600 transition-colors" />
-                    </div>
-                  </div>
-                </CardHeader>
-                
-                <CardContent className="space-y-3">
-                  <div className="flex items-center justify-between text-xs sm:text-sm">
-                    <div className="flex items-center space-x-2 text-gray-600 min-w-0">
-                      <Calendar className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
-                      <span className="truncate">Créé {formatDistanceToNow(bucket.creationDate, { addSuffix: true, locale: fr })}</span>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center justify-between text-xs sm:text-sm">
-                    <span className="text-gray-600">
-                      {bucket.hasMoreObjects ? '1000+' : (bucket.objectCount || 0)} objets
-                    </span>
-                    <div className="flex items-center space-x-2 text-gray-600">
-                      <HardDrive className="w-3 h-3 sm:w-4 sm:h-4" />
-                      <span>{formatBytes(bucket.size || 0)}</span>
-                    </div>
-                  </div>
-                  
-                  <Button 
-                    className="w-full mt-4 text-sm" 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleBucketClick(bucket.name);
-                    }}
-                    variant="outline"
-                  >
-                    Parcourir
-                    <ChevronRight className="w-3 h-3 sm:w-4 sm:h-4 ml-2" />
-                  </Button>
-                </CardContent>
-              </Card>
-            </TooltipTrigger>
-            <TooltipContent side="top" className="max-w-xs">
-              <p className="font-medium">{bucket.name}</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      ))}
-    </div>
-  );
-
-  // Helper function to get region badge class - more specific matching
+  // Helper function to get region badge class
   const getRegionBadgeClass = (region: string) => {
     const r = region.toLowerCase();
-    // Specific region matching
     if (r === 'eu-west-2' || r.includes('paris')) return 'region-badge--eu-west-2';
     if (r === 'eu-west-1' || r === 'eu-central-1' || r.includes('frankfurt') || r.includes('ireland')) return 'region-badge--eu-central';
     if (r.includes('site1') || r.includes('site2') || r.includes('site3')) return 'region-badge--site';
@@ -309,11 +226,11 @@ export const BucketList = () => {
     if (r.includes('us-west')) return 'region-badge--us-west';
     if (r.includes('ap-') || r.includes('asia') || r.includes('tokyo')) return 'region-badge--ap';
     if (r.includes('gov') || r.includes('cloudgouv')) return 'region-badge--gov';
-    // Fallback by continent
     if (r.includes('eu-') || r.includes('europe')) return 'region-badge--eu';
     if (r.includes('us-') || r.includes('america')) return 'region-badge--us';
     return 'region-badge--default';
   };
+
 
   const renderListView = () => (
     <div className="space-y-2">
@@ -458,62 +375,52 @@ export const BucketList = () => {
         </div>
       </div>
 
-      {/* Barre de recherche et toggle vue */}
+      {/* Barre de recherche et filtres */}
       {buckets.length > 0 && (
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4 flex-1">
+        <div className="space-y-3">
+          <div className="flex items-center gap-4">
             <SearchFilter
               value={searchQuery}
               onChange={setSearchQuery}
               placeholder="Rechercher un bucket..."
             />
-            {searchQuery && (
-              <span className="text-sm text-muted-foreground">
-                {filteredBuckets.length} résultat{filteredBuckets.length > 1 ? 's' : ''}
+            {(searchQuery || filters.regions.length > 0 || filters.sizeRange !== 'all' || filters.dateFrom || filters.dateTo) && (
+              <span className="text-sm text-muted-foreground whitespace-nowrap">
+                {filteredBuckets.length} résultat{filteredBuckets.length > 1 ? 's' : ''} sur {buckets.length}
               </span>
             )}
           </div>
-          <div className="flex items-center border rounded-md">
-            <Button
-              variant={viewMode === 'list' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setViewMode('list')}
-              className="rounded-r-none"
-            >
-              <List className="w-4 h-4" />
-            </Button>
-            <Button
-              variant={viewMode === 'grid' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setViewMode('grid')}
-              className="rounded-l-none"
-            >
-              <LayoutGrid className="w-4 h-4" />
-            </Button>
-          </div>
+          <BucketFilters 
+            filters={filters} 
+            onFiltersChange={setFilters} 
+            availableRegions={availableRegions}
+          />
         </div>
       )}
 
       {/* Afficher le message "aucun bucket" seulement si on a fini de charger ET qu'il n'y a vraiment aucun bucket */}
       {hasInitiallyLoaded && buckets.length === 0 && !loading ? (
         <div className="text-center py-12">
-          <div className="w-16 h-16 mx-auto mb-4 bg-blue-100 rounded-full flex items-center justify-center">
-            <Cloud className="w-8 h-8 text-blue-600" />
+          <div className="w-16 h-16 mx-auto mb-4 bg-primary/10 rounded-full flex items-center justify-center">
+            <Cloud className="w-8 h-8 text-primary" />
           </div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">Aucun bucket trouvé</h3>
-          <p className="text-gray-600 mb-6 max-w-md mx-auto">
+          <h3 className="text-lg font-semibold text-foreground mb-2">Aucun bucket trouvé</h3>
+          <p className="text-muted-foreground mb-6 max-w-md mx-auto">
             Vous n'avez pas encore de buckets S3. Créez votre premier bucket pour commencer à stocker vos fichiers dans le cloud.
           </p>
-          <Button onClick={() => setShowCreateDialog(true)} className="bg-blue-600 hover:bg-blue-700">
+          <Button onClick={() => setShowCreateDialog(true)}>
             <Plus className="w-4 h-4 mr-2" />
             Créer mon premier bucket
           </Button>
         </div>
-      ) : filteredBuckets.length === 0 && searchQuery ? (
+      ) : filteredBuckets.length === 0 && (searchQuery || filters.regions.length > 0) ? (
         <div className="text-center py-12">
-          <p className="text-gray-600">Aucun bucket ne correspond à "{searchQuery}"</p>
+          <p className="text-muted-foreground">Aucun bucket ne correspond aux critères de recherche</p>
+          <Button variant="link" onClick={() => { setSearchQuery(''); setFilters(getDefaultFilters()); }}>
+            Effacer les filtres
+          </Button>
         </div>
-      ) : viewMode === 'grid' ? renderGridView() : renderListView()}
+      ) : renderListView()}
 
       {/* Indicateur de chargement lors des rafraîchissements */}
       {loading && hasInitiallyLoaded && (
