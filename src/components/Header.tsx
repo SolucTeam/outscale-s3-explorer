@@ -117,6 +117,16 @@ export const Header = () => {
                 <Settings className="w-4 h-4 mr-2" />
                 Tableau de bord
               </DropdownMenuItem>
+              <DropdownMenuItem 
+                onClick={() => {
+                  // Dispatch custom event to open widget settings
+                  window.dispatchEvent(new CustomEvent('open-dashboard-settings'));
+                }}
+                className="cursor-pointer"
+              >
+                <Settings className="w-4 h-4 mr-2" />
+                Personnaliser le dashboard
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem 
                 onClick={handleLogout}

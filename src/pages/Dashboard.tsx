@@ -1,9 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { BucketList } from '../components/BucketList';
 import { ActionHistory } from '../components/ActionHistory';
 import { OperationStatusIndicator } from '../components/OperationStatusIndicator';
-import { Button } from '@/components/ui/button';
-import { Settings2 } from 'lucide-react';
 import { 
   StatsOverview, 
   StorageChart, 
@@ -41,6 +39,13 @@ const Dashboard = () => {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const { widgets } = useDashboardPreferences();
 
+  // Listen for custom event from header menu
+  useEffect(() => {
+    const handleOpenSettings = () => setSettingsOpen(true);
+    window.addEventListener('open-dashboard-settings', handleOpenSettings);
+    return () => window.removeEventListener('open-dashboard-settings', handleOpenSettings);
+  }, []);
+
   const visibleWidgets = useMemo(() => {
     return widgets
       .filter((w) => w.visible)
@@ -53,18 +58,6 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-6">
-        {/* Settings Button */}
-        <div className="flex justify-end mb-4">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setSettingsOpen(true)}
-            className="gap-2 hover-scale"
-          >
-            <Settings2 className="w-4 h-4" />
-            Personnaliser
-          </Button>
-        </div>
 
         {/* Stats Overview - Full width (if visible) */}
         <div className={`transition-all duration-500 ease-out overflow-hidden ${
