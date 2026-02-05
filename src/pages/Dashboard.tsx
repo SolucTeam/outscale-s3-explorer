@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, lazy, Suspense } from 'react';
 import { BucketList } from '../components/BucketList';
 import { ActionHistory } from '../components/ActionHistory';
 import { OperationStatusIndicator } from '../components/OperationStatusIndicator';
@@ -7,8 +7,12 @@ import {
   StorageChart, 
   SecurityAnalysis, 
   PermissionsOverview,
-  WidgetSettingsDialog 
+  WidgetSettingsDialog,
+  ResourceConsumptionWidget,
+  CarbonFootprintWidget
 } from '../components/dashboard';
+import { Card } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useDashboardPreferences } from '@/stores/dashboardPreferencesStore';
 
 const widgetComponents: Record<string, React.FC> = {
@@ -103,6 +107,16 @@ const Dashboard = () => {
           {/* Action History Sidebar - 1/3 width */}
           <div className="xl:col-span-1 animate-fade-in" style={{ animationDelay: '400ms' }}>
             <ActionHistory />
+            
+            {/* Widgets de consommation sous l'historique */}
+            <div className="mt-6 space-y-6">
+              <div className="animate-fade-in" style={{ animationDelay: '500ms' }}>
+                <ResourceConsumptionWidget />
+              </div>
+              <div className="animate-fade-in" style={{ animationDelay: '600ms' }}>
+                <CarbonFootprintWidget />
+              </div>
+            </div>
           </div>
         </div>
       </div>
