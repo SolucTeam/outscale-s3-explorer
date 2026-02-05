@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useS3Store } from '../hooks/useS3Store';
@@ -27,10 +26,10 @@ const Index = () => {
 
   // Afficher un loader pendant la vérification
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="min-h-screen flex items-center justify-center bg-background">
       <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-        <p className="mt-4 text-gray-600">Vérification de la session...</p>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+        <p className="mt-4 text-muted-foreground">Vérification de la session...</p>
       </div>
     </div>
   );

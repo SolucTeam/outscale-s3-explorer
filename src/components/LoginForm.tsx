@@ -118,17 +118,17 @@ export const LoginForm = () => {
   };
   
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-blue-100 p-4">
-      <Card className="w-full max-w-lg shadow-2xl border-0 bg-white/80 backdrop-blur-sm">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-accent/10 p-4">
+      <Card className="w-full max-w-lg shadow-2xl border-0 bg-card/80 backdrop-blur-sm">
         <CardHeader className="text-center space-y-4 pb-8">
-          <div className="mx-auto w-16 h-16 bg-gradient-to-br from-blue-600 to-blue-800 rounded-2xl flex items-center justify-center shadow-lg">
-            <Cloud className="w-8 h-8 text-white" />
+          <div className="mx-auto w-16 h-16 bg-gradient-to-br from-primary to-primary/80 rounded-2xl flex items-center justify-center shadow-lg">
+            <Cloud className="w-8 h-8 text-primary-foreground" />
           </div>
           <div>
-            <CardTitle className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
+            <CardTitle className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
               Outscale S3 Explorer
             </CardTitle>
-            <CardDescription className="text-gray-600 mt-2">
+            <CardDescription className="text-muted-foreground mt-2">
               Connectez-vous avec vos identifiants Outscale
             </CardDescription>
           </div>
@@ -137,7 +137,7 @@ export const LoginForm = () => {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="region" className="text-sm font-medium text-gray-700">
+              <Label htmlFor="region" className="text-sm font-medium text-foreground">
                 Région Outscale
               </Label>
               <Select value={region} onValueChange={setRegion} disabled={isLoading}>
@@ -158,11 +158,11 @@ export const LoginForm = () => {
               
               {/* Display endpoint for selected region */}
               {selectedRegion && (
-                <div className="mt-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                  <div className="flex items-center space-x-2 text-sm text-blue-800">
+                <div className="mt-2 p-3 bg-info/10 rounded-lg border border-info/20">
+                  <div className="flex items-center space-x-2 text-sm text-info">
                     <Server className="w-4 h-4" />
                     <span className="font-medium">Endpoint:</span>
-                    <code className="bg-blue-100 px-2 py-1 rounded text-xs">
+                    <code className="bg-info/20 px-2 py-1 rounded text-xs">
                       {selectedRegion.endpoint}
                     </code>
                   </div>
@@ -171,7 +171,7 @@ export const LoginForm = () => {
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="accessKey" className="text-sm font-medium text-gray-700">
+              <Label htmlFor="accessKey" className="text-sm font-medium text-foreground">
                 Access Key
               </Label>
               <Input 
@@ -187,7 +187,7 @@ export const LoginForm = () => {
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="secretKey" className="text-sm font-medium text-gray-700">
+              <Label htmlFor="secretKey" className="text-sm font-medium text-foreground">
                 Secret Key
               </Label>
               <div className="relative">
@@ -204,7 +204,7 @@ export const LoginForm = () => {
                 <button
                   type="button"
                   onClick={() => setShowSecretKey(!showSecretKey)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none transition-colors p-1"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground focus:outline-none transition-colors p-1"
                   disabled={isLoading}
                   aria-label={showSecretKey ? "Masquer le secret" : "Afficher le secret"}
                 >
@@ -219,7 +219,7 @@ export const LoginForm = () => {
             
             <Button 
               type="submit" 
-              className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white py-3 rounded-lg font-medium transition-all duration-200 shadow-lg hover:shadow-xl" 
+              className="w-full bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary/80 text-primary-foreground py-3 rounded-lg font-medium transition-all duration-200 shadow-lg hover:shadow-xl" 
               disabled={!accessKey || !secretKey || isLoading}
             >
               <Shield className="w-4 h-4 mr-2" />
@@ -227,15 +227,15 @@ export const LoginForm = () => {
             </Button>
           </form>
           
-          <div className="mt-4 p-4 bg-green-50 rounded-lg border border-green-200">
-            <p className="text-sm text-green-800">
+          <div className="mt-4 p-4 bg-success/10 rounded-lg border border-success/20">
+            <p className="text-sm text-success">
               <Shield className="w-4 h-4 inline mr-2" />
               Connexion sécurisée via proxy local à votre infrastructure Outscale.
             </p>
           </div>
 
-          <div className="mt-3 p-4 bg-blue-50 rounded-lg border border-blue-200">
-            <p className="text-sm text-blue-800 flex items-start">
+          <div className="mt-3 p-4 bg-info/10 rounded-lg border border-info/20">
+            <p className="text-sm text-info flex items-start">
               <AlertCircle className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
               Vos identifiants sont sécurisés et stockés uniquement durant votre session.
             </p>
