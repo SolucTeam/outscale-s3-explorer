@@ -2018,6 +2018,166 @@ app.put('/api/history/preferences', requireUserId, (req, res) => {
 });
 
 // Gestion des erreurs
+
+// ============================================================
+// API OUTSCALE - Consommation et Empreinte Carbone
+// ============================================================
+
+// Endpoint API Outscale (différent de S3)
+const getOutscaleApiEndpoint = (region) => {
+  const endpoints = {
+    'eu-west-2': 'https://api.eu-west-2.outscale.com/api/v1',
+    'cloudgouv-eu-west-1': 'https://api.cloudgouv-eu-west-1.outscale.com/api/v1',
+    'us-east-2': 'https://api.us-east-2.outscale.com/api/v1',
+    'us-west-1': 'https://api.us-west-1.outscale.com/api/v1'
+  };
+  return endpoints[region] || endpoints['eu-west-2'];
+};
+
+// Fonction utilitaire pour faire des appels à l'API Outscale
+const callOutscaleApi = async (accessKey, secretKey, region, action, params = {}) => {
+  const crypto = require('crypto');
+  const endpoint = getOutscaleApiEndpoint(region);
+  
+  const body = JSON.stringify({
+    ...params
+  });
+  
+  const date = new Date().toISOString().replace(/[:-]|\.\d{3}/g, '').slice(0, 15) + 'Z';
+  const dateStamp = date.slice(0, 8);
+  
+  // Création de la signature AWS Signature Version 4
+  const host = new URL(endpoint).host;
+  const service = 'api';
+  
+  const canonicalUri = '/api/v1/' + action;
+  const canonicalQuerystring = '';
+  const payloadHash = crypto.createHash('sha256').update(body).digest('hex');
+  
+  const canonicalHeaders = 
+    'content-type:application/json\n' +
+    'host:' + host + '\n' +
+    'x-amz-date:' + date + '\n';
+  
+  const signedHeaders = 'content-type;host;x-amz-date';
+  
+  const canonicalRequest = 
+    'POST\n' +
+    canonicalUri + '\n' +
+    canonicalQuerystring + '\n' +
+    canonicalHeaders + '\n' +
+    signedHeaders + '\n' +
+    payloadHash;
+  
+  const algorithm = 'AWS4-HMAC-SHA256';
+  const credentialScope = dateStamp + '/' + region + '/' + service + '/aws4_request';
+  const stringToSign = 
+    algorithm + '\n' +
+    date + '\n' +
+    credentialScope + '\n' +
+    crypto.createHash('sha256').update(canonicalRequest).digest('hex');
+  
+  // Calcul de la signature
+  const getSignatureKey = (key, dateStamp, region, service) => {
+    const kDate = crypto.createHmac('sha256', 'AWS4' + key).update(dateStamp).digest();
+    const kRegion = crypto.createHmac('sha256', kDate).update(region).digest();
+    const kService = crypto.createHmac('sha256', kRegion).update(service).digest();
+    const kSigning = crypto.createHmac('sha256', kService).update('aws4_request').digest();
+    return kSigning;
+  };
+  
+  const signingKey = getSignatureKey(secretKey, dateStamp, region, service);
+  const signature = crypto.createHmac('sha256', signingKey).update(stringToSign).digest('hex');
+  
+  const authorizationHeader = 
+    algorithm + ' ' +
+    'Credential=' + accessKey + '/' + credentialScope + ', ' +
+    'SignedHeaders=' + signedHeaders + ', ' +
+    'Signature=' + signature;
+  
+  const response = await fetch(endpoint + '/' + action, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Host': host,
+      'X-Amz-Date': date,
+      'Authorization': authorizationHeader
+    },
+    body: body
+  });
+  
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`API Outscale error: ${response.status} - ${errorText}`);
+  }
+  
+  return response.json();
+};
+
+// Consommation des ressources
+app.post('/api/consumption', extractCredentials, async (req, res) => {
+  try {
+    const { fromDate, toDate, showPrice = true, showResourceDetails = false, overall = false } = req.body;
+    
+    const accessKey = req.headers['x-access-key'];
+    const secretKey = req.headers['x-secret-key'];
+    const region = req.headers['x-region'] || 'eu-west-2';
+    
+    console.log(`📊 Récupération consommation: ${fromDate} à ${toDate}`);
+    
+    const result = await callOutscaleApi(accessKey, secretKey, region, 'ReadConsumptionAccount', {
+      FromDate: fromDate,
+      ToDate: toDate,
+      ShowPrice: showPrice,
+      ShowResourceDetails: showResourceDetails,
+      Overall: overall
+    });
+    
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    console.error('Erreur consommation:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur lors de la récupération de la consommation',
+      message: error.message
+    });
+  }
+});
+
+// Empreinte carbone
+app.post('/api/carbon-footprint', extractCredentials, async (req, res) => {
+  try {
+    const { fromMonth, toMonth, overall = false } = req.body;
+    
+    const accessKey = req.headers['x-access-key'];
+    const secretKey = req.headers['x-secret-key'];
+    const region = req.headers['x-region'] || 'eu-west-2';
+    
+    console.log(`🌱 Récupération empreinte carbone: ${fromMonth} à ${toMonth}`);
+    
+    const result = await callOutscaleApi(accessKey, secretKey, region, 'ReadCO2EmissionAccount', {
+      FromMonth: fromMonth,
+      ToMonth: toMonth,
+      Overall: overall
+    });
+    
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    console.error('Erreur empreinte carbone:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur lors de la récupération de l\'empreinte carbone',
+      message: error.message
+    });
+  }
+});
+
 app.use((error, req, res, next) => {
   console.error('Erreur serveur:', error);
   res.status(500).json({

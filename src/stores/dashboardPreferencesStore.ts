@@ -21,6 +21,8 @@ const defaultWidgets: WidgetConfig[] = [
   { id: 'storage', label: 'Utilisation du Stockage', visible: true, order: 1 },
   { id: 'security', label: 'Analyse de Sécurité', visible: true, order: 2 },
   { id: 'permissions', label: 'Permissions & ACL', visible: true, order: 3 },
+  { id: 'consumption', label: 'Consommation Ressources', visible: true, order: 4 },
+  { id: 'carbon', label: 'Empreinte Carbone', visible: true, order: 5 },
 ];
 
 export const useDashboardPreferences = create<DashboardPreferencesState>()(

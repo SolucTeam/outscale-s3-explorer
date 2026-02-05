@@ -11,12 +11,24 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useDashboardPreferences, WidgetConfig } from '@/stores/dashboardPreferencesStore';
-import { GripVertical, RotateCcw, Eye, EyeOff } from 'lucide-react';
+import { GripVertical, RotateCcw, Eye, EyeOff, Zap, Leaf, BarChart3, Shield, Users, Database } from 'lucide-react';
 
 interface WidgetSettingsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
+
+const getWidgetIcon = (id: string) => {
+  switch (id) {
+    case 'stats': return <BarChart3 className="w-4 h-4" />;
+    case 'storage': return <Database className="w-4 h-4" />;
+    case 'security': return <Shield className="w-4 h-4" />;
+    case 'permissions': return <Users className="w-4 h-4" />;
+    case 'consumption': return <Zap className="w-4 h-4" />;
+    case 'carbon': return <Leaf className="w-4 h-4" />;
+    default: return null;
+  }
+};
 
 export const WidgetSettingsDialog: React.FC<WidgetSettingsDialogProps> = ({
   open,
@@ -113,12 +125,12 @@ export const WidgetSettingsDialog: React.FC<WidgetSettingsDialogProps> = ({
                 <GripVertical className="w-4 h-4 text-muted-foreground flex-shrink-0 transition-transform duration-200 group-hover:scale-110" />
                 
                 <div className="flex-1 flex items-center gap-2">
-                  <div className={`transition-all duration-300 ${widget.visible ? 'text-emerald-500' : 'text-muted-foreground'}`}>
-                    {widget.visible ? (
-                      <Eye className="w-4 h-4 animate-scale-in" />
+                  <div className={`transition-all duration-300 ${widget.visible ? 'text-primary' : 'text-muted-foreground'}`}>
+                    {getWidgetIcon(widget.id) || (widget.visible ? (
+                      <Eye className="w-4 h-4" />
                     ) : (
-                      <EyeOff className="w-4 h-4 animate-scale-in" />
-                    )}
+                      <EyeOff className="w-4 h-4" />
+                    ))}
                   </div>
                   <Label htmlFor={`widget-${widget.id}`} className="cursor-pointer font-medium transition-colors duration-200">
                     {widget.label}
