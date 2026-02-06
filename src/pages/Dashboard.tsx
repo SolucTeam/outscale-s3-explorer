@@ -58,6 +58,8 @@ const Dashboard = () => {
 
   const statsWidget = visibleWidgets.find((w) => w.id === 'stats');
   const rowWidgets = visibleWidgets.filter((w) => ['storage', 'security', 'permissions'].includes(w.id));
+  const consumptionWidget = visibleWidgets.find((w) => w.id === 'consumption');
+  const carbonWidget = visibleWidgets.find((w) => w.id === 'carbon');
 
   return (
     <div className="min-h-screen bg-background">
@@ -110,12 +112,16 @@ const Dashboard = () => {
             
             {/* Widgets de consommation sous l'historique */}
             <div className="mt-6 space-y-6">
-              <div className="animate-fade-in" style={{ animationDelay: '500ms' }}>
-                <ResourceConsumptionWidget />
-              </div>
-              <div className="animate-fade-in" style={{ animationDelay: '600ms' }}>
-                <CarbonFootprintWidget />
-              </div>
+              {consumptionWidget && (
+                <div className="animate-fade-in" style={{ animationDelay: '500ms' }}>
+                  <ResourceConsumptionWidget />
+                </div>
+              )}
+              {carbonWidget && (
+                <div className="animate-fade-in" style={{ animationDelay: '600ms' }}>
+                  <CarbonFootprintWidget />
+                </div>
+              )}
             </div>
           </div>
         </div>
