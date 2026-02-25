@@ -1,0 +1,70 @@
+version: "3.8"
+
+services:
+  # ============================================
+  # Application principale (Frontend + Proxy)
+  # ============================================
+  nums3-console:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nums3-console
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      # URL du proxy (interne à l'image, ne pas modifier)
+      - VITE_PROXY_URL=/api
+
+      # Logging
+      - VITE_LOG_LEVEL=info
+      - VITE_LOGGING_ENABLED=true
+
+      # Cache
+      - VITE_CACHE_ENABLED=true
+      - VITE_CACHE_TTL_BUCKETS=300000
+      - VITE_CACHE_TTL_OBJECTS=180000
+      - VITE_CACHE_TTL_CREDENTIALS=1800000
+
+      # Endpoints Outscale (modifiez selon votre région)
+      - VITE_ENDPOINT_EU_WEST_2=https://oos.eu-west-2.outscale.com
+      - VITE_ENDPOINT_US_EAST_2=https://oos.us-east-2.outscale.com
+      - VITE_ENDPOINT_US_WEST_1=https://oos.us-west-1.outscale.com
+      - VITE_ENDPOINT_CLOUDGOUV=https://oos.cloudgouv-eu-west-1.outscale.com
+      - VITE_ENDPOINT_AP_NORTHEAST_1=https://oos.ap-northeast-1.outscale.com
+
+      # Upload
+      - VITE_UPLOAD_MAX_CONCURRENT=5
+      - VITE_UPLOAD_CHUNK_SIZE=5242880
+      - VITE_UPLOAD_TIMEOUT=60000
+
+      # Retry
+      - VITE_RETRY_MAX_ATTEMPTS=3
+      - VITE_RETRY_BASE_DELAY=1000
+      - VITE_RETRY_MAX_DELAY=10000
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost:8080/",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+    volumes:
+      # Persister les logs Nginx (optionnel)
+      - nginx_logs:/var/log/nginx
+
+networks:
+  default:
+    name: nums3-network
+
+volumes:
+  nginx_logs:
