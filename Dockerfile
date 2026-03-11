@@ -7,7 +7,7 @@
 # ============================================
 # ÉTAPE 1: Build du Frontend (React + Vite)
 # ============================================
-FROM node:20-alpine AS frontend-builder
+FROM node:25-alpine AS frontend-builder
 
 WORKDIR /app
 
@@ -33,7 +33,7 @@ RUN npm run build
 # ============================================
 # ÉTAPE 2: Build du Backend (Proxy Node.js)
 # ============================================
-FROM node:20-alpine AS backend-builder
+FROM node:25-alpine AS backend-builder
 
 WORKDIR /app
 
@@ -49,7 +49,7 @@ COPY proxy-server/server.js ./
 # ============================================
 # ÉTAPE 3: Image Finale (Nginx + Node.js)
 # ============================================
-FROM node:20-alpine
+FROM node:25-alpine
 
 # Installer nginx
 RUN apk add --no-cache nginx
